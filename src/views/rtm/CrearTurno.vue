@@ -1359,7 +1359,7 @@ function handleCancelAction() {
 
 async function submitTramite() {
   try {
-    await TramitesService.create({
+    const resp = await TramitesService.create({
       usuarioId:     form.value.usuarioId,
       servicioId:    form.value.servicioId!,
       nombreCliente: tramiteForm.value.nombreCliente,
@@ -1370,7 +1370,11 @@ async function submitTramite() {
       fecha:         form.value.fecha,
       horaIngreso:   form.value.horaIngreso,
     })
-    showSnackbar('✅ Trámite creado exitosamente', 'success')
+    if (resp.advertencia) {
+      showSnackbar(`⚠️ ${resp.advertencia}`, 'warning', 7000)
+    } else {
+      showSnackbar('✅ Trámite creado exitosamente', 'success')
+    }
     await resetFormFields()
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error desconocido al crear el trámite.'

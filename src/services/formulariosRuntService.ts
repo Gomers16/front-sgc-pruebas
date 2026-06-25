@@ -56,7 +56,6 @@ export interface FormularioRunt {
   propCorreo: string | null
 
   // Sección 3 — Datos del Comprador
-  incluyeCompraventa: boolean
   compPrimerApellido: string | null
   compSegundoApellido: string | null
   compNombres: string | null

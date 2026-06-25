@@ -1,0 +1,35 @@
+{
+  "fecha": "2026-06-17",
+  "results": [
+    {
+      "step": "R.1",
+      "status": "APROBADO",
+      "detail": "QRS810 $500k Datáfono DTF-FINAL-001 → Pagado=false. PDFs=3. Snackbar=\"Pago registrado correctamente Cerrar\" | PDF 119712B ✓",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\pago-after-QRS810-500000.png",
+      "pdfVerified": true,
+      "pdfBytes": 119712
+    },
+    {
+      "step": "R.2",
+      "status": "APROBADO",
+      "detail": "Pago LMK347 enviado. Parcial=false. $55k=false. Snackbar=\"Pago registrado correctamente Cerrar\". Revisar SS. | PDF 119738B ✓",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\pago-after-LMK347-40000.png",
+      "pdfVerified": true,
+      "pdfBytes": 119738
+    },
+    {
+      "step": "R.3",
+      "status": "APROBADO",
+      "detail": "EFG128: $200k Transf (parcial=false) + $480k Efec → Pagado=false. PDFs=2. Snackbar=\"El monto excede el saldo pendiente de $ 55.000 Cerrar\" | PDF 119755B ✓",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\pago-after-EFG128-480000.png",
+      "pdfVerified": true,
+      "pdfBytes": 119755
+    },
+    {
+      "step": "R.4",
+      "status": "APROBADO",
+      "detail": "HJN063: botón \"Registrar pago\" deshabilitado (saldo=$0). UI bloquea correctamente.",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\R4-hjn063-pre.png"
+    }
+  ]
+}

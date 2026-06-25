@@ -103,6 +103,7 @@ export interface User {
   tipoSangre?: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | null
   contactoEmergenciaNombre?: string
   contactoEmergenciaTelefono?: string
+  numeroDocumento?: string | null
 
   rolId: number
   rol?: Rol

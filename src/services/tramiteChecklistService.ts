@@ -7,6 +7,7 @@ export interface TramiteChecklist {
 
   tarjetaPropiedad:       boolean | null
   soat:                   boolean | null
+  fotocopiaCedula:        boolean | null
   runtVendedor:           boolean | null
   runtComprador:          boolean | null
   antecedentesComprador:  boolean | null

@@ -6,6 +6,7 @@ export interface PagoEnPeriodo {
   monto:          number
   formaPago:      string | null
   referenciaPago: string | null
+  evidenciaUrl:   string | null
 }
 
 export interface LiquidacionReporte {

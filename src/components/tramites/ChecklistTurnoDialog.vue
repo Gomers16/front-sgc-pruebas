@@ -41,14 +41,14 @@
       <v-card-text v-else class="pa-4">
         <div class="d-flex align-center mb-3" style="gap: 12px">
           <v-progress-linear
-            :model-value="(progreso / 13) * 100"
+            :model-value="(progreso / 14) * 100"
             color="teal"
             rounded
             height="8"
             class="flex-grow-1"
           />
-          <v-chip size="small" :color="progreso === 13 ? 'teal' : 'grey'" variant="tonal">
-            {{ progreso }} / 13 documentos
+          <v-chip size="small" :color="progreso === 14 ? 'teal' : 'grey'" variant="tonal">
+            {{ progreso }} / 14 documentos
           </v-chip>
         </div>
 
@@ -136,6 +136,7 @@ const emit = defineEmits<{
 const checklistItems: { key: ChecklistBoolKey; label: string }[] = [
   { key: 'tarjetaPropiedad',       label: 'Tarjeta de propiedad' },
   { key: 'soat',                   label: 'SOAT' },
+  { key: 'fotocopiaCedula',        label: 'Fotocopia cédula' },
   { key: 'runtVendedor',           label: 'RUNT vendedor' },
   { key: 'runtComprador',          label: 'RUNT comprador' },
   { key: 'antecedentesComprador',  label: 'Antecedentes comprador' },
@@ -153,6 +154,7 @@ function makeForm(): FormState {
   return {
     tarjetaPropiedad:       null,
     soat:                   null,
+    fotocopiaCedula:        null,
     runtVendedor:           null,
     runtComprador:          null,
     antecedentesComprador:  null,

@@ -66,9 +66,11 @@ export interface Tramite {
   referenciaPago: string | null
   fechaPago: string | null
   evidenciaPagoUrl: string | null
+  incluyeCompraventa: boolean | null
   funcionario?: { id: number; nombres: string; apellidos: string }
   sede?: { id: number; nombre: string }
   servicio?: { id: number; codigoServicio: string; nombreServicio: string }
+  advertencia?: string
 }
 
 export interface CreateTramitePayload {
@@ -85,8 +87,22 @@ export interface CreateTramitePayload {
   horaIngreso?: string
 }
 
-export interface UpdateTramitePayload {
+export interface AgregarTramitePayload {
   usuarioId: number
+  servicioId: number
+  nombreCliente: string
+  cedula: string
+  telefono?: string
+  email?: string
+  placa?: string | null
+  tipoTramite?: TipoTramite | null
+  observaciones?: string
+  fecha?: string
+  horaIngreso?: string
+}
+
+export interface UpdateTramitePayload {
+  usuarioId?: number
   tipoTramite?: TipoTramite | null
   tipoVehiculo?: 'automovil' | 'motocicleta' | null
   estado?: EstadoTramite
@@ -101,6 +117,7 @@ export interface UpdateTramitePayload {
   formaPagoCobro?: FormaPagoCobro | null
   referenciaPago?: string | null
   fechaPago?: string | null
+  incluyeCompraventa?: boolean | null
 }
 
 export const TIPOS_TRAMITE_ITEMS: { title: string; value: TipoTramite }[] = [
@@ -164,5 +181,9 @@ export const TramitesService = {
 
   registrarPago(id: number, formData: FormData) {
     return upload<Tramite>(`${BASE}/${id}/pago`, formData)
+  },
+
+  agregarATurno(turnoNumero: number, payload: AgregarTramitePayload) {
+    return post<Tramite, AgregarTramitePayload>(`${BASE}/${turnoNumero}/agregar`, payload)
   },
 }

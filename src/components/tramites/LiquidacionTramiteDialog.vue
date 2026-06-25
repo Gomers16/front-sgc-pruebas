@@ -184,7 +184,7 @@ function setField(key: FormKey, v: string) {
 }
 
 const total = computed(() =>
-  campos.reduce((sum, { key }) => sum + (form.value[key] ?? 0), 0)
+  campos.reduce((sum, { key }) => sum + Number(form.value[key] ?? 0), 0)
 )
 
 // ── Watchers ──────────────────────────────────────────────────────────────────

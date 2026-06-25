@@ -1,0 +1,80 @@
+{
+  "fecha": "2026-06-17",
+  "results": [
+    {
+      "step": "3.1",
+      "status": "APROBADO",
+      "detail": "Exactamente 3 filas de turno agrupado encontradas (no 6 planas). ✓",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.1-turnos-agrupados.png"
+    },
+    {
+      "step": "3.2",
+      "status": "APROBADO",
+      "detail": "2 chip(s) \"N trámites\" encontrado(s): [2 trámites, 3 trámites]. Turnos 2 y 3 expandidos con tarjetas individuales visibles.",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.2-chips-expansion.png"
+    },
+    {
+      "step": "3.3",
+      "status": "APROBADO",
+      "detail": "3 tarjeta(s) encontradas. Card1(5btn): [Ver | Formulario | Checklist | Liquidación | Pagos] | Card2(5btn): [Ver | Formulario | Checklist | Liquidación | Pagos] | Card3(0btn): []",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.3-botones-tarjeta.png"
+    },
+    {
+      "step": "3.4",
+      "status": "FALLÓ",
+      "detail": "Error: locator.waitFor: Timeout 6000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.v-card--variant-outlined').filter({ hasText: 'NXP774' }).first().locator('button').filter({ hasText: /Formulario/i }).first() to be visible\u001b[22m\n",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.4-error.png"
+    },
+    {
+      "step": "3.5",
+      "status": "FALLÓ",
+      "detail": "Error: locator.waitFor: Timeout 6000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.v-card--variant-outlined').filter({ hasText: 'LMK347' }).first().locator('button').filter({ hasText: /Formulario/i }).first() to be visible\u001b[22m\n",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.5-error.png"
+    },
+    {
+      "step": "3.6",
+      "status": "FALLÓ",
+      "detail": "Error: locator.waitFor: Timeout 6000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.v-card--variant-outlined').filter({ hasText: 'EFG128' }).first().locator('button').filter({ hasText: /Checklist/i }).first() to be visible\u001b[22m\n",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.6-error.png"
+    },
+    {
+      "step": "3.7",
+      "status": "FALLÓ",
+      "detail": "Error: locator.waitFor: Timeout 6000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.v-card--variant-outlined').filter({ hasText: 'HJN063' }).first().locator('button').filter({ hasText: /Liquidación/i }).first() to be visible\u001b[22m\n",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.7-error.png"
+    },
+    {
+      "step": "3.8",
+      "status": "FALLÓ",
+      "detail": "Error: locator.waitFor: Timeout 6000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.v-card--variant-outlined').filter({ hasText: 'QRS810' }).first().locator('button').filter({ hasText: /Pagos/i }).first() to be visible\u001b[22m\n",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.8-error.png"
+    },
+    {
+      "step": "3.9",
+      "status": "FALLÓ",
+      "detail": "Error: locator.waitFor: Timeout 6000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.v-card--variant-outlined').filter({ hasText: 'QRS810' }).first().locator('button').filter({ hasText: /Pagos/i }).first() to be visible\u001b[22m\n | PDF: 119751B, cabecera %PDF ✓.",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.9-error.png",
+      "pdfVerified": true,
+      "pdfBytes": 119751,
+      "pdfMagic": true
+    },
+    {
+      "step": "3.10",
+      "status": "FALLÓ",
+      "detail": "Error: locator.waitFor: Timeout 6000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.v-card--variant-outlined').filter({ hasText: 'LMK347' }).first().locator('button').filter({ hasText: /Pagos/i }).first() to be visible\u001b[22m\n",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.10-error.png"
+    },
+    {
+      "step": "3.11",
+      "status": "FALLÓ",
+      "detail": "Error: locator.waitFor: Timeout 6000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.v-card--variant-outlined').filter({ hasText: 'EFG128' }).first().locator('button').filter({ hasText: /Pagos/i }).first() to be visible\u001b[22m\n",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.11-error.png"
+    },
+    {
+      "step": "3.12",
+      "status": "FALLÓ",
+      "detail": "Error: locator.waitFor: Timeout 6000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.v-card--variant-outlined').filter({ hasText: 'HJN063' }).first().locator('button').filter({ hasText: /Pagos/i }).first() to be visible\u001b[22m\n",
+      "screenshot": "C:\\Users\\Diego Gomez\\front-sgc-pruebas\\qa-screenshots\\3.12-error.png"
+    }
+  ]
+}

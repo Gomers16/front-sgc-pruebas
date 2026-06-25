@@ -143,6 +143,16 @@
           <tr>
             <td :colspan="columns.length" class="pa-0">
               <div class="pa-3" style="background: #f8f9fb">
+                <v-btn
+                  size="small"
+                  color="deep-purple"
+                  variant="tonal"
+                  prepend-icon="mdi-plus"
+                  class="mb-3"
+                  @click="abrirAgregarTramite(item)"
+                >
+                  Agregar trámite
+                </v-btn>
                 <v-card
                   v-for="tramite in item.tramites"
                   :key="tramite.id"
@@ -488,6 +498,8 @@
       :tramite-id="tramiteSeleccionado.id"
       :tramite-numero="tramiteSeleccionado.turnoNumero"
       :tipo-tramite="tramiteSeleccionado.tipoTramite"
+      :incluye-compraventa="tramiteSeleccionado.incluyeCompraventa ?? false"
+      @tramite-actualizado="onFormularioRuntActualizado"
     />
 
     <!-- Historial de Pagos -->
@@ -515,6 +527,19 @@
       :tramite-id="tramiteSeleccionado.id"
       :placa="tramiteSeleccionado.placa"
       :turno-numero="tramiteSeleccionado.turnoNumero"
+    />
+
+    <!-- Agregar trámite al turno -->
+    <AgregarTramiteDialog
+      v-if="turnoParaAgregar"
+      v-model="showAgregarTramite"
+      :turno-numero="turnoParaAgregar.turnoNumero"
+      :turno-ref="{
+        nombreCliente: turnoParaAgregar.nombreCliente,
+        cedula:        turnoParaAgregar.cedula,
+        servicioId:    turnoParaAgregar.tramites[0]?.servicio?.id ?? 0,
+      }"
+      @tramite-agregado="onTramiteAgregado"
     />
 
     <!-- Confirmación cancelar trámite -->
@@ -588,6 +613,7 @@ import FormularioRuntDialog from '@/components/tramites/FormularioRuntDialog.vue
 import ChecklistTurnoDialog from '@/components/tramites/ChecklistTurnoDialog.vue'
 import LiquidacionTramiteDialog from '@/components/tramites/LiquidacionTramiteDialog.vue'
 import HistorialPagosTurnoDialog from '@/components/tramites/HistorialPagosTurnoDialog.vue'
+import AgregarTramiteDialog from '@/components/tramites/AgregarTramiteDialog.vue'
 
 const authStore = authSetStore()
 const cargando = ref(false)
@@ -602,11 +628,13 @@ const showFormularioRunt   = ref(false)
 const showChecklist        = ref(false)
 const showLiquidacion      = ref(false)
 const showHistorialPagos   = ref(false)
+const showAgregarTramite   = ref(false)
+const turnoParaAgregar     = ref<TurnoAgrupado | null>(null)
 
 const cargandoTarifa = ref(false)
 
 // Filtros
-const fechaFiltro = ref(new Date().toISOString().split('T')[0])
+const fechaFiltro = ref(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }))
 const filtroEstado = ref<EstadoTramite | null>(null)
 const filtroTipo = ref<string | null>(null)
 const busqueda = ref('')
@@ -780,6 +808,13 @@ async function abrirFormularioDirecto(tramite: Tramite) {
   showFormularioRunt.value = true
 }
 
+function onFormularioRuntActualizado(incluyeCompraventa: boolean) {
+  if (!tramiteSeleccionado.value) return
+  tramiteSeleccionado.value.incluyeCompraventa = incluyeCompraventa
+  const idx = tramites.value.findIndex((t) => t.id === tramiteSeleccionado.value!.id)
+  if (idx !== -1) tramites.value[idx] = { ...tramites.value[idx], incluyeCompraventa }
+}
+
 async function abrirHistorialPagosDirecto(tramite: Tramite) {
   tramiteSeleccionado.value = { ...tramite }
   await nextTick()
@@ -914,6 +949,15 @@ async function cambiarEstado(nuevoEstado: EstadoTramite) {
   } finally {
     guardando.value = false
   }
+}
+
+function abrirAgregarTramite(turno: TurnoAgrupado) {
+  turnoParaAgregar.value = turno
+  showAgregarTramite.value = true
+}
+
+function onTramiteAgregado(nuevo: Tramite) {
+  tramites.value.push(nuevo)
 }
 
 onMounted(async () => {

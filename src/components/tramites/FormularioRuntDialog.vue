@@ -30,7 +30,8 @@
       <!-- ── Formulario ─────────────────────────────────────────────────── -->
       <v-card-text v-else class="pa-4">
         <v-switch
-          v-model="form.incluyeCompraventa"
+          v-if="props.tipoTramite === 'TRASPASO'"
+          v-model="localIncluyeCompraventa"
           label="¿Incluye compraventa de este vehículo?"
           color="orange"
           density="compact"
@@ -53,6 +54,7 @@
                     label="Placa"
                     variant="outlined"
                     density="compact"
+                    maxlength="6"
                     @update:model-value="v => form.placa = v ? v.toUpperCase() : null"
                   />
                 </v-col>
@@ -183,7 +185,7 @@
           </v-expansion-panel>
 
           <!-- S3 — Datos del Comprador ─────────────────────────────────── -->
-          <v-expansion-panel v-if="form.incluyeCompraventa" value="comprador" eager>
+          <v-expansion-panel v-if="props.tipoTramite === 'TRASPASO' && localIncluyeCompraventa" value="comprador" eager>
             <v-expansion-panel-title class="font-weight-bold">
               <v-icon class="mr-2" color="orange-darken-2" size="20">mdi-account-arrow-right</v-icon>
               Datos del Comprador
@@ -389,6 +391,7 @@ import {
   TIPO_IMPORTACION_ITEMS,
 } from '@/services/formulariosRuntService'
 import type { FormularioRunt } from '@/services/formulariosRuntService'
+import { TramitesService } from '@/services/tramitesService'
 import { HttpError } from '@/services/http'
 
 // ── Props / Emits ─────────────────────────────────────────────────────────────
@@ -398,10 +401,12 @@ const props = defineProps<{
   tramiteId: number
   tramiteNumero: number
   tipoTramite: string | null
+  incluyeCompraventa: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
+  'tramite-actualizado': [incluyeCompraventa: boolean]
 }>()
 
 // ── Estado ────────────────────────────────────────────────────────────────────
@@ -420,7 +425,6 @@ function makeForm(): FormularioRunt {
     compPrimerApellido:     null, compSegundoApellido: null, compNombres:        null,
     compTipoDocumento:      null, compNoDocumento:     null, compDireccion:      null,
     compCiudad:             null, compTelefono:        null, compCorreo:         null,
-    incluyeCompraventa:     false,
     mandatarioNombre:       null, mandatarioDocumento: null,
     alertaHurto:            false, alertaLimitacionPropiedad: false, alertaEmbargo: false,
     alertaOtro:             null, tipoImportacion: null, noDocumentoImportacion: null,
@@ -430,13 +434,14 @@ function makeForm(): FormularioRunt {
 
 const authStore  = useAuthStore()
 
-const dialog     = ref(props.modelValue)
-const cargando   = ref(false)
-const guardando  = ref(false)
-const empaquetando = ref(false)
-const form      = ref<FormularioRunt>(makeForm())
-const panelAbierto = ref<string[]>(['vehiculo', 'propietario'])
-const snackbar  = ref({ show: false, message: '', color: '' })
+const dialog               = ref(props.modelValue)
+const cargando             = ref(false)
+const guardando            = ref(false)
+const empaquetando         = ref(false)
+const form                 = ref<FormularioRunt>(makeForm())
+const localIncluyeCompraventa = ref(false)
+const panelAbierto         = ref<string[]>(['vehiculo', 'propietario'])
+const snackbar             = ref({ show: false, message: '', color: '' })
 
 function showSnackbar(message: string, color = 'info') {
   snackbar.value = { show: true, message, color }
@@ -448,6 +453,7 @@ watch(() => props.modelValue, async (val) => {
   dialog.value = val
   if (!val) return
 
+  localIncluyeCompraventa.value = props.incluyeCompraventa
   form.value = makeForm()
   cargando.value = true
   try {
@@ -483,6 +489,14 @@ async function guardar() {
   try {
     const resultado = await FormulariosRuntService.upsert(props.tramiteId, form.value)
     form.value = { ...makeForm(), ...resultado }
+
+    if (props.tipoTramite === 'TRASPASO') {
+      await TramitesService.update(props.tramiteId, {
+        incluyeCompraventa: localIncluyeCompraventa.value,
+      })
+      emit('tramite-actualizado', localIncluyeCompraventa.value)
+    }
+
     showSnackbar('Formulario guardado correctamente', 'success')
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error al guardar'

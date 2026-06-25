@@ -168,6 +168,7 @@
                     <th>Monto</th>
                     <th>Forma de pago</th>
                     <th>Referencia</th>
+                    <th>Evidencia</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -176,6 +177,17 @@
                     <td class="font-weight-bold">{{ formatPeso(pago.monto) }}</td>
                     <td>{{ pago.formaPago ?? '—' }}</td>
                     <td class="text-medium-emphasis">{{ pago.referenciaPago ?? '—' }}</td>
+                    <td>
+                      <v-btn
+                        v-if="pago.evidenciaUrl"
+                        icon="mdi-image-outline"
+                        size="x-small"
+                        variant="tonal"
+                        color="teal"
+                        @click="abrirEvidencia(pago.evidenciaUrl)"
+                      />
+                      <span v-else class="text-medium-emphasis">—</span>
+                    </td>
                   </tr>
                 </tbody>
               </v-table>
@@ -186,12 +198,39 @@
       </v-card>
 
     </template>
+
+    <!-- Dialog evidencia -->
+    <v-dialog v-model="dialogEvidencia" max-width="800">
+      <v-card rounded="xl">
+        <v-card-title class="d-flex align-center justify-space-between pa-4">
+          <span class="text-subtitle-1 font-weight-bold">Evidencia de pago</span>
+          <v-btn icon="mdi-close" variant="text" @click="dialogEvidencia = false" />
+        </v-card-title>
+        <v-divider />
+        <v-card-text class="pa-4">
+          <v-img
+            :src="evidenciaActiva ?? ''"
+            max-height="600"
+            contain
+          />
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
   </v-container>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { ReporteCajaService, type ReporteCaja } from '@/services/reporteCajaService'
+
+const dialogEvidencia = ref(false)
+const evidenciaActiva = ref<string | null>(null)
+
+function abrirEvidencia(url: string | null) {
+  evidenciaActiva.value = url
+  dialogEvidencia.value = true
+}
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -225,7 +264,7 @@ const expandido   = reactive(new Set<number>())
 // ── Helpers de fecha ──────────────────────────────────────────────────────────
 
 function hoy(): string {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
 }
 
 const accionesRapidas = [
@@ -240,14 +279,13 @@ const accionesRapidas = [
       const day = d.getDay() || 7
       const lun = new Date(d)
       lun.setDate(d.getDate() - day + 1)
-      return { inicio: lun.toISOString().slice(0, 10), fin: hoy() }
+      return { inicio: lun.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }), fin: hoy() }
     },
   },
   {
     label: 'Este mes',
     calc: () => {
-      const d     = new Date()
-      const inicio = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
+      const inicio = hoy().slice(0, 7) + '-01'
       return { inicio, fin: hoy() }
     },
   },

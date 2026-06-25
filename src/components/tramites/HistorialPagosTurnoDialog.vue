@@ -166,6 +166,12 @@
                     />
                   </v-col>
                   <v-col cols="12" sm="6">
+                    <div class="text-caption text-medium-emphasis mb-1">
+                      Saldo disponible:
+                      <strong class="text-orange-darken-3">
+                        $ {{ tramite.saldoPendiente.toLocaleString('es-CO') }}
+                      </strong>
+                    </div>
                     <v-text-field
                       v-model="pagoForm.monto"
                       label="Monto"
@@ -173,6 +179,7 @@
                       variant="outlined"
                       density="compact"
                       min="0"
+                      :rules="[v => !v || Number(v) <= tramite.saldoPendiente || 'No puede superar el saldo disponible']"
                     />
                   </v-col>
                   <v-col cols="12" sm="6">
@@ -182,6 +189,7 @@
                       label="Forma de pago"
                       variant="outlined"
                       density="compact"
+                      :rules="[v => !!v || 'La forma de pago es obligatoria']"
                     />
                   </v-col>
                   <v-col cols="12" sm="6">
@@ -218,7 +226,7 @@
                     variant="elevated"
                     size="small"
                     :loading="enviando"
-                    :disabled="!pagoForm.formaPago || !pagoForm.monto"
+                    :disabled="!pagoForm.formaPago || !pagoForm.monto || Number(pagoForm.monto) > tramite.saldoPendiente"
                     @click="confirmarPago(tramite.liquidacionId)"
                   >
                     Confirmar pago
@@ -254,6 +262,20 @@
         </template>
       </v-snackbar>
 
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog evidencia -->
+  <v-dialog v-model="dialogEvidencia" max-width="800">
+    <v-card rounded="xl">
+      <v-card-title class="d-flex align-center justify-space-between pa-4">
+        <span class="text-subtitle-1 font-weight-bold">Evidencia de pago</span>
+        <v-btn icon="mdi-close" variant="text" @click="dialogEvidencia = false" />
+      </v-card-title>
+      <v-divider />
+      <v-card-text class="pa-4">
+        <v-img :src="evidenciaActiva ?? ''" max-height="600" contain />
+      </v-card-text>
     </v-card>
   </v-dialog>
 </template>
@@ -303,7 +325,7 @@ const snackbar    = ref({ show: false, message: '', color: '' })
 
 function makePagoForm() {
   return {
-    fecha:          new Date().toISOString().split('T')[0],
+    fecha:          new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }),
     monto:          '',
     formaPago:      null as string | null,
     referenciaPago: '',
@@ -331,9 +353,12 @@ async function abrirPdf(pagoId: number) {
   }
 }
 
+const dialogEvidencia = ref(false)
+const evidenciaActiva = ref<string | null>(null)
+
 function abrirEvidencia(url: string) {
-  const full = url.startsWith('http') ? url : `${BASE_URL}${url}`
-  window.open(full, '_blank')
+  evidenciaActiva.value = url.startsWith('http') ? url : `${BASE_URL}${url}`
+  dialogEvidencia.value = true
 }
 
 function abrirFormPago(tramiteId: number) {
@@ -368,7 +393,11 @@ async function confirmarPago(liquidacionId: number) {
     fd.append('formaPago', pagoForm.value.formaPago)
     if (pagoForm.value.referenciaPago) fd.append('referenciaPago', pagoForm.value.referenciaPago)
     const archivo = pagoForm.value.evidencia
-    if (Array.isArray(archivo) && archivo.length > 0) fd.append('evidencia', archivo[0])
+    if (archivo instanceof File) {
+      fd.append('evidencia', archivo)
+    } else if (Array.isArray(archivo) && archivo.length > 0) {
+      fd.append('evidencia', archivo[0])
+    }
     await LiquidacionPagoService.registrarPago(liquidacionId, fd)
     showSnackbar('Pago registrado correctamente', 'success')
     pagoAbierto.value = null

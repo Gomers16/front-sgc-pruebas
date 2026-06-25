@@ -29,6 +29,7 @@ export interface User {
   centroCosto: string
   estado: string
   recomendaciones: number
+  numeroDocumento?: string | null
   createdAt: string
   updatedAt: string
   rol: {
