@@ -85,6 +85,12 @@
         :sort-by="sortBy"
         @update:options="loadItems"
         item-value="id"
+        :items-per-page-options="[
+          { value: 10, title: '10' },
+          { value: 25, title: '25' },
+          { value: 50, title: '50' },
+          { value: 100, title: '100' },
+        ]"
       >
         <!-- Estado activo/inactivo -->
         <template #item.activo="{ item }">
@@ -858,9 +864,11 @@ async function loadItems() {
         ? sortBy.value[0]
         : { key: 'id', order: 'desc' as const }
 
+    const perPageSeguro = itemsPerPage.value > 0 ? itemsPerPage.value : 10
+
     const res = await listConvenios({
       page: page.value,
-      perPage: itemsPerPage.value,
+      perPage: perPageSeguro,
       texto: filters.value.texto || undefined,
       activo: filters.value.activo === '' ? undefined : filters.value.activo,
       estado: filters.value.estado || undefined,
