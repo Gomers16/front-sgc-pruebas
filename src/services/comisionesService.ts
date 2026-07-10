@@ -699,6 +699,46 @@ export async function anularComision(id: number) {
   return mapComisionToDetail(raw)
 }
 
+export async function pagarMasivoComisiones(payload: {
+  ids: number[]
+  accion: 'APROBAR' | 'PAGAR'
+  fecha_pago?: string
+}): Promise<{ actualizadas: number; ids_actualizadas: number[]; mensaje: string }> {
+  return apiFetch('/comisiones/pagar-masivo', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+export interface ResumenAsesorItem {
+  asesor_id: number
+  asesor_nombre: string
+  asesor_tipo: string
+  convenio_id: number | null
+  convenio_nombre: string | null
+  pendientes: number
+  aprobadas: number
+  pagadas: number
+  total_por_pagar: number
+  total_pendiente: number
+  total_aprobada: number
+}
+
+export interface ResumenAsesorResponse {
+  tipo: string
+  asesores: ResumenAsesorItem[]
+}
+
+export async function getResumenPorAsesor(
+  tipo: string,
+  fechaInicio?: string,
+  fechaFin?: string
+): Promise<ResumenAsesorResponse> {
+  return apiFetch('/comisiones/resumen-por-asesor', {
+    query: { tipo, fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+  })
+}
+
 /* ===== Configuración de comisiones (es_config = true) ===== */
 
 /**
@@ -762,33 +802,12 @@ export async function deleteConfigComision(id: number) {
 /* ===== Catálogo de agentes (asesores + convenios) ===== */
 
 export async function listAgentesCaptacion(): Promise<AgenteLight[]> {
-  try {
-    const PAGE_SIZE = 100
-    let page = 1
-    let allAgentes: AgenteLight[] = []
-
-    while (true) {
-      const res = await apiFetch<{ data?: unknown[]; total?: number; lastPage?: number }>(
-        '/agentes-captacion',
-        { query: { activos: 1, select: 'id,nombre,tipo', perPage: PAGE_SIZE, page } }
-      )
-      const r = res as Record<string, unknown>
-      const chunk: unknown[] = Array.isArray(r?.data) ? (r.data as unknown[]) : []
-
-      allAgentes = allAgentes.concat(
-        chunk.map(mapAgenteCaptacion).filter((a): a is AgenteLight => !!a)
-      )
-
-      const lastPage = (r?.lastPage as number) ?? Math.ceil(((r?.total as number) ?? 0) / PAGE_SIZE)
-      if (page >= lastPage || chunk.length === 0) break
-      page++
-    }
-
-    return allAgentes
-  } catch (err) {
-    console.error('Error cargando agentes de captación:', err)
-    return []
-  }
+  const res = await apiFetch<{ data?: unknown[] }>(
+    '/agentes-captacion/light',
+    { query: { activos: 1, select: 'id,nombre,tipo' } }
+  )
+  const rows = Array.isArray(res?.data) ? res.data : []
+  return rows.map(mapAgenteCaptacion).filter((a): a is AgenteLight => !!a)
 }
 
 // 🆕 Lista convenios para el autocomplete del filtro de convenio

@@ -62,7 +62,7 @@ export interface Dateo extends DateoImagenMeta {
   comprobante_avance_url?: string | null
 }
 
-export interface ListResponse<T> { data: T[]; total: number; page: number; perPage: number }
+export interface ListResponse<T> { data: T[]; total: number; page: number; perPage: number; lastPage: number }
 
 export interface ListParams {
   page?: number
@@ -80,10 +80,10 @@ export interface ListParams {
 }
 
 type BackendListEnvelope<T> =
-  | { data: T[]; total?: number; page?: number; perPage?: number; meta?: { total?: number; current_page?: number; per_page?: number } }
-  | { items: T[]; total?: number; page?: number; perPage?: number; meta?: { total?: number; current_page?: number; per_page?: number } }
-  | { rows: T[]; total?: number; page?: number; perPage?: number; meta?: { total?: number; current_page?: number; per_page?: number } }
-  | { data: T[]; count?: number; totalItems?: number; page?: number; perPage?: number; meta?: { total?: number; current_page?: number; per_page?: number } }
+  | { data: T[]; total?: number; page?: number; perPage?: number; lastPage?: number; meta?: { total?: number; current_page?: number; per_page?: number; last_page?: number } }
+  | { items: T[]; total?: number; page?: number; perPage?: number; lastPage?: number; meta?: { total?: number; current_page?: number; per_page?: number; last_page?: number } }
+  | { rows: T[]; total?: number; page?: number; perPage?: number; lastPage?: number; meta?: { total?: number; current_page?: number; per_page?: number; last_page?: number } }
+  | { data: T[]; count?: number; totalItems?: number; page?: number; perPage?: number; lastPage?: number; meta?: { total?: number; current_page?: number; per_page?: number; last_page?: number } }
 
 export function formatDateTime(d?: string | null): string {
   if (!d) return '—'
@@ -144,7 +144,13 @@ export async function listDateos(params: ListParams) {
     10
   )
 
-  return { data, total, page, perPage } as ListResponse<Dateo>
+  const lastPage = Number(
+    ('lastPage' in r && (r as { lastPage?: number }).lastPage) ??
+    meta?.last_page ??
+    (total && perPage ? Math.ceil(total / perPage) : 1)
+  ) || 1
+
+  return { data, total, page, perPage, lastPage } as ListResponse<Dateo>
 }
 
 export function getDateo(id: number) {

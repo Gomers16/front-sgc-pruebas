@@ -298,6 +298,100 @@ const routes: RouteRecordRaw[] = [
     props: true,
     meta: { layout: 'MainLayout', title: 'Editar cliente' },
   },
+
+  // REPORTES ADMINISTRATIVOS
+  {
+    path: '/reportes-admin',
+    redirect: '/reportes-admin/ingresos-canal',
+  },
+  {
+    path: '/reportes-admin/ingresos-canal',
+    name: 'ReporteIngresosCanal',
+    component: () => import('@/views/reportes/ReporteIngresosCanal.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Ingresos por Canal',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
+  {
+    path: '/reportes-admin/produccion-lider',
+    name: 'ReporteProduccionLider',
+    component: () => import('@/views/reportes/ReporteProduccionLider.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Producción por Líder',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
+  {
+    path: '/reportes-admin/asesores',
+    name: 'ReporteAsesores',
+    component: () => import('@/views/reportes/ReporteAsesores.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Asesores',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
+  {
+    path: '/reportes-admin/descuentos',
+    name: 'ReporteDescuentos',
+    component: () => import('@/views/reportes/ReporteDescuentos.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Descuentos',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
+  {
+    path: '/reportes-admin/retencion',
+    name: 'ReporteRetencion',
+    component: () => import('@/views/reportes/ReporteRetencion.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Retención de Clientes',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
+  {
+    path: '/reportes-admin/comisiones',
+    name: 'ReporteComisiones',
+    component: () => import('@/views/reportes/ReporteComisiones.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Comisiones y Pagos',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
+  {
+    path: '/configuracion/tarifas-servicios',
+    name: 'TarifasServicios',
+    component: () => import('@/views/configuracion/TarifasServiciosView.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Tarifas por Servicio',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA'],
+    },
+  },
+  {
+    path: '/reportes-admin/servicios',
+    name: 'ReporteServicios',
+    component: () => import('@/views/reportes/ReporteServicios.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Reporte de Servicios',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
 ]
 
 const router = createRouter({

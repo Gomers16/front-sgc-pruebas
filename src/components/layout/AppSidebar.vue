@@ -306,6 +306,111 @@
           link
         />
       </v-list-group>
+
+      <!-- Reportes Administrativos -->
+      <v-list-group
+        v-if="can.verReportesAdmin()"
+        value="reportes-admin"
+        prepend-icon="mdi-chart-bar"
+        class="nav-item"
+        color="#FACC15"
+      >
+        <template #activator="{ props }">
+          <v-list-item v-bind="props" title="Reportes Administrativos" />
+        </template>
+
+        <!-- Financieros -->
+        <v-list-group value="reportes-financieros">
+          <template #activator="{ props }">
+            <v-list-item
+              v-bind="props"
+              prepend-icon="mdi-currency-usd-circle"
+              title="Financieros"
+              class="nav-item-sub"
+            />
+          </template>
+          <v-list-item
+            prepend-icon="mdi-chart-line"
+            title="Ingresos por Canal"
+            :to="{ name: 'ReporteIngresosCanal' }"
+            link
+            class="nav-item-child"
+          />
+          <v-list-item
+            prepend-icon="mdi-account-group"
+            title="Producción por Líder"
+            :to="{ name: 'ReporteProduccionLider' }"
+            link
+            class="nav-item-child"
+          />
+          <v-list-item
+            prepend-icon="mdi-car-wrench"
+            title="Servicios"
+            :to="{ name: 'ReporteServicios' }"
+            link
+            class="nav-item-child"
+          />
+        </v-list-group>
+
+        <!-- Comercial -->
+        <v-list-group value="reportes-comercial">
+          <template #activator="{ props }">
+            <v-list-item
+              v-bind="props"
+              prepend-icon="mdi-handshake"
+              title="Comercial"
+              class="nav-item-sub"
+            />
+          </template>
+          <v-list-item
+            prepend-icon="mdi-account-tie"
+            title="Asesores"
+            :to="{ name: 'ReporteAsesores' }"
+            link
+            class="nav-item-child"
+          />
+          <v-list-item
+            prepend-icon="mdi-account-reactivate"
+            title="Retención de Clientes"
+            :to="{ name: 'ReporteRetencion' }"
+            link
+            class="nav-item-child"
+          />
+          <v-list-item
+            prepend-icon="mdi-cash-multiple"
+            title="Comisiones y Pagos"
+            :to="{ name: 'ReporteComisiones' }"
+            link
+            class="nav-item-child"
+          />
+        </v-list-group>
+
+        <!-- Gestión -->
+        <v-list-group value="reportes-gestion">
+          <template #activator="{ props }">
+            <v-list-item
+              v-bind="props"
+              prepend-icon="mdi-cog-outline"
+              title="Gestión"
+              class="nav-item-sub"
+            />
+          </template>
+          <v-list-item
+            prepend-icon="mdi-tag-multiple"
+            title="Descuentos"
+            :to="{ name: 'ReporteDescuentos' }"
+            link
+            class="nav-item-child"
+          />
+          <v-list-item
+            prepend-icon="mdi-currency-usd"
+            title="Tarifas por Servicio"
+            :to="{ name: 'TarifasServicios' }"
+            link
+            class="nav-item-child"
+          />
+        </v-list-group>
+      </v-list-group>
     </v-list>
   </v-navigation-drawer>
 </template>
@@ -338,6 +443,14 @@ const { drawer } = useDrawer()
 .v-navigation-drawer.v-navigation-drawer--expand-on-hover:not(.v-navigation-drawer--rail) {
   width: 280px !important;
   min-width: 280px !important;
+}
+
+.nav-item-sub {
+  padding-left: 16px !important;
+}
+
+.nav-item-child {
+  padding-left: 32px !important;
 }
 
 .user-info {

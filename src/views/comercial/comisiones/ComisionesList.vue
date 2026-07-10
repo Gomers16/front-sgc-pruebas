@@ -129,14 +129,19 @@
 <v-col cols="12" md="10">
   <div class="d-flex align-center gap-1 mb-2" style="flex-wrap:wrap">
     <v-chip
-      v-for="opt in [{ title: 'Todos', value: '' }, { title: 'Comercial', value: 'COMERCIAL' }, { title: 'Convenio', value: 'CONVENIO' }]"
+      v-for="opt in [
+        { title: 'TODOS', value: '' },
+        { title: 'ASESOR COMERCIAL', value: 'ASESOR_COMERCIAL' },
+        { title: 'ASESOR CONVENIO', value: 'ASESOR_CONVENIO' },
+        { title: 'CONVENIO', value: 'CONVENIO' },
+      ]"
       :key="opt.value"
       :color="filters.tipoAsesor === opt.value ? 'primary' : undefined"
       :variant="filters.tipoAsesor === opt.value ? 'flat' : 'outlined'"
       size="small"
       class="font-weight-600"
       style="cursor:pointer"
-      @click="filters.tipoAsesor = opt.value as '' | 'COMERCIAL' | 'CONVENIO'; filters.asesorId = null; filters.convenioId = null"
+      @click="filters.tipoAsesor = opt.value as typeof filters.tipoAsesor; filters.asesorId = null; filters.convenioId = null; onCambiarTabTipo()"
     >
       {{ opt.title }}
     </v-chip>
@@ -144,26 +149,26 @@
 
   <v-row dense>
     <!-- Autocomplete asesor -->
-    <v-col cols="12" :md="filters.tipoAsesor === 'COMERCIAL' ? 6 : 12">
+    <v-col cols="12" :md="filters.tipoAsesor === 'ASESOR_COMERCIAL' ? 6 : 12" v-if="filters.tipoAsesor !== 'CONVENIO'">
       <v-autocomplete
         v-model="filters.asesorId"
         :items="agentesVisiblesFiltro"
         item-title="nombre"
         item-value="id"
-        :label="filters.tipoAsesor === 'COMERCIAL' ? 'Buscar comercial…' : filters.tipoAsesor === 'CONVENIO' ? 'Buscar convenio…' : 'Buscar asesor…'"
+        :label="filters.tipoAsesor === 'ASESOR_COMERCIAL' ? 'Buscar comercial…' : filters.tipoAsesor === 'ASESOR_CONVENIO' ? 'Buscar asesor convenio…' : 'Buscar asesor…'"
         density="comfortable"
         variant="outlined"
         hide-details
         clearable
         :loading="asesoresLoading"
-        :prepend-inner-icon="filters.tipoAsesor === 'CONVENIO' ? 'mdi-handshake' : 'mdi-account-tie'"
+        :prepend-inner-icon="filters.tipoAsesor === 'ASESOR_CONVENIO' ? 'mdi-handshake' : 'mdi-account-tie'"
         auto-select-first
         @update:model-value="onFiltroAsesorChange"
       />
     </v-col>
 
     <!-- Convenios asignados al comercial seleccionado -->
-    <v-col cols="12" md="6" v-if="filters.tipoAsesor === 'COMERCIAL'">
+    <v-col cols="12" md="6" v-if="filters.tipoAsesor === 'ASESOR_COMERCIAL'">
       <v-autocomplete
         v-model="filters.convenioId"
         :items="conveniosFiltroComercial"
@@ -205,222 +210,335 @@
       <!-- ====== TAB DETALLE ====================================== -->
       <template v-if="activeTab === 'detalle'">
 
-        <!-- Resumen de página -->
-        <v-card-text class="pt-4 pb-2 px-6">
-          <div class="d-flex flex-wrap gap-3 align-center">
-            <v-chip variant="tonal" size="large">
-              Total página: <strong class="ms-1">{{ formatCOP(totalPagina) }}</strong>
-            </v-chip>
-            <v-chip v-if="pendientesPagina > 0" variant="tonal" size="large" color="warning">
-              Pendientes: <strong class="ms-1">{{ pendientesPagina }}</strong>
-            </v-chip>
-            <v-chip v-if="pagadasPagina > 0" variant="tonal" size="large" color="success">
-              Pagadas: <strong class="ms-1">{{ pagadasPagina }}</strong>
-            </v-chip>
-            <v-chip v-if="filters.descuentoCodigo" variant="outlined" size="small" color="orange">
-              <v-icon start size="12">mdi-tag</v-icon>
-              Descuento: {{ filters.descuentoCodigo }}
-            </v-chip>
-          </div>
-        </v-card-text>
-
-        <!-- ── BARRA DE ACCIONES BULK ── -->
-        <v-expand-transition>
-          <div v-if="selectedIds.length > 0" class="px-6 pb-3">
-            <v-card variant="tonal" color="primary" class="rounded-lg px-4 py-3">
-              <div class="d-flex align-center flex-wrap gap-3">
-                <v-icon color="primary">mdi-checkbox-multiple-marked</v-icon>
-                <span class="font-weight-medium">
-                  {{ selectedIds.length }} comisión{{ selectedIds.length !== 1 ? 'es' : '' }} seleccionada{{ selectedIds.length !== 1 ? 's' : '' }}
-                  &nbsp;|&nbsp; Total:
-                  <strong>{{ formatCOP(totalSeleccionado) }}</strong>
-                </span>
-
-                <v-spacer />
-
-                <v-btn
-                  v-if="canAprobarSelected"
-                  size="small"
-                  color="info"
-                  variant="elevated"
-                  prepend-icon="mdi-check-decagram"
-                  :loading="bulkLoading"
-                  @click="confirmBulkAprobar"
-                >
-                  Aprobar seleccionadas
-                </v-btn>
-
-                <v-btn
-                  v-if="canPagarSelected"
-                  size="small"
-                  color="success"
-                  variant="elevated"
-                  prepend-icon="mdi-cash-multiple"
-                  :loading="bulkLoading"
-                  @click="confirmBulkPagar"
-                >
-                  Pagar seleccionadas
-                </v-btn>
-
-                <!-- 🆕 Generar comprobante (guarda en backend) -->
-                <v-btn
-                  size="small"
-                  color="orange"
-                  variant="elevated"
-                  prepend-icon="mdi-file-document-plus"
-                  @click="abrirConfirmacionComprobante"
-                >
-                  Generar comprobante
-                </v-btn>
-
-                <v-btn
-                  size="small"
-                  variant="text"
-                  @click="selectedIds = []"
-                  icon="mdi-close"
-                />
-              </div>
-            </v-card>
-          </div>
-        </v-expand-transition>
-
-        <!-- ── TABLA ──────────────────────────────────────────── -->
-        <v-data-table-server
-          class="px-4 pb-4"
-          :headers="headers"
-          :items="filteredRows"
-          :items-length="totalItems"
-          v-model:page="page"
-          v-model:items-per-page="itemsPerPage"
-          :loading="loading"
-          :sort-by="sortBy"
-          @update:options="loadItems"
-          item-value="id"
-          v-model="selectedIds"
-          show-select
-          return-object
-        >
-          <template #item.estado="{ item }">
-            <v-chip :color="estadoColor(item.estado)" size="small" variant="flat">
-              {{ item.estado }}
-            </v-chip>
-          </template>
-
-          <template #item.tipo_vehiculo="{ item }">
-            <v-chip
-              v-if="item.tipo_vehiculo"
-              size="x-small"
-              :color="item.tipo_vehiculo === 'MOTO' ? 'deep-purple' : 'teal'"
-              variant="tonal"
-              :prepend-icon="item.tipo_vehiculo === 'MOTO' ? 'mdi-motorbike' : 'mdi-car'"
-            >
-              {{ item.tipo_vehiculo === 'MOTO' ? 'Moto' : 'Vehículo' }}
-            </v-chip>
-            <span v-else class="text-medium-emphasis text-caption">—</span>
-          </template>
-
-          <template #item.tipo_cliente="{ item }">
-            <v-chip size="x-small" :color="tipoClienteColor(item.turno)" variant="tonal">
-              {{ tipoClienteLabel(item.turno) }}
-            </v-chip>
-          </template>
-          <template #item.placa="{ item }">
-  <span class="font-weight-medium">{{ item.turno?.placa || '—' }}</span>
-</template>
-
-          <template #item.turno="{ item }">
-            <div class="d-flex flex-column">
-              <span>
-                Turno #{{ item.turno?.numero_global || item.turno?.numero || item.turno?.id || '—' }}
-              </span>
-              <span class="text-caption text-medium-emphasis">
-                {{ item.turno?.placa || '—' }} ·
-                {{ item.turno?.servicio?.nombre || item.turno?.servicio?.codigo || '—' }}
-              </span>
+        <!-- Tabs de tipo (no TODOS): lista expandible por asesor/convenio -->
+        <template v-if="filters.tipoAsesor">
+          <v-card-text class="pt-4 pb-2 px-6">
+            <div v-if="resumenPorAsesorLoading" class="text-center py-6">
+              <v-progress-circular indeterminate color="primary" />
             </div>
-          </template>
+            <v-alert v-else-if="!asesoresAgrupados.length" type="info" variant="tonal">
+              No hay comisiones pendientes o aprobadas para este filtro.
+            </v-alert>
+            <v-expansion-panels v-else v-model="panelAbierto" variant="accordion">
+              <v-expansion-panel
+                v-for="item in asesoresAgrupados"
+                :key="panelKey(item)"
+                :value="panelKey(item)"
+              >
+                <v-expansion-panel-title>
+                  <div class="d-flex flex-column" style="width:100%">
+                    <div class="d-flex align-center gap-2">
+                      <v-icon size="20">mdi-account-circle</v-icon>
+                      <span class="font-weight-bold">{{ nombreItem(item) }}</span>
+                    </div>
+                    <div class="text-caption text-medium-emphasis mt-1">
+                      <span v-if="item.pendientes > 0">{{ item.pendientes }} pendientes ({{ formatCOP(item.total_pendiente) }})</span>
+                      <span v-if="item.pendientes > 0 && item.aprobadas > 0"> · </span>
+                      <span v-if="item.aprobadas > 0">{{ item.aprobadas }} aprobadas ({{ formatCOP(item.total_aprobada) }})</span>
+                    </div>
+                  </div>
+                  <template #actions>
+                    <div class="d-flex align-center gap-3" @click.stop>
+                      <span class="text-body-2 font-weight-bold">Por pagar: {{ formatCOP(item.total_por_pagar) }}</span>
+                      <v-btn
+                        size="small"
+                        color="success"
+                        variant="elevated"
+                        prepend-icon="mdi-cash-multiple"
+                        @click="pagarTodasDelPanel(item)"
+                      >
+                        Pagar todas
+                      </v-btn>
+                    </div>
+                  </template>
+                </v-expansion-panel-title>
 
-          <template #item.descuento="{ item }">
-            <template v-if="item.descuento">
-              <v-chip size="x-small" color="orange-darken-2" variant="tonal" prepend-icon="mdi-tag-check">
-                {{ item.descuento.nombre }}
+                <v-expansion-panel-text>
+                  <div v-if="panelDetalle.loading" class="text-center py-4">
+                    <v-progress-circular indeterminate color="primary" size="24" />
+                  </div>
+                  <template v-else>
+                    <v-expand-transition>
+                      <div v-if="panelSeleccionIds.length > 0" class="mb-3">
+                        <v-card variant="tonal" color="primary" class="rounded-lg px-4 py-2">
+                          <div class="d-flex align-center flex-wrap gap-3">
+                            <span class="font-weight-medium">
+                              {{ panelSeleccionIds.length }} seleccionadas — {{ formatCOP(panelSeleccionTotal) }}
+                            </span>
+                            <v-spacer />
+                            <v-btn v-if="panelPuedeAprobar" size="small" color="info" variant="elevated" @click="panelConfirmarAprobar(item)">
+                              Aprobar
+                            </v-btn>
+                            <v-btn v-if="panelPuedePagar" size="small" color="success" variant="elevated" @click="panelConfirmarPagar(item)">
+                              Pagar
+                            </v-btn>
+                            <v-btn size="small" variant="text" icon="mdi-close" @click="panelSeleccionIds = []" />
+                          </div>
+                        </v-card>
+                      </div>
+                    </v-expand-transition>
+
+                    <v-data-table
+                      :headers="headersPanel"
+                      :items="panelDetalle.rows"
+                      item-key="id"
+                      item-selectable="_selectable"
+                      v-model="panelSeleccionIds"
+                      show-select
+                      density="compact"
+                      hide-default-footer
+                    >
+                      <template #item.estado="{ item: fila }">
+                        <v-chip size="small" :color="estadoColor(fila.estado)" variant="flat">{{ fila.estado }}</v-chip>
+                      </template>
+                      <template #item.placa="{ item: fila }">{{ fila.turno?.placa ?? '—' }}</template>
+                      <template #item.tipo_vehiculo="{ item: fila }">{{ fila.tipo_vehiculo ?? '—' }}</template>
+                      <template #item.tipo_cliente="{ item: fila }">
+                        <v-chip size="x-small" :color="tipoClienteColor(fila.turno)" variant="tonal">
+                          {{ tipoClienteLabel(fila.turno) }}
+                        </v-chip>
+                      </template>
+                      <template #item.convenio="{ item: fila }">{{ fila.convenio?.nombre ?? '—' }}</template>
+                      <template #item.monto="{ item: fila }">{{ formatCOP(calcTotalItem(fila)) }}</template>
+                      <template #item.generado_at="{ item: fila }">{{ formatDate(fila.generado_at) }}</template>
+                    </v-data-table>
+
+                    <v-alert v-if="!panelDetalle.rows.length" type="info" variant="tonal" density="compact" class="mt-3">
+                      Este asesor no tiene comisiones registradas.
+                    </v-alert>
+                  </template>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </v-card-text>
+        </template>
+
+        <!-- Tab TODOS: comportamiento original sin cambios -->
+        <template v-else>
+          <!-- Resumen de página -->
+          <v-card-text class="pt-4 pb-2 px-6">
+            <div class="d-flex flex-wrap gap-3 align-center">
+              <v-chip variant="tonal" size="large">
+                Total página: <strong class="ms-1">{{ formatCOP(totalPagina) }}</strong>
               </v-chip>
-              <div class="text-caption text-medium-emphasis mt-1">
-                <v-icon size="12" class="mr-1">
-                  {{ item.descuento_origen === 'dateo' ? 'mdi-calendar-check' : 'mdi-cash-register' }}
-                </v-icon>
-                {{ item.descuento_origen === 'dateo' ? 'Pre-marcado' : 'En caja' }}
+              <v-chip v-if="pendientesPagina > 0" variant="tonal" size="large" color="warning">
+                Pendientes: <strong class="ms-1">{{ pendientesPagina }}</strong>
+              </v-chip>
+              <v-chip v-if="pagadasPagina > 0" variant="tonal" size="large" color="success">
+                Pagadas: <strong class="ms-1">{{ pagadasPagina }}</strong>
+              </v-chip>
+              <v-chip v-if="filters.descuentoCodigo" variant="outlined" size="small" color="orange">
+                <v-icon start size="12">mdi-tag</v-icon>
+                Descuento: {{ filters.descuentoCodigo }}
+              </v-chip>
+            </div>
+          </v-card-text>
+
+          <!-- ── BARRA DE ACCIONES BULK ── -->
+          <v-expand-transition>
+            <div v-if="selectedIds.length > 0" class="px-6 pb-3">
+              <v-card variant="tonal" color="primary" class="rounded-lg px-4 py-3">
+                <div class="d-flex align-center flex-wrap gap-3">
+                  <v-icon color="primary">mdi-checkbox-multiple-marked</v-icon>
+                  <span class="font-weight-medium">
+                    {{ selectedIds.length }} comisión{{ selectedIds.length !== 1 ? 'es' : '' }} seleccionada{{ selectedIds.length !== 1 ? 's' : '' }}
+                    &nbsp;|&nbsp; Total:
+                    <strong>{{ formatCOP(totalSeleccionado) }}</strong>
+                  </span>
+
+                  <v-spacer />
+
+                  <v-btn
+                    v-if="canAprobarSelected"
+                    size="small"
+                    color="info"
+                    variant="elevated"
+                    prepend-icon="mdi-check-decagram"
+                    @click="confirmBulkAprobar"
+                  >
+                    Aprobar seleccionadas
+                  </v-btn>
+
+                  <v-btn
+                    v-if="canPagarSelected"
+                    size="small"
+                    color="success"
+                    variant="elevated"
+                    prepend-icon="mdi-cash-multiple"
+                    @click="confirmBulkPagar"
+                  >
+                    Pagar seleccionadas
+                  </v-btn>
+
+                  <!-- 🆕 Generar comprobante (guarda en backend) -->
+                  <v-btn
+                    size="small"
+                    color="orange"
+                    variant="elevated"
+                    prepend-icon="mdi-file-document-plus"
+                    @click="abrirConfirmacionComprobante"
+                  >
+                    Generar comprobante
+                  </v-btn>
+
+                  <v-btn
+                    size="small"
+                    variant="text"
+                    @click="selectedIds = []"
+                    icon="mdi-close"
+                  />
+                </div>
+              </v-card>
+            </div>
+          </v-expand-transition>
+
+          <!-- ── TABLA ──────────────────────────────────────────── -->
+          <div class="scroll-wrapper" ref="scrollWrapper">
+            <div class="scroll-top" ref="scrollTop">
+              <div :style="{ width: innerWidth + 'px', height: '1px' }"></div>
+            </div>
+            <div class="scroll-content" ref="scrollContent" @scroll="syncScroll('content')">
+          <v-data-table-server
+            class="px-4 pb-4"
+            style="min-width: 1400px"
+            :headers="headers"
+            :items="filteredRows"
+            :items-length="totalItems"
+            v-model:page="page"
+            v-model:items-per-page="itemsPerPage"
+            :loading="loading"
+            :sort-by="sortBy"
+            @update:options="loadItems"
+            item-value="id"
+            item-selectable="_selectable"
+            v-model="selectedIds"
+            show-select
+            return-object
+          >
+            <template #item.estado="{ item }">
+              <v-chip :color="estadoColor(item.estado)" size="small" variant="flat">
+                {{ item.estado }}
+              </v-chip>
+            </template>
+
+            <template #item.tipo_vehiculo="{ item }">
+              <v-chip
+                v-if="item.tipo_vehiculo"
+                size="x-small"
+                :color="item.tipo_vehiculo === 'MOTO' ? 'deep-purple' : 'teal'"
+                variant="tonal"
+                :prepend-icon="item.tipo_vehiculo === 'MOTO' ? 'mdi-motorbike' : 'mdi-car'"
+              >
+                {{ item.tipo_vehiculo === 'MOTO' ? 'Moto' : 'Vehículo' }}
+              </v-chip>
+              <span v-else class="text-medium-emphasis text-caption">—</span>
+            </template>
+
+            <template #item.tipo_cliente="{ item }">
+              <v-chip size="x-small" :color="tipoClienteColor(item.turno)" variant="tonal">
+                {{ tipoClienteLabel(item.turno) }}
+              </v-chip>
+            </template>
+            <template #item.placa="{ item }">
+    <span class="font-weight-medium">{{ item.turno?.placa || '—' }}</span>
+  </template>
+
+            <template #item.turno="{ item }">
+              <div class="d-flex flex-column">
+                <span>
+                  Turno #{{ item.turno?.numero_global || item.turno?.numero || item.turno?.id || '—' }}
+                </span>
+                <span class="text-caption text-medium-emphasis">
+                  {{ item.turno?.placa || '—' }} ·
+                  {{ item.turno?.servicio?.nombre || item.turno?.servicio?.codigo || '—' }}
+                </span>
               </div>
             </template>
-            <span v-else class="text-medium-emphasis text-caption">—</span>
-          </template>
 
-          <template #item.valor_unitario="{ item }">
-            {{ formatCOP(Number(item.monto_asesor ?? item.valor_unitario ?? 0)) }}
-          </template>
+            <template #item.descuento="{ item }">
+              <template v-if="item.descuento">
+                <v-chip size="x-small" color="orange-darken-2" variant="tonal" prepend-icon="mdi-tag-check">
+                  {{ item.descuento.nombre }}
+                </v-chip>
+                <div class="text-caption text-medium-emphasis mt-1">
+                  <v-icon size="12" class="mr-1">
+                    {{ item.descuento_origen === 'dateo' ? 'mdi-calendar-check' : 'mdi-cash-register' }}
+                  </v-icon>
+                  {{ item.descuento_origen === 'dateo' ? 'Pre-marcado' : 'En caja' }}
+                </div>
+              </template>
+              <span v-else class="text-medium-emphasis text-caption">—</span>
+            </template>
 
-          <template #item.valor_cliente="{ item }">
-            {{ formatCOP(Number(item.monto_convenio ?? item.valor_cliente ?? 0)) }}
-          </template>
+            <template #item.valor_unitario="{ item }">
+              {{ formatCOP(Number(item.monto_asesor ?? item.valor_unitario ?? 0)) }}
+            </template>
 
-          <template #item.valor_total="{ item }">
-            <strong>{{ formatCOP(calcTotalItem(item)) }}</strong>
-          </template>
+            <template #item.valor_cliente="{ item }">
+              {{ formatCOP(Number(item.monto_convenio ?? item.valor_cliente ?? 0)) }}
+            </template>
 
-          <template #item.asesor="{ item }">{{ item.asesor?.nombre || '—' }}</template>
-          <template #item.convenio="{ item }">{{ item.convenio?.nombre || '—' }}</template>
-          <template #item.generado_at="{ item }">{{ formatDate(item.generado_at) }}</template>
-          <template #item.rep_general="{ item }">
-            <v-chip
-             v-if="item.turno?.rep_general_verificado"
-              size="x-small"
-              color="success"
-              variant="tonal"
-              prepend-icon="mdi-check-circle"
-            >
-              Verificado
-            </v-chip>
-            <v-chip
-              v-else
-              size="x-small"
-              color="warning"
-              variant="tonal"
-              prepend-icon="mdi-clock-outline"
-            >
-              Sin Rep
-            </v-chip>
-          </template>
+            <template #item.valor_total="{ item }">
+              <strong>{{ formatCOP(calcTotalItem(item)) }}</strong>
+            </template>
 
-          <template #item.acciones="{ item }">
-  <div class="d-flex gap-1">
-    <v-btn size="small" variant="text" icon="mdi-eye" @click="verDetalle(item)" />
-    <v-btn
-      v-if="item.estado === 'PENDIENTE'"
-      size="small" variant="text" color="primary"
-      icon="mdi-pencil"
-      @click="abrirEditar(item)"
-    />
-    <v-btn
-      v-if="item.estado === 'PENDIENTE'"
-      size="small" variant="text" color="warning"
-                icon="mdi-check-decagram"
-                @click="confirmAprobar(item.id)"
-              />
-              <v-btn
-                v-if="item.estado === 'APROBADA'"
-                size="small" variant="text" color="success"
-                icon="mdi-cash-multiple"
-                @click="confirmPagar(item.id)"
-              />
-              <v-btn
-                v-if="item.estado === 'PENDIENTE' || item.estado === 'APROBADA'"
-                size="small" variant="text" color="error"
-                icon="mdi-cancel"
-                @click="confirmAnular(item.id)"
-              />
+            <template #item.asesor="{ item }">{{ item.asesor?.nombre || '—' }}</template>
+            <template #item.convenio="{ item }">{{ item.convenio?.nombre || '—' }}</template>
+            <template #item.generado_at="{ item }">{{ formatDate(item.generado_at) }}</template>
+            <template #item.rep_general="{ item }">
+              <v-chip
+               v-if="item.turno?.rep_general_verificado"
+                size="x-small"
+                color="success"
+                variant="tonal"
+                prepend-icon="mdi-check-circle"
+              >
+                Verificado
+              </v-chip>
+              <v-chip
+                v-else
+                size="x-small"
+                color="warning"
+                variant="tonal"
+                prepend-icon="mdi-clock-outline"
+              >
+                Sin Rep
+              </v-chip>
+            </template>
+
+            <template #item.acciones="{ item }">
+    <div class="d-flex gap-1">
+      <v-btn size="small" variant="text" icon="mdi-eye" @click="verDetalle(item)" />
+      <v-btn
+        v-if="item.estado === 'PENDIENTE'"
+        size="small" variant="text" color="primary"
+        icon="mdi-pencil"
+        @click="abrirEditar(item)"
+      />
+      <v-btn
+        v-if="item.estado === 'PENDIENTE'"
+        size="small" variant="text" color="warning"
+                  icon="mdi-check-decagram"
+                  @click="confirmAprobar(item.id)"
+                />
+                <v-btn
+                  v-if="item.estado === 'APROBADA'"
+                  size="small" variant="text" color="success"
+                  icon="mdi-cash-multiple"
+                  @click="confirmPagar(item.id)"
+                />
+                <v-btn
+                  v-if="item.estado === 'PENDIENTE' || item.estado === 'APROBADA'"
+                  size="small" variant="text" color="error"
+                  icon="mdi-cancel"
+                  @click="confirmAnular(item.id)"
+                />
+              </div>
+            </template>
+          </v-data-table-server>
             </div>
-          </template>
-        </v-data-table-server>
+          </div>
+        </template>
       </template>
 
       <!-- ====== TAB METAS ======================================== -->
@@ -496,6 +614,68 @@
           <v-spacer />
           <v-btn variant="text" @click="dialog.visible = false">Cancelar</v-btn>
           <v-btn :color="dialog.color" @click="dialog.onConfirm">Confirmar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- ══════════════════════════════════════════════════════════
+         DIÁLOGO: Confirmación de acción masiva (aprobar/pagar)
+    ══════════════════════════════════════════════════════════ -->
+    <v-dialog v-model="bulkAccionDialog.visible" max-width="480" persistent>
+      <v-card>
+        <v-card-title class="text-h6">
+          {{ bulkAccionDialog.accion === 'APROBAR'
+            ? `Aprobar comisiones — ${bulkAccionDialog.nombre}`
+            : `Registrar pago — ${bulkAccionDialog.nombre}` }}
+        </v-card-title>
+        <v-card-text>
+          <template v-if="bulkAccionDialog.accion === 'APROBAR'">
+            <p>
+              ¿Confirmas aprobar {{ bulkAccionDialog.ids.length }} comisiones por
+              <strong>{{ formatCOP(bulkAccionDialog.total) }}</strong> total?
+            </p>
+          </template>
+          <template v-else>
+            <v-table density="compact">
+              <tbody>
+                <tr>
+                  <td class="text-medium-emphasis">Asesor</td>
+                  <td class="font-weight-medium">{{ bulkAccionDialog.nombre }}</td>
+                </tr>
+                <tr>
+                  <td class="text-medium-emphasis">Cantidad</td>
+                  <td class="font-weight-medium">{{ bulkAccionDialog.ids.length }} comisiones</td>
+                </tr>
+                <tr>
+                  <td class="text-medium-emphasis">Total a pagar</td>
+                  <td class="font-weight-bold text-success">{{ formatCOP(bulkAccionDialog.total) }}</td>
+                </tr>
+              </tbody>
+            </v-table>
+            <v-text-field
+              v-model="bulkAccionDialog.fechaPago"
+              label="Fecha de pago"
+              type="date"
+              variant="outlined"
+              density="comfortable"
+              class="mt-3"
+              hide-details
+            />
+          </template>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="bulkAccionDialog.loading" @click="bulkAccionDialog.visible = false">
+            Cancelar
+          </v-btn>
+          <v-btn
+            :color="bulkAccionDialog.accion === 'APROBAR' ? 'info' : 'success'"
+            variant="elevated"
+            :loading="bulkAccionDialog.loading"
+            @click="ejecutarAccionMasiva"
+          >
+            {{ bulkAccionDialog.accion === 'APROBAR' ? 'APROBAR' : 'CONFIRMAR PAGO' }}
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -1653,16 +1833,19 @@
       </v-card>
     </v-dialog>
 
+    <v-snackbar v-model="snack.show" :timeout="3000" :color="snack.color">{{ snack.text }}</v-snackbar>
 </v-container>
 </template>
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import {
   listComisiones,
   getComision,
   aprobarComision,
   pagarComision,
   anularComision,
+  pagarMasivoComisiones,
+  getResumenPorAsesor,
   patchComisionEditar,
   listConveniosDeAsesor,
   listAgentesCaptacion,
@@ -1679,6 +1862,7 @@ import {
   type TurnoLight,
   type ConvenioItem,
   type TurnoParaComision,
+  type ResumenAsesorItem,
 } from '@/services/comisionesService'
 import { createComprobantes, type ComprobantePago as ComprobantePagoDto } from '@/services/comprobantesService'
 import { ClientesService, type ClienteDetalle } from '@/services/clientes_service'
@@ -1691,6 +1875,7 @@ interface ComisionListItemExtended extends ComisionListItem {
   base?: number | null
   descuento_monto_aplicado?: number | null
   tipo_vehiculo?: 'MOTO' | 'VEHICULO' | null
+  _selectable?: boolean
 }
 
 interface ComisionDetailExtended extends ComisionDetail {
@@ -1745,7 +1930,7 @@ const filters = ref<{
   estado: ComisionEstado | ''
   tipoVehiculo: 'MOTO' | 'VEHICULO' | ''
   descuentoCodigo: string
-  tipoAsesor: '' | 'COMERCIAL' | 'CONVENIO'
+  tipoAsesor: '' | 'ASESOR_COMERCIAL' | 'ASESOR_CONVENIO' | 'CONVENIO'
   placa: string
 }>({
   desde: '',
@@ -1764,6 +1949,25 @@ const activeFiltersCount = computed(() =>
    filters.value.estado, filters.value.tipoVehiculo, filters.value.descuentoCodigo]
    .filter(Boolean).length
 )
+
+/* ── Scroll horizontal sincronizado (barra arriba + tabla ancha) ── */
+const scrollWrapper = ref<HTMLDivElement | null>(null)
+const scrollTop = ref<HTMLDivElement | null>(null)
+const scrollContent = ref<HTMLDivElement | null>(null)
+const innerWidth = ref(1400)
+
+function syncScroll(source: 'top' | 'content') {
+  if (!scrollTop.value || !scrollContent.value) return
+  if (source === 'top') {
+    scrollContent.value.scrollLeft = scrollTop.value.scrollLeft
+  } else {
+    scrollTop.value.scrollLeft = scrollContent.value.scrollLeft
+  }
+}
+
+onMounted(() => {
+  scrollTop.value?.addEventListener('scroll', () => syncScroll('top'))
+})
 
 /* ── Tabla detalle ── */
 const headers = [
@@ -1795,9 +1999,26 @@ const selectedIds = ref<ComisionListItemExtended[]>([])
 const selectedItemsData = computed<ComisionListItemExtended[]>(() => selectedIds.value)
 
 const filteredRows = computed<ComisionListItemExtended[]>(() => {
-  if (!filters.value.descuentoCodigo) return rows.value
-  const codigo = filters.value.descuentoCodigo.toUpperCase()
-  return rows.value.filter((item) => item.descuento?.codigo?.toUpperCase() === codigo)
+  let items = rows.value
+
+  if (filters.value.descuentoCodigo) {
+    const codigo = filters.value.descuentoCodigo.toUpperCase()
+    items = items.filter((item) => item.descuento?.codigo?.toUpperCase() === codigo)
+  }
+
+  const tab = filters.value.tipoAsesor
+  if (tab === 'ASESOR_COMERCIAL') {
+    items = items.filter((item) => item.asesor?.tipo === 'ASESOR_COMERCIAL')
+  } else if (tab === 'ASESOR_CONVENIO') {
+    items = items.filter((item) => item.asesor?.tipo === 'ASESOR_CONVENIO')
+  } else if (tab === 'CONVENIO') {
+    items = items.filter((item) => item.convenio != null)
+  }
+
+  return items.map((item) => ({
+    ...item,
+    _selectable: item.estado === 'PENDIENTE' || item.estado === 'APROBADA',
+  }))
 })
 
 const totalSeleccionado = computed(() =>
@@ -1805,11 +2026,167 @@ const totalSeleccionado = computed(() =>
 )
 
 const canAprobarSelected = computed(() =>
-  selectedItemsData.value.length > 0 && selectedItemsData.value.every((i) => i.estado === 'PENDIENTE')
+  selectedItemsData.value.some((i) => i.estado === 'PENDIENTE')
 )
 const canPagarSelected = computed(() =>
-  selectedItemsData.value.length > 0 && selectedItemsData.value.every((i) => i.estado === 'APROBADA')
+  selectedItemsData.value.some((i) => i.estado === 'PENDIENTE' || i.estado === 'APROBADA')
 )
+
+/* ── Resumen por asesor (lista expandible, pagos masivos) ── */
+const resumenPorAsesorList = ref<ResumenAsesorItem[]>([])
+const resumenPorAsesorLoading = ref(false)
+const panelAbierto = ref<string | null>(null)
+
+interface PanelDetalleState {
+  loading: boolean
+  rows: ComisionListItemExtended[]
+}
+const panelDetalle = ref<PanelDetalleState>({ loading: false, rows: [] })
+const panelSeleccionIds = ref<ComisionListItemExtended[]>([])
+
+function panelKey(item: ResumenAsesorItem): string {
+  // Agrupado: en los tabs de asesor la clave es el asesor; en CONVENIO,
+  // como una fila ahora puede combinar varios asesores, la clave es el convenio.
+  return filters.value.tipoAsesor === 'CONVENIO' ? `cv-${item.convenio_id}` : `as-${item.asesor_id}`
+}
+function nombreItem(item: ResumenAsesorItem): string {
+  return filters.value.tipoAsesor === 'CONVENIO' ? (item.convenio_nombre ?? '—') : item.asesor_nombre
+}
+
+/**
+ * El backend agrupa por (asesor, convenio, ...), así que un mismo asesor con
+ * comisiones de varios convenios (o con y sin convenio) llega como varias
+ * filas. Acá se consolida en una sola fila por asesor (o por convenio en el
+ * tab CONVENIO, donde varios asesores pueden aportar al mismo convenio).
+ */
+const asesoresAgrupados = computed<ResumenAsesorItem[]>(() => {
+  const map = new Map<string, ResumenAsesorItem>()
+
+  for (const item of resumenPorAsesorList.value) {
+    const key = panelKey(item)
+    const existing = map.get(key)
+    if (existing) {
+      existing.pendientes += item.pendientes
+      existing.aprobadas += item.aprobadas
+      existing.pagadas += item.pagadas
+      existing.total_por_pagar += item.total_por_pagar
+      existing.total_pendiente += item.total_pendiente
+      existing.total_aprobada += item.total_aprobada
+    } else {
+      map.set(key, { ...item })
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.total_por_pagar - a.total_por_pagar)
+})
+
+async function cargarResumenPorAsesor() {
+  const tab = filters.value.tipoAsesor
+  if (!tab) {
+    resumenPorAsesorList.value = []
+    return
+  }
+  resumenPorAsesorLoading.value = true
+  panelAbierto.value = null
+  try {
+    const resp = await getResumenPorAsesor(tab, filters.value.desde || undefined, filters.value.hasta || undefined)
+    resumenPorAsesorList.value = resp.asesores
+  } catch (err) {
+    resumenPorAsesorList.value = []
+    snack.text = 'Error al cargar el resumen de asesores'
+    snack.color = 'error'
+    snack.show = true
+  } finally {
+    resumenPorAsesorLoading.value = false
+  }
+}
+
+async function cargarPanelDetalle(item: ResumenAsesorItem) {
+  panelDetalle.value = { loading: true, rows: [] }
+  panelSeleccionIds.value = []
+  try {
+    // ASESOR_COMERCIAL/ASESOR_CONVENIO: la fila es por asesor (puede abarcar
+    // varios convenios) -> filtrar solo por asesorId, sin acotar convenio.
+    // CONVENIO: la fila es por convenio (puede abarcar varios asesores) ->
+    // filtrar solo por convenioId, sin acotar asesor.
+    const query: Record<string, unknown> = { perPage: 100, page: 1 }
+    if (filters.value.tipoAsesor === 'CONVENIO') {
+      query.convenioId = item.convenio_id ?? undefined
+    } else {
+      query.asesorId = item.asesor_id
+    }
+    const res = await listComisiones(query as any)
+    panelDetalle.value = {
+      loading: false,
+      rows: res.data.map((r) => ({ ...r, _selectable: r.estado === 'PENDIENTE' || r.estado === 'APROBADA' })),
+    }
+  } catch (err) {
+    panelDetalle.value = { loading: false, rows: [] }
+    snack.text = 'Error al cargar el detalle del asesor'
+    snack.color = 'error'
+    snack.show = true
+  }
+}
+
+watch(panelAbierto, (key) => {
+  if (!key) {
+    panelDetalle.value = { loading: false, rows: [] }
+    panelSeleccionIds.value = []
+    return
+  }
+  const item = asesoresAgrupados.value.find((i) => panelKey(i) === key)
+  if (item) cargarPanelDetalle(item)
+})
+
+function onCambiarTabTipo() {
+  panelAbierto.value = null
+  if (filters.value.tipoAsesor) cargarResumenPorAsesor()
+  else resumenPorAsesorList.value = []
+}
+
+const panelPuedeAprobar = computed(() => panelSeleccionIds.value.some((i) => i.estado === 'PENDIENTE'))
+const panelPuedePagar = computed(() =>
+  panelSeleccionIds.value.some((i) => i.estado === 'PENDIENTE' || i.estado === 'APROBADA')
+)
+const panelSeleccionTotal = computed(() => panelSeleccionIds.value.reduce((acc, i) => acc + calcTotalItem(i), 0))
+
+function panelConfirmarAprobar(item: ResumenAsesorItem) {
+  const elegibles = panelSeleccionIds.value.filter((i) => i.estado === 'PENDIENTE')
+  abrirDialogAccionMasiva(
+    'APROBAR',
+    elegibles.map((i) => i.id),
+    elegibles.reduce((acc, i) => acc + calcTotalItem(i), 0),
+    nombreItem(item)
+  )
+}
+function panelConfirmarPagar(item: ResumenAsesorItem) {
+  const elegibles = panelSeleccionIds.value.filter((i) => i.estado === 'PENDIENTE' || i.estado === 'APROBADA')
+  abrirDialogAccionMasiva(
+    'PAGAR',
+    elegibles.map((i) => i.id),
+    elegibles.reduce((acc, i) => acc + calcTotalItem(i), 0),
+    nombreItem(item)
+  )
+}
+
+async function pagarTodasDelPanel(item: ResumenAsesorItem) {
+  panelAbierto.value = panelKey(item)
+  await cargarPanelDetalle(item)
+  const elegibles = panelDetalle.value.rows.filter((r) => r.estado === 'PENDIENTE' || r.estado === 'APROBADA')
+  panelSeleccionIds.value = elegibles
+  panelConfirmarPagar(item)
+}
+
+const headersPanel = [
+  { title: 'ID', key: 'id' },
+  { title: 'Estado', key: 'estado' },
+  { title: 'Placa', key: 'placa' },
+  { title: 'Tipo Vehículo', key: 'tipo_vehiculo' },
+  { title: 'Tipo Cliente', key: 'tipo_cliente' },
+  { title: 'Convenio', key: 'convenio' },
+  { title: 'Monto', key: 'monto' },
+  { title: 'Fecha', key: 'generado_at' },
+]
 
 /* ── Tabla metas ── */
 const metaHeaders = [
@@ -1839,11 +2216,11 @@ const conveniosItems = ref<ConvenioItem[]>([])
 
 const agentesVisiblesFiltro = computed(() => {
   const tipo = filters.value.tipoAsesor
-  if (!tipo) return allAsesores.value
+  if (!tipo || tipo === 'CONVENIO') return allAsesores.value
   return allAsesores.value.filter((a) => {
     const u = (a.tipo ?? '').toUpperCase()
-    if (tipo === 'COMERCIAL') return !u.includes('CONVENIO')
-    if (tipo === 'CONVENIO') return u.includes('CONVENIO')
+    if (tipo === 'ASESOR_COMERCIAL') return !u.includes('CONVENIO')
+    if (tipo === 'ASESOR_CONVENIO') return u.includes('CONVENIO')
     return true
   })
 })
@@ -1854,7 +2231,7 @@ const conveniosFiltroLoading = ref(false)
 async function onFiltroAsesorChange(asesorId: number | null) {
   filters.value.convenioId = null
   conveniosFiltroComercial.value = []
-  if (!asesorId || filters.value.tipoAsesor !== 'COMERCIAL') return
+  if (!asesorId || filters.value.tipoAsesor !== 'ASESOR_COMERCIAL') return
   conveniosFiltroLoading.value = true
   try {
     conveniosFiltroComercial.value = await listConveniosDeAsesor(asesorId)
@@ -2356,48 +2733,92 @@ async function cargarClientePorPlaca(placa: string) {
   }
 }
 
-/* ── Acciones Bulk ── */
-const bulkLoading = ref(false)
+/* ── Acciones Bulk (pago masivo vía /comisiones/pagar-masivo) ── */
+const snack = reactive({ show: false, text: '', color: 'success' })
+
+interface BulkAccionDialogState {
+  visible: boolean
+  accion: 'APROBAR' | 'PAGAR'
+  ids: number[]
+  total: number
+  nombre: string
+  fechaPago: string
+  loading: boolean
+}
+const bulkAccionDialog = ref<BulkAccionDialogState>({
+  visible: false,
+  accion: 'APROBAR',
+  ids: [],
+  total: 0,
+  nombre: '',
+  fechaPago: '',
+  loading: false,
+})
+
+function abrirDialogAccionMasiva(accion: 'APROBAR' | 'PAGAR', ids: number[], total: number, nombre: string) {
+  if (ids.length === 0) return
+  bulkAccionDialog.value = {
+    visible: true,
+    accion,
+    ids,
+    total,
+    nombre,
+    fechaPago: new Date().toISOString().slice(0, 10),
+    loading: false,
+  }
+}
+
+const nombreSeleccion = computed(() => {
+  const nombres = new Set(selectedItemsData.value.map((i) => i.asesor?.nombre || i.convenio?.nombre || '—'))
+  return nombres.size === 1 ? [...nombres][0] : `${nombres.size} beneficiarios`
+})
 
 function confirmBulkAprobar() {
-  const count = selectedItemsData.value.length
-  openConfirm(
-    'Aprobar comisiones',
-    `¿Confirmas aprobar las ${count} comisiones seleccionadas?`,
-    'info',
-    async () => {
-      dialog.value.visible = false
-      bulkLoading.value = true
-      try {
-        await Promise.all(selectedItemsData.value.map((i) => aprobarComision(i.id)))
-        selectedIds.value = []
-        await loadItems()
-      } finally {
-        bulkLoading.value = false
-      }
-    }
+  const elegibles = selectedItemsData.value.filter((i) => i.estado === 'PENDIENTE')
+  abrirDialogAccionMasiva(
+    'APROBAR',
+    elegibles.map((i) => i.id),
+    elegibles.reduce((acc, i) => acc + calcTotalItem(i), 0),
+    nombreSeleccion.value
   )
 }
 
 function confirmBulkPagar() {
-  const count = selectedItemsData.value.length
-  const total = formatCOP(totalSeleccionado.value)
-  openConfirm(
-    'Pagar comisiones',
-    `¿Confirmas registrar el pago de ${count} comisiones por un total de ${total}?`,
-    'success',
-    async () => {
-      dialog.value.visible = false
-      bulkLoading.value = true
-      try {
-        await Promise.all(selectedItemsData.value.map((i) => pagarComision(i.id)))
-        selectedIds.value = []
-        await loadItems()
-      } finally {
-        bulkLoading.value = false
-      }
-    }
+  const elegibles = selectedItemsData.value.filter((i) => i.estado === 'PENDIENTE' || i.estado === 'APROBADA')
+  abrirDialogAccionMasiva(
+    'PAGAR',
+    elegibles.map((i) => i.id),
+    elegibles.reduce((acc, i) => acc + calcTotalItem(i), 0),
+    nombreSeleccion.value
   )
+}
+
+async function ejecutarAccionMasiva() {
+  const { accion, ids, fechaPago, nombre } = bulkAccionDialog.value
+  bulkAccionDialog.value.loading = true
+  try {
+    const resp = await pagarMasivoComisiones({
+      ids,
+      accion,
+      fecha_pago: accion === 'PAGAR' ? fechaPago : undefined,
+    })
+    const verbo = accion === 'APROBAR' ? 'aprobadas' : 'pagadas'
+    snack.text = `${resp.actualizadas} comisiones ${verbo} a ${nombre}`
+    snack.color = 'success'
+    snack.show = true
+    bulkAccionDialog.value.visible = false
+    selectedIds.value = []
+    panelSeleccionIds.value = []
+    panelAbierto.value = null
+    await loadItems()
+    await cargarResumenPorAsesor()
+  } catch (err) {
+    snack.text = err instanceof Error ? err.message : 'Error al procesar la acción masiva'
+    snack.color = 'error'
+    snack.show = true
+  } finally {
+    bulkAccionDialog.value.loading = false
+  }
 }
 
 /* ── Comprobante / Print ── */
@@ -3113,3 +3534,16 @@ watch(activeTab, (val) => {
 loadCatalogos()
 loadItems()
 </script>
+
+<style scoped>
+.scroll-wrapper {
+  position: relative;
+}
+.scroll-top {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.scroll-content {
+  overflow-x: auto;
+}
+</style>

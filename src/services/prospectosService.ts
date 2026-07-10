@@ -154,6 +154,7 @@ export interface ListResponse<T> {
   total: number
   page: number
   perPage: number
+  lastPage: number
 }
 
 export interface ListParams {
@@ -259,7 +260,14 @@ function normalizeListShape<T = unknown>(r: unknown, fallback: ListParams): List
     : Number(rObj?.total ?? (rObj?.meta as Record<string, unknown>)?.total ?? rObj?.totalItems ?? rObj?.count ?? data.length) || 0
   const page = Number(rObj?.page ?? (rObj?.meta as Record<string, unknown>)?.current_page ?? fallback.page ?? 1)
   const perPage = Number(rObj?.perPage ?? (rObj?.meta as Record<string, unknown>)?.per_page ?? fallback.perPage ?? 10)
-  return { data: data as unknown as T[], total, page, perPage }
+  const lastPage = Array.isArray(r)
+    ? 1
+    : Number(
+        rObj?.lastPage ??
+        (rObj?.meta as Record<string, unknown>)?.last_page ??
+        (total && perPage ? Math.ceil(total / perPage) : 1)
+      ) || 1
+  return { data: data as unknown as T[], total, page, perPage, lastPage }
 }
 
 /* ============================

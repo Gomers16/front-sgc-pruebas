@@ -269,6 +269,13 @@ export function usePermissions() {
         'SUPER_ADMIN',
         'GERENCIA'
       ]),
+
+      // ==================== REPORTES ADMINISTRATIVOS ====================
+      verReportesAdmin: () => auth.hasAnyRole([
+        'SUPER_ADMIN',
+        'GERENCIA',
+        'CONTABILIDAD'
+      ]),
     }
   }
 }
