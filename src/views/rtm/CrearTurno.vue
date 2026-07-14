@@ -771,7 +771,7 @@ import { BusquedasService } from '@/services/busquedas_service'
 import { TramitesService } from '@/services/tramitesService'
 
 /** ===== Parámetros de búsqueda ===== **/
-const PLACA_LEN = 6
+const PLACA_REGEX = /^(?:[A-Z]{3}\d{3}|[A-Z]{3}\d{2}[A-Z]?|\d{3}[A-Z]{3})$/
 const TEL_LEN = 10
 const AUTO_SEARCH_ON_COMPLETE = true
 
@@ -1054,7 +1054,7 @@ async function doSearch(force: boolean = false) {
   const placa = (form.value.placa || '').trim().toUpperCase()
   const telRaw = normalizePhone(telefonoBusqueda.value || '')
 
-  const placaOk = !!placa && placa.length === PLACA_LEN
+  const placaOk = !!placa && PLACA_REGEX.test(placa)
   const telOk   = !!telRaw && telRaw.length === TEL_LEN
 
   if (!force) {
@@ -1064,12 +1064,12 @@ async function doSearch(force: boolean = false) {
         (telOk && telRaw === lastSearched.value.tel)) return
   } else {
     if (!placaOk && !telOk) {
-      if (placa && placa.length !== PLACA_LEN && !telRaw) {
-        showSnackbar(`La placa debe tener ${PLACA_LEN} caracteres (ej: ABC123).`, 'warning')
+      if (placa && !PLACA_REGEX.test(placa) && !telRaw) {
+        showSnackbar('Formato de placa inválido (ej: ABC123 o ABC12).', 'warning')
       } else if (telRaw && telRaw.length !== TEL_LEN && !placa) {
         showSnackbar(`El teléfono debe tener ${TEL_LEN} dígitos.`, 'warning')
       } else {
-        showSnackbar('Ingresa una placa de 6 o un teléfono de 10 dígitos.', 'warning')
+        showSnackbar('Ingresa una placa válida o un teléfono de 10 dígitos.', 'warning')
       }
       return
     }
@@ -1275,7 +1275,7 @@ onMounted(async () => {
 watch(() => form.value.placa, () => {
   if (!AUTO_SEARCH_ON_COMPLETE || esTramites.value) return
   const p = (form.value.placa || '').trim().toUpperCase()
-  if (p.length === PLACA_LEN) doSearch(false)
+  if (PLACA_REGEX.test(p)) doSearch(false)
 })
 watch(() => telefonoBusqueda.value, () => {
   if (!AUTO_SEARCH_ON_COMPLETE || esTramites.value) return

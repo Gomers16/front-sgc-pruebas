@@ -131,7 +131,7 @@
                 prepend-inner-icon="mdi-car"
                 :counter="6"
                 :maxlength="6"
-                hint="Exactamente 6 caracteres en mayúsculas"
+                hint="Formato válido: 3 letras + 3 dígitos, o 3 letras + 2 dígitos (+ letra opcional)"
                 persistent-hint
               />
             </v-col>
@@ -534,9 +534,9 @@ watch(() => form.value.placa, (val) => {
   // Limpiar resultado anterior
   rtmInfo.value = null
 
-  // Verificar RTM cuando tenga 6 caracteres (con debounce)
+  // Verificar RTM cuando la placa tenga un formato válido (con debounce)
   if (rtmCheckTimer) clearTimeout(rtmCheckTimer)
-  if (normalizada.length === 6) {
+  if (PLACA_REGEX.test(normalizada)) {
     rtmCheckTimer = setTimeout(async () => {
       rtmChecking.value = true
       try {
@@ -803,12 +803,14 @@ onBeforeUnmount(() => {
 })
 
 /* ===== Reglas ===== */
+const PLACA_REGEX = /^(?:[A-Z]{3}\d{3}|[A-Z]{3}\d{2}[A-Z]?|\d{3}[A-Z]{3})$/
+
 const rules = {
   required: (v: unknown) => !!v || 'Este campo es requerido',
   placaLength: (v: unknown) => {
     if (!v) return 'La placa es requerida'
     const trimmed = v.toString().trim()
-    return trimmed.length === 6 || 'La placa debe tener exactamente 6 caracteres'
+    return PLACA_REGEX.test(trimmed) || 'Formato de placa inválido'
   },
   imagenRequerida: (v: unknown) => {
     const f = Array.isArray(v) ? v[0] : v
@@ -835,7 +837,7 @@ const mostrarAgente = computed(() => {
 const canSubmit = computed(() => {
   return (
     !!form.value.placa?.trim() &&
-    form.value.placa.trim().length === 6 &&
+    PLACA_REGEX.test(form.value.placa.trim()) &&
     !(rtmBloqueado.value && servicioSeleccionadoEsRtm.value && !esPrivilegiado.value) &&
     !rtmChecking.value
   )

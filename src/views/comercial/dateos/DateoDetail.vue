@@ -62,7 +62,7 @@
                   :disabled="!editando"
                   :readonly="!editando"
                   @input="editando ? normalizePlaca($event) : null"
-                  :hint="editando ? 'Exactamente 6 caracteres en mayúsculas' : ''"
+                  :hint="editando ? 'Formato válido: 3 letras + 3 dígitos, o 3 letras + 2 dígitos (+ letra opcional)' : ''"
                   :persistent-hint="editando"
                 />
               </v-col>
@@ -549,17 +549,19 @@ const snackbar = ref<{ visible: boolean; msg: string; color: 'error' | 'success'
 )
 
 /* ===== Validaciones ===== */
+const PLACA_REGEX = /^(?:[A-Z]{3}\d{3}|[A-Z]{3}\d{2}[A-Z]?|\d{3}[A-Z]{3})$/
+
 const rules = {
   required: (v: string | number | null | undefined) => !!v || 'Este campo es requerido',
   placaLength: (v: string | number | null | undefined) => {
     if (!v) return 'La placa es requerida'
     const trimmed = v.toString().trim()
-    return trimmed.length === 6 || 'La placa debe tener exactamente 6 caracteres'
+    return PLACA_REGEX.test(trimmed) || 'Formato de placa inválido'
   },
 }
 
 const isFormValid = computed(() => {
-  return form.value.placa && form.value.placa.trim().length === 6
+  return !!form.value.placa && PLACA_REGEX.test(form.value.placa.trim())
 })
 
 /* ===== Modo Edición ===== */
@@ -763,7 +765,7 @@ async function uploadImagen() {
 /* ===== 🔥 GUARDAR ===== */
 async function guardar() {
   if (!isFormValid.value) {
-    snackbar.value = { visible: true, msg: 'La placa debe tener exactamente 6 caracteres', color: 'error' }
+    snackbar.value = { visible: true, msg: 'La placa no tiene un formato válido', color: 'error' }
     return
   }
 

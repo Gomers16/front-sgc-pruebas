@@ -399,7 +399,7 @@ function nombreAsesorDetalle(d: DetalleTicket) {
 }
 
 function onClickCanalRow(_e: unknown, { item }: { item: IngresoCanal }) {
-  abrirDetalleCanal(item.canal)
+  abrirDetalleCanal(item.canal || 'FACHADA')
 }
 
 async function abrirDetalleCanal(canal: string) {

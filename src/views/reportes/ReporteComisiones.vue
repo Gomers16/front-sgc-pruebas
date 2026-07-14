@@ -178,7 +178,6 @@
           :loading="loading"
           item-key="_key"
           hover
-          hide-default-footer
           @click:row="onClickComercial"
         >
           <template #item.total_asesor="{ item }">{{ formatCOP(item.total_asesor) }}</template>
@@ -206,7 +205,6 @@
           :loading="loading"
           item-key="_key"
           hover
-          hide-default-footer
           @click:row="onClickAsesorConvenio"
         >
           <template #item.nombreConvenio="{ item }">
@@ -237,7 +235,6 @@
           :loading="loading"
           item-key="_key"
           hover
-          hide-default-footer
           @click:row="onClickConvenio"
         >
           <template #item.total_convenio="{ item }">{{ formatCOP(item.total_convenio) }}</template>

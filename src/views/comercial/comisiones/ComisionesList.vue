@@ -285,6 +285,7 @@
                       item-selectable="_selectable"
                       v-model="panelSeleccionIds"
                       show-select
+                      return-object
                       density="compact"
                       hide-default-footer
                     >

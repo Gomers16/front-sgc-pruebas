@@ -79,10 +79,18 @@ export interface ReporteAsesor {
   total_bruto: number
   total_neto: number
 }
+export interface ConvenioResumenAPI {
+  convenio_nombre: string
+  asesores: string
+  total_vehiculos: number
+  total_bruto: number
+  total_neto: number
+}
 export interface ReporteAsesoresResponse {
   fecha_inicio: string
   fecha_fin: string
   asesores: ReporteAsesor[]
+  convenios: ConvenioResumenAPI[]
 }
 
 /**

@@ -166,6 +166,7 @@
           @click:row="onClickConvenioRow"
         >
           <template #item.total_bruto="{ item }">{{ formatCOP(item.total_bruto) }}</template>
+          <template #item.total_neto="{ item }">{{ formatCOP(item.total_neto) }}</template>
         </v-data-table>
 
         <v-alert
@@ -331,6 +332,7 @@ const headersConvenios = [
   { title: 'Asesores', key: 'asesores' },
   { title: 'Vehículos', key: 'vehiculos' },
   { title: 'Total Bruto', key: 'total_bruto' },
+  { title: 'Total Neto', key: 'total_neto' },
 ]
 
 /* ===== Headers de la tabla del dialog de detalle ===== */
@@ -357,7 +359,8 @@ const busquedaAsesor = ref('')
  * canal=ASESOR_CONVENIO (mismo endpoint del drill-down), que sí trae
  * convenio_nombre por ticket. Se carga una sola vez (lazy) y se cachea.
  */
-const convenioDetalleRows = ref<DetalleTicket[]>([])
+const convenioAsesorRows = ref<DetalleTicket[]>([])       // ASESOR_CONVENIO — para el tab "Asesor Convenio"
+const convenioComercialRows = ref<DetalleTicket[]>([])    // ASESOR_COMERCIAL — para el tab "Convenio"
 const convenioDetalleLoaded = ref(false)
 const convenioDetalleLoading = ref(false)
 
@@ -365,8 +368,12 @@ async function ensureConvenioDetalle() {
   if (convenioDetalleLoaded.value || convenioDetalleLoading.value) return
   convenioDetalleLoading.value = true
   try {
-    const resp = await getDetalleCanal(fechaInicio.value, fechaFin.value, 'ASESOR_CONVENIO')
-    convenioDetalleRows.value = resp.detalle
+    const [respConvenio, respComercial] = await Promise.all([
+      getDetalleCanal(fechaInicio.value, fechaFin.value, 'ASESOR_CONVENIO'),
+      getDetalleCanal(fechaInicio.value, fechaFin.value, 'ASESOR_COMERCIAL'),
+    ])
+    convenioAsesorRows.value = respConvenio.detalle
+    convenioComercialRows.value = respComercial.detalle
     convenioDetalleLoaded.value = true
   } catch (err) {
     console.error('Error cargando datos de convenio:', err)
@@ -392,7 +399,7 @@ const asesoresComercial = computed(() => {
 /* ===== Segmento: Asesor Convenio (enriquecido con convenio_nombre) ===== */
 const convenioPorAsesorNombre = computed(() => {
   const map = new Map<string, string>()
-  for (const d of convenioDetalleRows.value) {
+  for (const d of convenioAsesorRows.value) {
     const key = d.asesor_convenio_nombre
     if (key && d.convenio_nombre && !map.has(key)) map.set(key, d.convenio_nombre)
   }
@@ -408,41 +415,28 @@ const asesoresConvenio = computed(() => {
   return rows
 })
 
-/* ===== Segmento: Convenio (agrupado desde convenioDetalleRows) =====
- * Nota: no incluye "Total Neto" porque detalle-canal no trae `subtotal`
- * por ticket (solo detalle-asesor lo trae); solo Total Bruto es exacto
- * en esta agrupación por convenio. */
+/* ===== Segmento: Convenio (agrupado por el backend, cualquier tipo de asesor) ===== */
 interface ConvenioResumen {
   convenio_nombre: string
-  asesores: number
+  asesores: string
   vehiculos: number
   total_bruto: number
+  total_neto: number
 }
 
 const conveniosAgrupados = computed<ConvenioResumen[]>(() => {
-  const map = new Map<string, { asesores: Set<string>; vehiculos: number; total_bruto: number }>()
-  for (const d of convenioDetalleRows.value) {
-    if (!d.convenio_nombre) continue
-    if (!map.has(d.convenio_nombre)) {
-      map.set(d.convenio_nombre, { asesores: new Set(), vehiculos: 0, total_bruto: 0 })
-    }
-    const g = map.get(d.convenio_nombre)!
-    if (d.asesor_convenio_nombre) g.asesores.add(d.asesor_convenio_nombre)
-    g.vehiculos += 1
-    g.total_bruto += d.total || 0
-  }
-
-  let rows: ConvenioResumen[] = Array.from(map.entries()).map(([convenio_nombre, g]) => ({
-    convenio_nombre,
-    asesores: g.asesores.size,
-    vehiculos: g.vehiculos,
-    total_bruto: g.total_bruto,
+  let rows: ConvenioResumen[] = (asesoresData.value?.convenios ?? []).map((r) => ({
+    convenio_nombre: r.convenio_nombre,
+    asesores: r.asesores,
+    vehiculos: r.total_vehiculos,
+    total_bruto: r.total_bruto,
+    total_neto: r.total_neto,
   }))
 
   const q = busquedaAsesor.value.trim().toLowerCase()
   if (q) rows = rows.filter((r) => r.convenio_nombre.toLowerCase().includes(q))
 
-  return rows.sort((a, b) => b.total_bruto - a.total_bruto)
+  return rows
 })
 
 const filasSegmentoActivo = computed(() => {
@@ -492,7 +486,8 @@ async function generarReporte() {
 
     // El caché de convenio queda ligado al rango de fechas anterior: se
     // invalida y, si el segmento activo lo necesita, se recarga.
-    convenioDetalleRows.value = []
+    convenioAsesorRows.value = []
+    convenioComercialRows.value = []
     convenioDetalleLoaded.value = false
     if (segmentoAsesor.value !== 'COMERCIAL') await ensureConvenioDetalle()
   } catch (err) {
@@ -559,8 +554,8 @@ function exportarAsesores() {
     ])
     exportarExcel('ReporteAsesorConvenio', encabezados, filas)
   } else {
-    const encabezados = ['Convenio', 'Asesores', 'Vehículos', 'Total Bruto']
-    const filas = conveniosAgrupados.value.map((r) => [r.convenio_nombre, r.asesores, r.vehiculos, r.total_bruto])
+    const encabezados = ['Convenio', 'Asesores', 'Vehículos', 'Total Bruto', 'Total Neto']
+    const filas = conveniosAgrupados.value.map((r) => [r.convenio_nombre, r.asesores, r.vehiculos, r.total_bruto, r.total_neto])
     exportarExcel('ReporteConvenios', encabezados, filas)
   }
 }
@@ -633,7 +628,7 @@ async function abrirDetalleAsesor(agenteId: number, canal: string, nombre: strin
  * detalle-canal(ASESOR_CONVENIO) que ya está cargado para el segmento
  * Convenio — no requiere una llamada adicional al backend. */
 function abrirDetalleConvenio(convenioNombre: string) {
-  const rows = convenioDetalleRows.value.filter((d) => d.convenio_nombre === convenioNombre)
+  const rows = convenioComercialRows.value.filter((d) => d.convenio_nombre === convenioNombre)
 
   dialogDetalle.open = true
   dialogDetalle.loading = false

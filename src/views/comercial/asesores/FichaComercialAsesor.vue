@@ -1538,13 +1538,18 @@ const buscarPlaca = ref('')
 const verTodosDateos = ref(false)
 
 const dateosFiltrados = computed(() => {
+  const desde = new Date(filtros.value.desde + 'T00:00:00')
+  const hasta = new Date(filtros.value.hasta + 'T23:59:59')
   const placaQuery = buscarPlaca.value.trim().toUpperCase()
   return dateos.value.filter((d) => {
     const tRaw = normalizeCreatedAt(d)
+    const t = tRaw ? new Date(tRaw) : null
+    const enRango = t ? t >= desde && t <= hasta : true
+    const pasaRango = verTodosDateos.value ? true : enRango
     const pasaExito = filtrosDateo.value.soloExitosos ? isExitoso(d) : true
     const pasaPlaca = placaQuery ? (d.placa || '').toUpperCase().includes(placaQuery) : true
     if (tRaw) d.created_at = tRaw
-    return pasaExito && pasaPlaca
+    return pasaRango && pasaExito && pasaPlaca
   })
 })
 
