@@ -95,25 +95,31 @@
 
         <v-data-table
           :headers="headers"
-          :items="detalleRows"
+          :items="filasConSubtotal"
           :loading="loading"
-          item-key="codigo_servicio"
+          item-key="_rowKey"
+          :row-props="rowProps"
           hover
           hide-default-footer
         >
           <template #item.codigo_servicio="{ item }">
-            <v-chip size="small" :color="colorServicio(item.codigo_servicio)" variant="flat">
-              {{ item.codigo_servicio }}
-            </v-chip>
-            <span class="ml-2">{{ item.nombre_servicio }}</span>
+            <template v-if="item._esSubtotal">
+              <span class="font-weight-bold">{{ item.nombre_servicio }} · Total</span>
+            </template>
+            <template v-else>
+              <v-chip size="small" :color="colorServicio(item.codigo_servicio)" variant="flat">
+                {{ item.codigo_servicio }}
+              </v-chip>
+              <span class="ml-2">{{ item.nombre_servicio }}</span>
+            </template>
           </template>
 
           <template #item.tipo_vehiculo="{ item }">
-            {{ tipoVehiculoLabel(item.tipo_vehiculo) }}
+            {{ item._esSubtotal ? '' : tipoVehiculoLabel(item.tipo_vehiculo) }}
           </template>
 
           <template #item.valor_unitario="{ item }">
-            {{ formatCOP(item.valor_unitario) }}
+            {{ item._esSubtotal ? '—' : formatCOP(item.valor_unitario) }}
           </template>
 
           <template #item.total_generado="{ item }">
@@ -156,7 +162,13 @@ import {
   getReporteServicios,
   getRangoMesActual,
   type ReporteServiciosResponse,
+  type ReporteServicioDetalle,
 } from '@/services/reportesAdminService'
+
+interface FilaServicio extends ReporteServicioDetalle {
+  _rowKey: string
+  _esSubtotal?: boolean
+}
 
 const rangoMes = getRangoMesActual()
 const fechaInicio = ref(rangoMes.inicio)
@@ -167,6 +179,46 @@ const snack = reactive({ show: false, text: '' })
 
 const reporteData = ref<ReporteServiciosResponse | null>(null)
 const detalleRows = computed(() => reporteData.value?.detalle ?? [])
+
+// Inserta una fila "TOTAL" (Moto + Vehículo) después de cada par de filas del mismo servicio
+const filasConSubtotal = computed<FilaServicio[]>(() => {
+  const rows = detalleRows.value
+  const resultado: FilaServicio[] = []
+
+  let i = 0
+  while (i < rows.length) {
+    const codigo = rows[i].codigo_servicio
+    const grupo: ReporteServicioDetalle[] = []
+    while (i < rows.length && rows[i].codigo_servicio === codigo) {
+      grupo.push(rows[i])
+      i++
+    }
+
+    grupo.forEach((r, idx) => {
+      resultado.push({ ...r, _rowKey: `${codigo}-${idx}` })
+    })
+
+    if (grupo.length > 1) {
+      resultado.push({
+        codigo_servicio: codigo,
+        nombre_servicio: grupo[0].nombre_servicio,
+        tipo_vehiculo: 'TOTAL',
+        turnos: grupo.reduce((acc, r) => acc + r.turnos, 0),
+        valor_unitario: 0,
+        total_generado: grupo.reduce((acc, r) => acc + r.total_generado, 0),
+        total_neto: grupo.reduce((acc, r) => acc + r.total_neto, 0),
+        _rowKey: `${codigo}-subtotal`,
+        _esSubtotal: true,
+      })
+    }
+  }
+
+  return resultado
+})
+
+function rowProps({ item }: { item: FilaServicio }) {
+  return item._esSubtotal ? { class: 'fila-subtotal' } : {}
+}
 
 const headers = [
   { title: 'Servicio', key: 'codigo_servicio' },
@@ -246,11 +298,11 @@ async function generarReporte() {
 
 function exportarExcelServicios() {
   const encabezados = ['Servicio', 'Tipo', 'Turnos', 'Valor Unitario', 'Total Generado', 'Total Neto']
-  const filas = detalleRows.value.map((r) => [
-    `${r.codigo_servicio} - ${r.nombre_servicio}`,
-    tipoVehiculoLabel(r.tipo_vehiculo),
+  const filas = filasConSubtotal.value.map((r) => [
+    r._esSubtotal ? `${r.nombre_servicio} - TOTAL` : `${r.codigo_servicio} - ${r.nombre_servicio}`,
+    r._esSubtotal ? '' : tipoVehiculoLabel(r.tipo_vehiculo),
     r.turnos,
-    r.valor_unitario,
+    r._esSubtotal ? '' : r.valor_unitario,
     r.total_generado,
     r.total_neto,
   ])
@@ -281,4 +333,5 @@ onMounted(() => {
 .rounded-2xl { border-radius: 20px; }
 .text-medium-emphasis { color: rgba(0,0,0,.6); }
 .fila-totales { background-color: #e3f2fd; }
+.fila-subtotal { background-color: #f5f5f5; font-weight: 600; }
 </style>

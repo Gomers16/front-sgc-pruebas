@@ -172,6 +172,22 @@ export function deleteDateo(id: number) {
   return del<{ ok: boolean }>(`/api/captacion-dateos/${id}`)
 }
 
+/** Config de exclusividad del dateo (horas durante las que le pertenece a un asesor) */
+export interface ExclusividadConfig {
+  horas_exclusividad: number
+}
+
+export function getExclusividadConfig() {
+  return get<ExclusividadConfig>('/api/captacion-dateos/config/exclusividad')
+}
+
+export function updateExclusividadConfig(horasExclusividad: number) {
+  return post<ExclusividadConfig, { horas_exclusividad: number }>(
+    '/api/captacion-dateos/config/exclusividad',
+    { horas_exclusividad: horasExclusividad }
+  )
+}
+
 export function toggleAvance(
   id: number,
   esAvance: boolean,

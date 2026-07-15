@@ -618,6 +618,21 @@
                 <span v-else class="text-medium-emphasis d-flex justify-center">—</span>
               </template>
 
+              <!-- Exclusividad (countdown) -->
+              <template #item.exclusividad="{ item }">
+                <v-chip
+                  v-if="reservaCountdown(item).aplica"
+                  size="x-small"
+                  :color="reservaCountdown(item).vigente ? 'orange-darken-1' : 'grey-darken-1'"
+                  variant="tonal"
+                  prepend-icon="mdi-timer-sand"
+                  class="font-weight-600"
+                >
+                  {{ reservaCountdown(item).texto }}
+                </v-chip>
+                <span v-else class="text-medium-emphasis d-flex justify-center">—</span>
+              </template>
+
               <!-- 🆕 ACTUALIZADO: Comisión con tooltip de desglose -->
               <template #item.comisionAsesor="{ item }">
                 <v-tooltip location="top" max-width="300">
@@ -891,7 +906,8 @@ import { useDisplay } from 'vuetify'
 import { get } from '@/services/http'
 import { getMiFicha, getAsesorById } from '@/services/asesoresService'
 import { useAuthStore } from '@/stores/AuthStore'
-import { listDateos, type Dateo, formatDateTime } from '@/services/dateosService'
+import { listDateos, getExclusividadConfig, type Dateo, formatDateTime } from '@/services/dateosService'
+import { calcularReservaCountdown } from '@/composables/useReservaCountdown'
 import {
   listComisiones,
   type ComisionListItem,
@@ -1010,6 +1026,20 @@ const loading = ref(false)
 const globalError = ref<string | null>(null)
 const tab = ref<'prospectos' | 'convenios' | 'dateos'>('prospectos')
 
+/* ===== Countdown de exclusividad (solo lectura, ver DateosList.vue para el campo editable) ===== */
+const horasExclusividad = ref<number | null>(null)
+async function cargarHorasExclusividad() {
+  try {
+    const res = await getExclusividadConfig()
+    horasExclusividad.value = res.horas_exclusividad
+  } catch {
+    horasExclusividad.value = null
+  }
+}
+function reservaCountdown(item: DateoConExtras) {
+  return calcularReservaCountdown(item, horasExclusividad.value)
+}
+
 /* ===== Filtros de fecha ===== */
 const filtros = ref<{ desde: string; hasta: string }>({ desde: '', hasta: '' })
 
@@ -1099,6 +1129,7 @@ const headersDateos = computed(() => {
     { title: 'Convenio', key: 'convenio' },
     { title: 'Estado', key: 'resultado' },
     { title: 'Turno', key: 'turnoInfo', align: 'center' as const },
+    { title: 'Exclusividad', key: 'exclusividad', align: 'center' as const, sortable: false },
     { title: tituloComision, key: 'comisionAsesor', align: 'end' as const },
     { title: '💰 Estado Pago', key: 'estadoComision', align: 'center' as const },
     { title: 'Creado', key: 'created_at' },
@@ -1125,6 +1156,7 @@ const headersDateosResponsive = computed(() => {
       { title: 'Descuento', key: 'descuento_col', sortable: false },
       { title: 'Convenio', key: 'convenio' },
       { title: 'Estado', key: 'resultado' },
+      { title: 'Exclusividad', key: 'exclusividad', align: 'center' as const, sortable: false },
       { title: esAsesorConvenio.value ? 'Incentivo' : 'Comisión', key: 'comisionAsesor', align: 'end' as const },
       { title: '💰 Pago', key: 'estadoComision', align: 'center' as const },
     ]
@@ -2095,6 +2127,7 @@ onMounted(async () => {
     console.log(`✅ currentAgenteId disponible: ${authStore.currentAgenteId}`)
   }
   await loadAll()
+  cargarHorasExclusividad()
 })
 
 function verProspecto(id: number) {

@@ -115,6 +115,10 @@
         <v-alert v-if="!loading && !liderRows.length" type="info" variant="tonal" class="mt-4">
           No hay datos para el rango de fechas seleccionado.
         </v-alert>
+
+        <v-alert v-if="liderRows.length" type="info" variant="tonal" density="compact" class="mt-4">
+          ℹ️ RTM/SOAT/PREV/PERI = turnos atendidos (turnos_rtms). Vehículos/Total Bruto/Total Neto = facturación confirmada. Pueden no coincidir.
+        </v-alert>
       </v-card-text>
     </v-card>
 
@@ -158,6 +162,10 @@ function formatCOP(value: number | string) {
 const headersLider = [
   { title: 'Sede', key: 'sede_nombre' },
   { title: 'Líder', key: 'lider_nombre' },
+  { title: 'RTM', key: 'turnos_rtm', align: 'center' as const },
+  { title: 'SOAT', key: 'turnos_soat', align: 'center' as const },
+  { title: 'PREV', key: 'turnos_prev', align: 'center' as const },
+  { title: 'PERI', key: 'turnos_peri', align: 'center' as const },
   { title: 'Vehículos', key: 'vehiculos' },
   { title: 'Total Bruto', key: 'total_bruto' },
   { title: 'Total Neto', key: 'total_neto' },
@@ -234,10 +242,14 @@ function exportarExcel(
 }
 
 function exportarLider() {
-  const encabezados = ['Sede', 'Líder', 'Vehículos', 'Total Bruto', 'Total Neto']
+  const encabezados = ['Sede', 'Líder', 'RTM', 'SOAT', 'PREV', 'PERI', 'Vehículos', 'Total Bruto', 'Total Neto']
   const filas = liderRows.value.map((r) => [
     r.sede_nombre,
     r.lider_nombre,
+    r.turnos_rtm,
+    r.turnos_soat,
+    r.turnos_prev,
+    r.turnos_peri,
     r.vehiculos,
     r.total_bruto,
     r.total_neto,

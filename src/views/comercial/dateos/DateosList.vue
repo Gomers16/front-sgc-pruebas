@@ -2,8 +2,32 @@
 <template>
   <v-container class="py-6">
     <v-card elevation="8" class="rounded-xl">
-      <v-card-title class="py-4 px-4 px-sm-6">
-        <div class="text-h5 font-weight-bold mb-4">🗒️ Dateos</div>
+      <v-card-title class="py-4 px-4 px-sm-6 d-flex align-center justify-space-between flex-wrap gap-3">
+        <div class="text-h5 font-weight-bold">🗒️ Dateos</div>
+
+        <div class="d-flex align-end gap-2">
+          <v-text-field
+            v-model.number="exclusividad.horas"
+            label="Horas de exclusividad"
+            type="number"
+            min="1"
+            variant="outlined"
+            density="compact"
+            hide-details
+            style="width: 160px"
+            :loading="exclusividad.loading"
+          />
+          <v-btn
+            color="primary"
+            variant="tonal"
+            prepend-icon="mdi-content-save"
+            :disabled="!exclusividadCambiada"
+            :loading="exclusividad.guardando"
+            @click="guardarExclusividad"
+          >
+            Guardar
+          </v-btn>
+        </div>
       </v-card-title>
 
       <v-card-text class="px-4 px-sm-6 pt-0">
@@ -289,6 +313,21 @@
               {{ textoEstadoTurno(item.turnoInfo.estado || item.resultado) }}
             </v-chip>
           </div>
+          <span v-else class="text-medium-emphasis d-flex justify-center">—</span>
+        </template>
+
+        <!-- Exclusividad (countdown) -->
+        <template #item.exclusividad="{ item }">
+          <v-chip
+            v-if="reservaCountdown(item).aplica"
+            size="x-small"
+            :color="reservaCountdown(item).vigente ? 'orange-darken-1' : 'grey-darken-1'"
+            variant="tonal"
+            prepend-icon="mdi-timer-sand"
+            class="font-weight-600"
+          >
+            {{ reservaCountdown(item).texto }}
+          </v-chip>
           <span v-else class="text-medium-emphasis d-flex justify-center">—</span>
         </template>
 
@@ -725,11 +764,13 @@
         </v-card-text>
       </v-card>
     </v-dialog>
+
+    <v-snackbar v-model="snack.show" :timeout="3000">{{ snack.text }}</v-snackbar>
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   listDateos,
@@ -740,6 +781,8 @@ import {
   formatDateTime,
   previewHistoricoRtm,
   importarHistoricoRtm,
+  getExclusividadConfig,
+  updateExclusividadConfig,
   type Dateo,
   type ResultadoDateo,
   type HistoricoPreviewResponse,
@@ -747,6 +790,7 @@ import {
 } from '@/services/dateosService'
 import { listConveniosAsignados } from '@/services/conveniosService'
 import { ClientesService } from '@/services/clientes_service'
+import { calcularReservaCountdown } from '@/composables/useReservaCountdown'
 
 const router = useRouter()
 
@@ -772,6 +816,48 @@ const filters = ref<{
   desde: '',
   hasta: '',
 })
+
+/* ── Config: horas de exclusividad del dateo ── */
+const exclusividad = ref<{ horas: number | null; original: number | null; loading: boolean; guardando: boolean }>({
+  horas: null,
+  original: null,
+  loading: false,
+  guardando: false,
+})
+
+const exclusividadCambiada = computed(() => {
+  const { horas, original } = exclusividad.value
+  return horas !== null && horas > 0 && horas !== original
+})
+
+async function cargarExclusividad() {
+  exclusividad.value.loading = true
+  try {
+    const res = await getExclusividadConfig()
+    exclusividad.value.horas = res.horas_exclusividad
+    exclusividad.value.original = res.horas_exclusividad
+  } catch {
+    errorMsg.value = 'No se pudo cargar la configuración de exclusividad'
+  } finally {
+    exclusividad.value.loading = false
+  }
+}
+
+async function guardarExclusividad() {
+  if (!exclusividadCambiada.value || exclusividad.value.horas === null) return
+  exclusividad.value.guardando = true
+  try {
+    const res = await updateExclusividadConfig(exclusividad.value.horas)
+    exclusividad.value.horas = res.horas_exclusividad
+    exclusividad.value.original = res.horas_exclusividad
+    snack.text = '✅ Horas de exclusividad actualizadas'
+    snack.show = true
+  } catch {
+    errorMsg.value = 'No se pudo guardar la configuración de exclusividad'
+  } finally {
+    exclusividad.value.guardando = false
+  }
+}
 
 const canalItems = [{ title: 'Asesor', value: 'ASESOR' as const }]
 
@@ -802,6 +888,7 @@ const headers = [
   { title: 'Estado', key: 'resultado', sortable: true },
   { title: 'Descuento', key: 'descuento', sortable: false },
   { title: 'Turno', key: 'turnoInfo', sortable: false, align: 'center' as const },
+  { title: 'Exclusividad', key: 'exclusividad', sortable: false, align: 'center' as const },
   { title: 'Acciones', key: 'acciones', sortable: false, align: 'end' as const },
 ]
 
@@ -812,6 +899,7 @@ const itemsPerPage = ref(10)
 const sortBy = ref<{ key: string; order: 'asc' | 'desc' }[]>([{ key: 'id', order: 'desc' }])
 const loading = ref(false)
 const errorMsg = ref<string | null>(null)
+const snack = reactive({ show: false, text: '' })
 
 /* ── Visor ── */
 const viewer = ref<{ visible: boolean; url: string | null }>({ visible: false, url: null })
@@ -950,6 +1038,9 @@ function textoResultado(r?: string) {
   if (r === 'EN_PROCESO') return 'En proceso'
   if (r === 'RE_DATEAR') return 'Re-datear'
   return 'Pendiente'
+}
+function reservaCountdown(item: Dateo) {
+  return calcularReservaCountdown(item, exclusividad.value.horas)
 }
 function chipColorEstadoTurno(e?: string) {
   const v = String(e || '').toLowerCase()
@@ -1230,6 +1321,7 @@ async function abrirDetalleCliente(placa: string) {
 loadAsesores()
 loadConveniosAll()
 loadItems()
+cargarExclusividad()
 </script>
 
 <style scoped>

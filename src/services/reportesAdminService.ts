@@ -62,6 +62,10 @@ export interface ProduccionLider {
   vehiculos: number
   total_bruto: number
   total_neto: number
+  turnos_rtm: number
+  turnos_soat: number
+  turnos_prev: number
+  turnos_peri: number
 }
 export interface ProduccionLiderResponse {
   fecha_inicio: string
