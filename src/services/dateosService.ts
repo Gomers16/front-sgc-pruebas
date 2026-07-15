@@ -60,6 +60,9 @@ export interface Dateo extends DateoImagenMeta {
   descuento?: { id: number; codigo: string; nombre: string } | null
   es_avance?: boolean
   comprobante_avance_url?: string | null
+  aprobado_excepcion_por?: number | null
+  aprobado_excepcion_at?: string | null
+  aprobado_excepcion_por_nombre?: string | null
 }
 
 export interface ListResponse<T> { data: T[]; total: number; page: number; perPage: number; lastPage: number }

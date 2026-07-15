@@ -225,14 +225,22 @@
 
         <!-- Estado (resultado del dateo) -->
         <template #item.resultado="{ item }">
-          <v-chip
-            :color="chipColorResultado(item.resultado)"
-            size="small"
-            variant="flat"
-            :prepend-icon="item.resultado === 'RE_DATEAR' ? 'mdi-refresh' : undefined"
-          >
-            {{ textoResultado(item.resultado) }}
-          </v-chip>
+          <div class="d-flex align-center justify-center" style="gap:4px">
+            <v-chip
+              :color="chipColorResultado(item.resultado)"
+              size="small"
+              variant="flat"
+              :prepend-icon="item.resultado === 'RE_DATEAR' ? 'mdi-refresh' : undefined"
+            >
+              {{ textoResultado(item.resultado) }}
+            </v-chip>
+            <v-tooltip v-if="item.aprobado_excepcion_por" location="top">
+              <template #activator="{ props }">
+                <v-icon v-bind="props" color="warning" size="18">mdi-shield-alert</v-icon>
+              </template>
+              <span>Excepción RTM aprobada por {{ item.aprobado_excepcion_por_nombre || '—' }}</span>
+            </v-tooltip>
+          </div>
         </template>
 
         <!-- Descuento -->

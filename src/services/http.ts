@@ -19,7 +19,11 @@ export interface RequestOptions<TBody = unknown> {
 }
 
 export class HttpError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly data?: unknown
+  ) {
     super(message)
     this.name = 'HttpError'
   }
@@ -148,11 +152,12 @@ export async function http<TResp = unknown, TBody = unknown>(
 
   if (!res.ok) {
     let errMsg = `HTTP ${res.status}`
+    let errData: unknown
     try {
-      const data = await parseResponse(res, true)
-      errMsg = extractMessage(data, errMsg)
+      errData = await parseResponse(res, true)
+      errMsg = extractMessage(errData, errMsg)
     } catch { /* ignore */ }
-    throw new HttpError(res.status, errMsg)
+    throw new HttpError(res.status, errMsg, errData)
   }
 
   return (await parseResponse(res, expectJson)) as TResp

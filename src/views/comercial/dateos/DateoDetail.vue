@@ -95,6 +95,21 @@
                   <strong>Convenio:</strong> {{ dateo?.convenio?.nombre || '—' }}
                 </div>
               </v-col>
+
+              <!-- 🆕 Excepción RTM_VIGENTE (SUPER_ADMIN / GERENCIA) -->
+              <v-col v-if="dateo?.aprobado_excepcion_por" cols="12">
+                <v-alert
+                  type="warning"
+                  variant="tonal"
+                  density="comfortable"
+                  icon="mdi-shield-alert"
+                  class="rounded-lg"
+                >
+                  <strong>Dateo con excepción de días RTM</strong><br />
+                  Aprobado por: {{ dateo.aprobado_excepcion_por_nombre || '—' }}
+                  ({{ fmt(dateo.aprobado_excepcion_at) }})
+                </v-alert>
+              </v-col>
             </v-row>
 
             <!-- Turno (solo visual) -->

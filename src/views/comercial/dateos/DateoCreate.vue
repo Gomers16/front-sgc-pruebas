@@ -379,7 +379,11 @@
           <div class="text-subtitle-1 text-sm-h5 font-weight-bold mb-2">
             ¡Dateo creado exitosamente!
           </div>
-          <div class="text-caption text-sm-body-1 text-medium-emphasis">
+          <div v-if="excepcionAprobada" class="text-caption text-sm-body-1 text-medium-emphasis">
+            Este dateo excede el tiempo permitido y ha sido creado exitosamente.<br />
+            Aprobado por: <strong>{{ authStore.user?.nombres }} {{ authStore.user?.apellidos }}</strong>
+          </div>
+          <div v-else class="text-caption text-sm-body-1 text-medium-emphasis">
             El dateo ha sido registrado correctamente en el sistema.
           </div>
         </v-card-text>
@@ -396,6 +400,49 @@
       </v-card>
     </v-dialog>
 
+    <!-- Modal excepción RTM_VIGENTE (SUPER_ADMIN / GERENCIA) -->
+    <v-dialog
+      v-model="showExcepcionRtmDialog"
+      :max-width="$vuetify.display.xs ? '100%' : '500'"
+      :fullscreen="$vuetify.display.xs"
+      persistent
+    >
+      <v-card>
+        <v-card-title class="d-flex align-center justify-center py-4 py-sm-6">
+          <v-icon color="warning" :size="$vuetify.display.xs ? 48 : 60">mdi-shield-alert</v-icon>
+        </v-card-title>
+        <v-card-text class="text-center px-3 px-sm-4">
+          <div class="text-subtitle-1 text-sm-h5 font-weight-bold mb-2">
+            Este dateo excede los días permitidos
+          </div>
+          <div class="text-caption text-sm-body-1 text-medium-emphasis">
+            Esta placa excede el límite de días permitido por
+            <strong>{{ excepcionRtmDias }}</strong> día{{ excepcionRtmDias === 1 ? '' : 's' }}.
+            ¿Deseas continuar de todos modos?
+          </div>
+        </v-card-text>
+        <v-card-actions class="justify-center pb-4 pb-sm-6 gap-2">
+          <v-btn
+            variant="text"
+            :size="$vuetify.display.xs ? 'small' : 'default'"
+            :disabled="loading"
+            @click="showExcepcionRtmDialog = false"
+          >
+            Cancelar
+          </v-btn>
+          <v-btn
+            color="warning"
+            variant="elevated"
+            :size="$vuetify.display.xs ? 'small' : 'default'"
+            :loading="loading"
+            @click="confirmarExcepcionRtm"
+          >
+            Continuar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">
       {{ snackbar.text }}
@@ -407,6 +454,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { createDateo, esDescuentoAvance, verificarPlacaRtm, type RtmVerificacion } from '@/services/dateosService'
+import { HttpError } from '@/services/http'
 import { listAgentesCaptacion, listConveniosAsignados } from '@/services/conveniosService'
 import { uploadImage, type UploadImageResponse } from '@/services/uploadsService'
 import { listConveniosLight } from '@/services/dateosService'
@@ -447,6 +495,7 @@ interface CreateDateoPayload {
   imagen_hash?: string | null
   imagen_origen_id?: string | number | null
    servicio_id?: number | null  // 🆕 agregar esta línea
+  confirmar_excepcion?: boolean // 🆕 excepción RTM_VIGENTE (SUPER_ADMIN/GERENCIA)
 }
 
 /* ===== Contexto desde ficha ===== */
@@ -467,6 +516,11 @@ const snackbar = ref<{ show: boolean; text: string; color: 'success' | 'error' }
   text: '',
   color: 'success',
 })
+
+/* ===== 🆕 Excepción RTM_VIGENTE (SUPER_ADMIN / GERENCIA) ===== */
+const showExcepcionRtmDialog = ref(false)
+const excepcionRtmDias = ref<number | null>(null)
+const excepcionAprobada = ref(false)
 
 /* ===== RTM verificación ===== */
 const rtmInfo = ref<RtmVerificacion | null>(null)
@@ -943,6 +997,35 @@ async function confirmCreate() {
   await handleSubmit()
 }
 
+/** Arma el payload desde form.value (imágenes ya subidas) y crea el dateo. */
+async function submitDateo(confirmarExcepcion = false) {
+  const payload: CreateDateoPayload = {
+    canal: form.value.canal,
+    origen: 'UI',
+    agente_id: form.value.agente_id,
+    convenio_id: form.value.convenio_id,
+    placa: form.value.placa ? form.value.placa.toUpperCase().trim() : null,
+    telefono: form.value.telefono || null,
+    observacion: form.value.observacion || null,
+    descuento_id: puedeSeleccionarDescuento.value ? (form.value.descuento_id || null) : null,
+    es_avance: form.value.es_avance || false,
+    comprobante_avance_url: form.value.es_avance ? (form.value.comprobante_avance_url || null) : null,
+    servicio_id: form.value.servicio_id || null, // 🆕
+  }
+
+  if (form.value.imagen_url) {
+    payload.imagen_url = form.value.imagen_url
+    payload.imagen_mime = form.value.imagen_mime ?? null
+    payload.imagen_tamano_bytes = form.value.imagen_tamano_bytes ?? null
+    payload.imagen_hash = form.value.imagen_hash ?? null
+    payload.imagen_origen_id = form.value.imagen_origen_id ?? null
+  }
+
+  if (confirmarExcepcion) payload.confirmar_excepcion = true
+
+  return createDateo(payload)
+}
+
 async function handleSubmit() {
   const valid = await formRef.value?.validate()
   if (!valid?.valid) {
@@ -973,34 +1056,45 @@ async function handleSubmit() {
       if (!comprobanteSubido) { loading.value = false; return }
     }
 
-    const payload: CreateDateoPayload = {
-      canal: form.value.canal,
-      origen: 'UI',
-      agente_id: form.value.agente_id,
-      convenio_id: form.value.convenio_id,
-      placa: form.value.placa ? form.value.placa.toUpperCase().trim() : null,
-      telefono: form.value.telefono || null,
-      observacion: form.value.observacion || null,
-      descuento_id: puedeSeleccionarDescuento.value ? (form.value.descuento_id || null) : null,
-      es_avance: form.value.es_avance || false,
-      comprobante_avance_url: form.value.es_avance ? (form.value.comprobante_avance_url || null) : null,
-      servicio_id: form.value.servicio_id || null, // 🆕
-    }
-
-    if (form.value.imagen_url) {
-      payload.imagen_url = form.value.imagen_url
-      payload.imagen_mime = form.value.imagen_mime ?? null
-      payload.imagen_tamano_bytes = form.value.imagen_tamano_bytes ?? null
-      payload.imagen_hash = form.value.imagen_hash ?? null
-      payload.imagen_origen_id = form.value.imagen_origen_id ?? null
-    }
-
-    await createDateo(payload)
+    excepcionAprobada.value = false
+    await submitDateo(false)
     showSuccessDialog.value = true
   } catch (error) {
-    console.error('❌ Error creando dateo:', error)
-    const errorObj = error as { response?: { data?: { message?: string } }; message?: string }
-    const msg = errorObj?.response?.data?.message || errorObj?.message || 'Error al crear el dateo'
+    // http.ts lanza HttpError (fetch-based), no un error estilo axios: el body
+    // del backend viene en error.data, NO en error.response.data.
+    const data =
+      error instanceof HttpError
+        ? (error.data as { code?: string; diasExcedidos?: number; message?: string } | undefined)
+        : undefined
+    const code = data?.code
+
+    if (code === 'RTM_VIGENTE_EXCEPCION_DISPONIBLE' && esPrivilegiado.value) {
+      excepcionRtmDias.value = data?.diasExcedidos ?? null
+      showExcepcionRtmDialog.value = true
+    } else {
+      console.error('❌ Error creando dateo:', error)
+      const fallback = error instanceof Error ? error.message : 'Error al crear el dateo'
+      const msg = data?.message || fallback
+      snackbar.value = { show: true, color: 'error', text: msg }
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+/** El admin confirmó crear el dateo aunque exceda los días permitidos de RTM. */
+async function confirmarExcepcionRtm() {
+  showExcepcionRtmDialog.value = false
+  loading.value = true
+  try {
+    await submitDateo(true)
+    excepcionAprobada.value = true
+    showSuccessDialog.value = true
+  } catch (error) {
+    console.error('❌ Error creando dateo con excepción RTM:', error)
+    const data = error instanceof HttpError ? (error.data as { message?: string } | undefined) : undefined
+    const fallback = error instanceof Error ? error.message : 'Error al crear el dateo'
+    const msg = data?.message || fallback
     snackbar.value = { show: true, color: 'error', text: msg }
   } finally {
     loading.value = false
