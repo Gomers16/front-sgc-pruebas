@@ -392,6 +392,17 @@ const routes: RouteRecordRaw[] = [
       roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
     },
   },
+  {
+    path: '/reportes-admin/meta-mensual',
+    name: 'ReporteMetaMensual',
+    component: () => import('@/views/reportes/ReporteMetaMensual.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Meta Mensual',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
 ]
 
 const router = createRouter({

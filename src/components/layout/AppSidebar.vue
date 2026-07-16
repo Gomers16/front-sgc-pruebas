@@ -350,6 +350,13 @@
             link
             class="nav-item-child"
           />
+          <v-list-item
+            prepend-icon="mdi-target"
+            title="Meta Mensual"
+            :to="{ name: 'ReporteMetaMensual' }"
+            link
+            class="nav-item-child"
+          />
         </v-list-group>
 
         <!-- Comercial -->

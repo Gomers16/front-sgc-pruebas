@@ -16,7 +16,7 @@ function buildQuery(params?: Record<string, unknown>) {
 
 async function apiFetch<T>(
   endpoint: string,
-  opts: { query?: Record<string, unknown> } = {}
+  opts: { query?: Record<string, unknown>; method?: 'GET' | 'POST'; body?: unknown } = {}
 ) {
   const url = `${BASE}${endpoint}${buildQuery(opts.query)}`
 
@@ -27,7 +27,11 @@ async function apiFetch<T>(
     sessionStorage.getItem('token') || localStorage.getItem('token')
   if (token) (headers as Record<string, string>).Authorization = `Bearer ${token}`
 
-  const res = await fetch(url, { method: 'GET', headers })
+  const res = await fetch(url, {
+    method: opts.method ?? 'GET',
+    headers,
+    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+  })
 
   if (!res.ok) {
     let msg = `HTTP ${res.status}`
@@ -526,5 +530,178 @@ export async function getDetalleComisionesPorConvenio(
 ): Promise<DetalleComisionesResponse> {
   return apiFetch<DetalleComisionesResponse>('/reportes-admin/detalle-comisiones', {
     query: { fecha_inicio: fechaInicio, fecha_fin: fechaFin, convenio_id: convenioId },
+  })
+}
+
+/* ======================= Reporte Meta Mensual ======================= */
+
+export type FuenteMetaMensual = 'real' | 'historico' | 'sin_datos'
+export type SemaforoColor = 'VERDE' | 'AMARILLO' | 'ROJO'
+
+export interface MetaMensualConfig {
+  mes: number
+  anio: number
+  meta_livianos: number
+  meta_motos: number
+  meta_total: number
+  pct_crecimiento_referencia: number
+}
+
+export interface MetaMensualKpi {
+  meta: number
+  avance: number
+  pct_avance: number
+  proyeccion_cierre: number
+  pct_proyeccion: number
+}
+
+export interface MetaMensualResumenResponse {
+  mes: number
+  anio: number
+  fuente_datos: FuenteMetaMensual
+  dias_transcurridos: number
+  dias_del_mes: number
+  kpis: {
+    total_general: MetaMensualKpi
+    livianos: MetaMensualKpi
+    motos: MetaMensualKpi
+  }
+  semaforo: {
+    general: SemaforoColor
+    diario: SemaforoColor
+    semanal: SemaforoColor
+    meta: SemaforoColor
+    proyectado: SemaforoColor
+  }
+}
+
+export interface MetaMensualDiarioDia {
+  fecha: string
+  livianos: number
+  motos: number
+  total: number
+  acumulado_livianos: number
+  acumulado_motos: number
+  acumulado_total: number
+  pct_vs_meta: number
+  total_anio_anterior: number | null
+  diferencia_vs_anio_anterior: number | null
+}
+
+export interface MetaMensualDiarioResponse {
+  mes: number
+  anio: number
+  fuente_datos: FuenteMetaMensual
+  fuente_datos_anio_anterior: FuenteMetaMensual
+  meta_total: number
+  dias: MetaMensualDiarioDia[]
+}
+
+export interface MetaMensualSemana {
+  inicio: string
+  fin: string
+  livianos: number
+  motos: number
+  total: number
+  pct_livianos: number
+  pct_motos: number
+}
+
+export interface MetaMensualSemanalResponse {
+  mes: number
+  anio: number
+  fuente_datos: FuenteMetaMensual
+  meta_livianos: number
+  meta_motos: number
+  meta_total: number
+  semanas: MetaMensualSemana[]
+}
+
+export interface MetaMensualProyectadoDia {
+  fecha: string
+  acumulado_livianos: number
+  acumulado_motos: number
+  promedio_diario_livianos: number
+  promedio_diario_motos: number
+  proyeccion_cierre_livianos: number
+  proyeccion_cierre_motos: number
+  proyeccion_cierre_total: number
+}
+
+export interface MetaMensualProyectadoResponse {
+  mes: number
+  anio: number
+  fuente_datos: FuenteMetaMensual
+  dias_transcurridos: number
+  dias_del_mes: number
+  meta_livianos: number
+  meta_motos: number
+  meta_total: number
+  resumen: {
+    promedio_diario_livianos: number
+    promedio_diario_motos: number
+    proyeccion_cierre_livianos: number
+    proyeccion_cierre_motos: number
+    proyeccion_cierre_total: number
+    pct_proyeccion_total: number
+  } | null
+  dias: MetaMensualProyectadoDia[]
+}
+
+export async function getMetaMensualConfig(
+  mes: number,
+  anio: number
+): Promise<MetaMensualConfig> {
+  return apiFetch<MetaMensualConfig>('/reportes-admin/meta-mensual/config', {
+    query: { mes, anio },
+  })
+}
+
+export async function putMetaMensualConfig(payload: {
+  mes: number
+  anio: number
+  meta_livianos: number
+  meta_motos: number
+  pct_crecimiento_referencia: number
+}): Promise<MetaMensualConfig> {
+  return apiFetch<MetaMensualConfig>('/reportes-admin/meta-mensual/config', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+export async function getMetaMensualResumen(
+  mes: number,
+  anio: number
+): Promise<MetaMensualResumenResponse> {
+  return apiFetch<MetaMensualResumenResponse>('/reportes-admin/meta-mensual/resumen', {
+    query: { mes, anio },
+  })
+}
+
+export async function getMetaMensualDiario(
+  mes: number,
+  anio: number
+): Promise<MetaMensualDiarioResponse> {
+  return apiFetch<MetaMensualDiarioResponse>('/reportes-admin/meta-mensual/diario', {
+    query: { mes, anio },
+  })
+}
+
+export async function getMetaMensualSemanal(
+  mes: number,
+  anio: number
+): Promise<MetaMensualSemanalResponse> {
+  return apiFetch<MetaMensualSemanalResponse>('/reportes-admin/meta-mensual/semanal', {
+    query: { mes, anio },
+  })
+}
+
+export async function getMetaMensualProyectado(
+  mes: number,
+  anio: number
+): Promise<MetaMensualProyectadoResponse> {
+  return apiFetch<MetaMensualProyectadoResponse>('/reportes-admin/meta-mensual/proyectado', {
+    query: { mes, anio },
   })
 }
