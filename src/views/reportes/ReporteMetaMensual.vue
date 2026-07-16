@@ -21,9 +21,9 @@
           :color="colorSemaforo(resumen.semaforo.general)"
           variant="flat"
           size="large"
-          prepend-icon="mdi-circle"
+          :prepend-icon="iconSemaforo(resumen.semaforo.general)"
         >
-          {{ resumen.semaforo.general }}
+          {{ labelSemaforo(resumen.semaforo.general) }}
         </v-chip>
       </v-card-title>
 
@@ -79,7 +79,15 @@
       <v-col cols="12" sm="6" md="3">
         <v-card elevation="6" class="rounded-xl kpi-card" :class="borderSemaforo(resumen?.semaforo.general)">
           <v-card-text>
-            <div class="text-caption text-medium-emphasis">Total General</div>
+            <div class="text-caption text-medium-emphasis d-flex align-center">
+              Total General
+              <v-tooltip location="top" max-width="240">
+                <template #activator="{ props }">
+                  <v-icon v-bind="props" size="14" icon="mdi-information-outline" class="ml-1" />
+                </template>
+                <span>{{ TOOLTIPS.totalGeneral }}</span>
+              </v-tooltip>
+            </div>
             <div class="text-h5 font-weight-bold">
               {{ formatNum(resumen?.kpis.total_general.avance) }} / {{ formatNum(resumen?.kpis.total_general.meta) }}
             </div>
@@ -90,7 +98,15 @@
       <v-col cols="12" sm="6" md="3">
         <v-card elevation="6" class="rounded-xl kpi-card">
           <v-card-text>
-            <div class="text-caption text-medium-emphasis">Livianos</div>
+            <div class="text-caption text-medium-emphasis d-flex align-center">
+              Livianos
+              <v-tooltip location="top" max-width="240">
+                <template #activator="{ props }">
+                  <v-icon v-bind="props" size="14" icon="mdi-information-outline" class="ml-1" />
+                </template>
+                <span>{{ TOOLTIPS.livianos }}</span>
+              </v-tooltip>
+            </div>
             <div class="text-h5 font-weight-bold">
               {{ formatNum(resumen?.kpis.livianos.avance) }} / {{ formatNum(resumen?.kpis.livianos.meta) }}
             </div>
@@ -101,7 +117,15 @@
       <v-col cols="12" sm="6" md="3">
         <v-card elevation="6" class="rounded-xl kpi-card">
           <v-card-text>
-            <div class="text-caption text-medium-emphasis">Motos</div>
+            <div class="text-caption text-medium-emphasis d-flex align-center">
+              Motos
+              <v-tooltip location="top" max-width="240">
+                <template #activator="{ props }">
+                  <v-icon v-bind="props" size="14" icon="mdi-information-outline" class="ml-1" />
+                </template>
+                <span>{{ TOOLTIPS.motos }}</span>
+              </v-tooltip>
+            </div>
             <div class="text-h5 font-weight-bold">
               {{ formatNum(resumen?.kpis.motos.avance) }} / {{ formatNum(resumen?.kpis.motos.meta) }}
             </div>
@@ -112,7 +136,15 @@
       <v-col cols="12" sm="6" md="3">
         <v-card elevation="6" class="rounded-xl kpi-card" :class="borderSemaforo(resumen?.semaforo.proyectado)">
           <v-card-text>
-            <div class="text-caption text-medium-emphasis">Proyección de cierre</div>
+            <div class="text-caption text-medium-emphasis d-flex align-center">
+              Proyección de cierre
+              <v-tooltip location="top" max-width="240">
+                <template #activator="{ props }">
+                  <v-icon v-bind="props" size="14" icon="mdi-information-outline" class="ml-1" />
+                </template>
+                <span>{{ TOOLTIPS.proyeccion }}</span>
+              </v-tooltip>
+            </div>
             <div class="text-h5 font-weight-bold">
               {{ formatNum(resumen?.kpis.total_general.proyeccion_cierre) }}
             </div>
@@ -151,7 +183,25 @@
         <v-window v-model="tab">
           <!-- TAB DIARIO -->
           <v-window-item value="diario">
+            <div class="text-body-2 text-medium-emphasis mb-3">{{ textoNarrativoDiario }}</div>
+
+            <v-row class="mb-4" dense>
+              <v-col cols="12" md="6">
+                <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoAcumulado }}</div>
+                <div style="height: 220px;">
+                  <Line :data="chartDataAcumuladoMes" :options="chartOptionsAcumulado" />
+                </div>
+              </v-col>
+              <v-col cols="12" md="6">
+                <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoComparativo }}</div>
+                <div style="height: 220px;">
+                  <Bar :data="chartDataComparativoAnio" :options="chartOptionsComparativo" />
+                </div>
+              </v-col>
+            </v-row>
+
             <v-data-table
+              class="tabla-zebra"
               :headers="headersDiario"
               :items="diario?.dias ?? []"
               :loading="loading"
@@ -160,14 +210,109 @@
               hide-default-footer
               :items-per-page="-1"
             >
+              <template #header.livianos="{ column }">
+                {{ column.title }}
+                <v-tooltip location="top" max-width="200">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="12" icon="mdi-information-outline" class="ml-1" />
+                  </template>
+                  <span>{{ TOOLTIPS.colLivianos }}</span>
+                </v-tooltip>
+              </template>
+              <template #header.motos="{ column }">
+                {{ column.title }}
+                <v-tooltip location="top" max-width="200">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="12" icon="mdi-information-outline" class="ml-1" />
+                  </template>
+                  <span>{{ TOOLTIPS.colMotos }}</span>
+                </v-tooltip>
+              </template>
+              <template #header.total="{ column }">
+                {{ column.title }}
+                <v-tooltip location="top" max-width="200">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="12" icon="mdi-information-outline" class="ml-1" />
+                  </template>
+                  <span>{{ TOOLTIPS.colTotal }}</span>
+                </v-tooltip>
+              </template>
+              <template #header.acumulado_livianos="{ column }">
+                {{ column.title }}
+                <v-tooltip location="top" max-width="200">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="12" icon="mdi-information-outline" class="ml-1" />
+                  </template>
+                  <span>{{ TOOLTIPS.colAcumLivianos }}</span>
+                </v-tooltip>
+              </template>
+              <template #header.acumulado_motos="{ column }">
+                {{ column.title }}
+                <v-tooltip location="top" max-width="200">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="12" icon="mdi-information-outline" class="ml-1" />
+                  </template>
+                  <span>{{ TOOLTIPS.colAcumMotos }}</span>
+                </v-tooltip>
+              </template>
+              <template #header.acumulado_total="{ column }">
+                {{ column.title }}
+                <v-tooltip location="top" max-width="200">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="12" icon="mdi-information-outline" class="ml-1" />
+                  </template>
+                  <span>{{ TOOLTIPS.colAcumTotal }}</span>
+                </v-tooltip>
+              </template>
+              <template #header.pct_vs_meta="{ column }">
+                {{ column.title }}
+                <v-tooltip location="top" max-width="200">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="12" icon="mdi-information-outline" class="ml-1" />
+                  </template>
+                  <span>{{ TOOLTIPS.colPctMeta }}</span>
+                </v-tooltip>
+              </template>
+              <template #header.vs_anio_anterior="{ column }">
+                {{ column.title }}
+                <v-tooltip location="top" max-width="220">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="12" icon="mdi-information-outline" class="ml-1" />
+                  </template>
+                  <span>{{ TOOLTIPS.colVsAnioAnterior }}</span>
+                </v-tooltip>
+              </template>
               <template #item.fecha="{ item }">{{ formatFechaCorta(item.fecha) }}</template>
-              <template #item.pct_vs_meta="{ item }">{{ formatPct(item.pct_vs_meta) }}</template>
-              <template #item.total_anio_anterior="{ item }">{{ item.total_anio_anterior ?? '—' }}</template>
-              <template #item.diferencia_vs_anio_anterior="{ item }">
-                <span v-if="item.diferencia_vs_anio_anterior === null">—</span>
-                <span v-else :class="item.diferencia_vs_anio_anterior >= 0 ? 'text-green-darken-2' : 'text-red-darken-2'">
-                  {{ item.diferencia_vs_anio_anterior >= 0 ? '+' : '' }}{{ item.diferencia_vs_anio_anterior }}
-                </span>
+              <template #item.pct_vs_meta="{ item }">
+                <span v-if="item.pct_vs_meta === null" class="text-caption text-medium-emphasis">Sin meta</span>
+                <div v-else class="d-flex align-center ga-2">
+                  <span class="text-caption" style="min-width: 40px;">{{ formatPct(item.pct_vs_meta) }}</span>
+                  <v-progress-linear
+                    :model-value="Math.min(100, item.pct_vs_meta)"
+                    height="5"
+                    rounded
+                    :color="colorPctVsMeta(item.pct_vs_meta)"
+                    style="flex: 1; max-width: 70px;"
+                  />
+                </div>
+              </template>
+              <template #item.vs_anio_anterior="{ item }">
+                <template v-if="item.diferencia_vs_anio_anterior === null">
+                  <span class="text-caption text-medium-emphasis">Sin dato</span>
+                </template>
+                <template v-else>
+                  <div class="d-flex align-center ga-1">
+                    <v-chip
+                      size="small"
+                      :color="item.diferencia_vs_anio_anterior >= 0 ? 'success' : 'error'"
+                      variant="tonal"
+                      :prepend-icon="item.diferencia_vs_anio_anterior >= 0 ? 'mdi-arrow-up' : 'mdi-arrow-down'"
+                    >
+                      {{ item.diferencia_vs_anio_anterior >= 0 ? '+' : '' }}{{ item.diferencia_vs_anio_anterior }}
+                    </v-chip>
+                    <span class="text-caption text-medium-emphasis">({{ item.total_anio_anterior ?? '—' }})</span>
+                  </div>
+                </template>
               </template>
             </v-data-table>
 
@@ -182,12 +327,9 @@
 
           <!-- TAB SEMANAL -->
           <v-window-item value="semanal">
-            <div class="text-caption text-medium-emphasis mb-3">
-              Semanas sábado→viernes. Cada semana se compara contra la meta TOTAL del mes
-              ({{ formatNum(semanal?.meta_livianos) }} livianos / {{ formatNum(semanal?.meta_motos) }} motos),
-              sin prorratear entre semanas.
-            </div>
+            <div class="text-body-2 text-medium-emphasis mb-3">{{ textoNarrativoSemanal }}</div>
             <v-data-table
+              class="tabla-zebra"
               :headers="headersSemanal"
               :items="semanal?.semanas ?? []"
               :loading="loading"
@@ -199,8 +341,32 @@
               <template #item.semana="{ item }">
                 {{ formatFechaCorta(item.inicio) }} — {{ formatFechaCorta(item.fin) }}
               </template>
-              <template #item.pct_livianos="{ item }">{{ formatPct(item.pct_livianos) }}</template>
-              <template #item.pct_motos="{ item }">{{ formatPct(item.pct_motos) }}</template>
+              <template #item.pct_livianos="{ item }">
+                <span v-if="item.pct_livianos === null" class="text-caption text-medium-emphasis">Sin meta</span>
+                <div v-else class="d-flex align-center ga-2">
+                  <span class="text-caption" style="min-width: 40px;">{{ formatPct(item.pct_livianos) }}</span>
+                  <v-progress-linear
+                    :model-value="Math.min(100, item.pct_livianos)"
+                    height="5"
+                    rounded
+                    :color="colorPctVsMeta(item.pct_livianos)"
+                    style="flex: 1; max-width: 70px;"
+                  />
+                </div>
+              </template>
+              <template #item.pct_motos="{ item }">
+                <span v-if="item.pct_motos === null" class="text-caption text-medium-emphasis">Sin meta</span>
+                <div v-else class="d-flex align-center ga-2">
+                  <span class="text-caption" style="min-width: 40px;">{{ formatPct(item.pct_motos) }}</span>
+                  <v-progress-linear
+                    :model-value="Math.min(100, item.pct_motos)"
+                    height="5"
+                    rounded
+                    :color="colorPctVsMeta(item.pct_motos)"
+                    style="flex: 1; max-width: 70px;"
+                  />
+                </div>
+              </template>
             </v-data-table>
 
             <v-alert v-if="!loading && !semanal?.semanas.length" type="info" variant="tonal" class="mt-4">
@@ -210,6 +376,7 @@
 
           <!-- TAB META (configuración) -->
           <v-window-item value="meta">
+            <div class="text-body-2 text-medium-emphasis mb-3">{{ textoNarrativoMeta }}</div>
             <v-row>
               <v-col cols="12" md="6">
                 <v-card variant="outlined" class="rounded-xl">
@@ -263,7 +430,7 @@
                           (falta {{ formatNum(Math.max(0, resumen.kpis.livianos.meta - resumen.kpis.livianos.avance)) }})</span>
                       </div>
                       <v-progress-linear
-                        :model-value="resumen.kpis.livianos.pct_avance"
+                        :model-value="resumen.kpis.livianos.pct_avance ?? 0"
                         :color="colorSemaforo(resumen.semaforo.meta)"
                         height="10"
                         rounded
@@ -277,7 +444,7 @@
                           (falta {{ formatNum(Math.max(0, resumen.kpis.motos.meta - resumen.kpis.motos.avance)) }})</span>
                       </div>
                       <v-progress-linear
-                        :model-value="resumen.kpis.motos.pct_avance"
+                        :model-value="resumen.kpis.motos.pct_avance ?? 0"
                         :color="colorSemaforo(resumen.semaforo.meta)"
                         height="10"
                         rounded
@@ -291,7 +458,7 @@
                           (falta {{ formatNum(Math.max(0, resumen.kpis.total_general.meta - resumen.kpis.total_general.avance)) }})</span>
                       </div>
                       <v-progress-linear
-                        :model-value="resumen.kpis.total_general.pct_avance"
+                        :model-value="resumen.kpis.total_general.pct_avance ?? 0"
                         :color="colorSemaforo(resumen.semaforo.meta)"
                         height="12"
                         rounded
@@ -306,6 +473,7 @@
 
           <!-- TAB PROYECTADO -->
           <v-window-item value="proyectado">
+            <div class="text-body-2 text-medium-emphasis mb-3">{{ textoNarrativoProyectado }}</div>
             <v-row v-if="proyectado?.resumen" class="mb-3" dense>
               <v-col cols="12" sm="4">
                 <v-card variant="tonal" class="rounded-xl">
@@ -360,7 +528,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import {
   getMetaMensualConfig,
   putMetaMensualConfig,
@@ -375,6 +543,33 @@ import {
   type FuenteMetaMensual,
   type SemaforoColor,
 } from '@/services/reportesAdminService'
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  LineElement,
+  PointElement,
+  LineController,
+  Filler,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+} from 'chart.js'
+import { Line, Bar } from 'vue-chartjs'
+
+ChartJS.register(
+  Title,
+  Tooltip,
+  Legend,
+  LineElement,
+  PointElement,
+  LineController,
+  Filler,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+)
 
 /* ===== Selector mes/año ===== */
 const MESES = [
@@ -422,7 +617,8 @@ function formatNum(n: number | undefined | null) {
   return new Intl.NumberFormat('es-CO').format(n)
 }
 function formatPct(n: number | undefined | null) {
-  if (n === undefined || n === null) return '—'
+  if (n === undefined) return '—'
+  if (n === null) return 'Sin meta'
   return `${n}%`
 }
 function formatFechaCorta(fecha: string) {
@@ -434,15 +630,223 @@ const SEMAFORO_COLOR: Record<SemaforoColor, string> = {
   VERDE: 'green-darken-1',
   AMARILLO: 'amber-darken-2',
   ROJO: 'red-darken-1',
+  SIN_META: 'grey-darken-1',
+}
+const SEMAFORO_LABEL: Record<SemaforoColor, string> = {
+  VERDE: 'VERDE',
+  AMARILLO: 'AMARILLO',
+  ROJO: 'ROJO',
+  SIN_META: 'SIN META',
+}
+const SEMAFORO_ICON: Record<SemaforoColor, string> = {
+  VERDE: 'mdi-circle',
+  AMARILLO: 'mdi-circle',
+  ROJO: 'mdi-circle',
+  SIN_META: 'mdi-minus-circle-outline',
 }
 function colorSemaforo(color: SemaforoColor | undefined) {
   if (!color) return 'grey'
   return SEMAFORO_COLOR[color]
 }
+function labelSemaforo(color: SemaforoColor | undefined) {
+  if (!color) return ''
+  return SEMAFORO_LABEL[color]
+}
+function iconSemaforo(color: SemaforoColor | undefined) {
+  if (!color) return 'mdi-circle'
+  return SEMAFORO_ICON[color]
+}
 function borderSemaforo(color: SemaforoColor | undefined) {
   if (!color) return ''
   return `border-${color.toLowerCase()}`
 }
+function colorPctVsMeta(pct: number) {
+  if (pct >= 100) return colorSemaforo('VERDE')
+  if (pct >= 90) return colorSemaforo('AMARILLO')
+  return colorSemaforo('ROJO')
+}
+
+const TOOLTIPS = {
+  totalGeneral:
+    'Suma de todos los turnos RTM finalizados en el mes (livianos + motos), comparados contra la meta total.',
+  livianos:
+    'Turnos RTM finalizados de vehículos livianos (particular, taxi y público) en el mes, comparados contra su meta.',
+  motos: 'Turnos RTM finalizados de motocicletas en el mes, comparados contra su meta.',
+  proyeccion: 'Estimado de cómo cerrará el mes si se mantiene el ritmo actual de turnos por día.',
+  colLivianos: 'Turnos de vehículos livianos finalizados ese día.',
+  colMotos: 'Turnos de motocicletas finalizadas ese día.',
+  colTotal: 'Suma de livianos + motos de ese día.',
+  colAcumLivianos: 'Total de livianos acumulados desde el día 1 del mes hasta este día.',
+  colAcumMotos: 'Total de motos acumuladas desde el día 1 del mes hasta este día.',
+  colAcumTotal: 'Total general acumulado (livianos + motos) desde el día 1 del mes hasta este día.',
+  colPctMeta:
+    "Porcentaje del acumulado del mes frente a la meta total configurada. Si no hay meta configurada, se muestra 'Sin meta'.",
+  colVsAnioAnterior:
+    'Compara el total de ese día contra el mismo día del año anterior: el chip muestra cuántos turnos más (o menos) se hicieron; el número entre paréntesis es el total de ese día el año pasado.',
+}
+
+const textoNarrativoDiario = computed(() => {
+  if (!resumen.value) return ''
+  const pct = resumen.value.kpis.total_general.pct_avance
+  const diasRestantes = Math.max(0, resumen.value.dias_del_mes - resumen.value.dias_transcurridos)
+  if (pct === null) {
+    return `Este es el avance día a día de turnos RTM (livianos + motos) del mes. Aún no hay una meta configurada para ${etiquetaMes(mesSeleccionado.value)} ${anioSeleccionado.value} — configúrala en la pestaña "Meta" para ver el % de cumplimiento.`
+  }
+  return `Este es el avance día a día de turnos RTM (livianos + motos) frente a la meta del mes. Vas en ${pct}% con ${diasRestantes} día${diasRestantes === 1 ? '' : 's'} restante${diasRestantes === 1 ? '' : 's'}.`
+})
+
+/* ===== Gráficos tab Diario ===== */
+const CHART_COLORS = { esteAnio: '#42A5F5', anioAnterior: '#9E9E9E', metaLinea: '#9E9E9E' }
+
+const chartDataAcumuladoMes = computed(() => {
+  const dias = diario.value?.dias ?? []
+  const labels = dias.map((d) => formatFechaCorta(d.fecha))
+
+  const datasets: any[] = [
+    {
+      label: 'Acumulado del mes',
+      data: dias.map((d) => d.acumulado_total),
+      borderColor: CHART_COLORS.esteAnio,
+      backgroundColor: 'rgba(66, 165, 245, 0.25)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 2,
+    },
+  ]
+
+  const pctAvance = resumen.value?.kpis.total_general.pct_avance ?? null
+  const metaTotal = resumen.value?.kpis.total_general.meta ?? null
+  if (pctAvance !== null && metaTotal) {
+    datasets.push({
+      label: 'Meta del mes',
+      data: dias.map(() => metaTotal),
+      borderColor: CHART_COLORS.metaLinea,
+      borderDash: [6, 6],
+      fill: false,
+      pointRadius: 0,
+    })
+  }
+
+  return { labels, datasets }
+})
+
+const chartOptionsAcumulado = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { position: 'top' as const },
+  },
+  scales: {
+    y: { beginAtZero: true },
+  },
+}
+
+const chartDataComparativoAnio = computed(() => {
+  const dias = diario.value?.dias ?? []
+  const labels = dias.map((d) => formatFechaCorta(d.fecha))
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: `Este año (${anioSeleccionado.value})`,
+        backgroundColor: CHART_COLORS.esteAnio,
+        data: dias.map((d) => d.total),
+      },
+      {
+        label: 'Año anterior',
+        backgroundColor: CHART_COLORS.anioAnterior,
+        data: dias.map((d) => (d.total_anio_anterior === null ? null : d.total_anio_anterior)),
+      },
+    ],
+  }
+})
+
+const chartOptionsComparativo = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { position: 'top' as const },
+    tooltip: {
+      callbacks: {
+        label: (context: { dataset: { label?: string }; parsed: { y: number | null } }) => {
+          const label = context.dataset.label ?? ''
+          if (context.parsed.y === null) return `${label}: sin dato`
+          return `${label}: ${context.parsed.y}`
+        },
+      },
+    },
+  },
+}
+
+const textoGraficoAcumulado = computed(() => {
+  if (!resumen.value || !diario.value) return ''
+  const pct = resumen.value.kpis.total_general.pct_avance
+  if (pct === null) {
+    return `El área muestra tu acumulado real del mes. Configura una meta en la pestaña "Meta" para ver la línea de referencia.`
+  }
+  const { meta, avance } = resumen.value.kpis.total_general
+  const { dias_del_mes: diasDelMes, dias_transcurridos: diasTranscurridos } = resumen.value
+  const ritmoEsperado = diasDelMes > 0 ? (meta * diasTranscurridos) / diasDelMes : 0
+  const vaBien = avance >= ritmoEsperado
+  return `El área muestra tu acumulado real; la línea punteada es la meta del mes. Hoy vas ${vaBien ? 'por encima' : 'por debajo'} del ritmo necesario para llegar a la meta.`
+})
+
+const textoGraficoComparativo = computed(() => {
+  const dias = diario.value?.dias ?? []
+  const conDato = dias.filter((d) => d.diferencia_vs_anio_anterior !== null)
+  if (conDato.length === 0) {
+    return 'Cada barra compara ese día contra el mismo día del año anterior.'
+  }
+  const mejores = conDato.filter((d) => (d.diferencia_vs_anio_anterior as number) > 0).length
+  return `Cada barra compara ese día contra el mismo día del año anterior. Vas mejor que el año pasado en ${mejores} de ${conDato.length} días.`
+})
+
+const textoNarrativoSemanal = computed(() => {
+  if (!resumen.value || !semanal.value) return ''
+  const pct = resumen.value.kpis.total_general.pct_avance
+  const semanas = semanal.value.semanas
+  const hoy = new Date()
+  const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+  const semanasCompletas = semanas.filter((s) => s.fin < hoyISO).length
+  const acumulado = semanas.reduce((acc, s) => acc + s.total, 0)
+  const plural = semanasCompletas === 1 ? '' : 's'
+  if (pct === null) {
+    return `Estos son los turnos agrupados por semana (sábado a viernes) frente a la meta total del mes. Aún no hay una meta configurada para ${etiquetaMes(mesSeleccionado.value)} ${anioSeleccionado.value} — configúrala en la pestaña "Meta" para ver el % de cumplimiento. Llevas ${semanasCompletas} semana${plural} completa${plural} con un acumulado de ${formatNum(acumulado)} turnos.`
+  }
+  return `Estos son los turnos agrupados por semana (sábado a viernes) frente a la meta total del mes (${formatNum(resumen.value.kpis.total_general.meta)}). Llevas ${semanasCompletas} semana${plural} completa${plural} con un acumulado de ${formatNum(acumulado)} turnos.`
+})
+
+const textoNarrativoMeta = computed(() => {
+  if (!resumen.value) return ''
+  const pct = resumen.value.kpis.total_general.pct_avance
+  const mesLabel = `${etiquetaMes(mesSeleccionado.value)} ${anioSeleccionado.value}`
+  if (pct === null) {
+    return `Aquí configuras la meta mensual de turnos RTM (livianos y motos) y ves cuánto falta para cumplirla. Aún no hay una meta configurada para ${mesLabel} — complétala en el formulario de la izquierda para ver el avance.`
+  }
+  const avance = resumen.value.kpis.total_general.avance
+  const meta = resumen.value.kpis.total_general.meta
+  if (avance >= meta) {
+    return `Aquí configuras la meta mensual de turnos RTM (livianos y motos) y ves cuánto falta para cumplirla. Meta cumplida: llevas ${formatNum(avance)} de ${formatNum(meta)} turnos (${pct}%).`
+  }
+  const falta = meta - avance
+  return `Aquí configuras la meta mensual de turnos RTM (livianos y motos) y ves cuánto falta para cumplirla. Llevas ${formatNum(avance)} de ${formatNum(meta)} turnos (${pct}%) — faltan ${formatNum(falta)} para completar la meta del mes.`
+})
+
+const textoNarrativoProyectado = computed(() => {
+  if (!proyectado.value) return ''
+  const r = proyectado.value.resumen
+  const mesLabel = `${etiquetaMes(mesSeleccionado.value)} ${anioSeleccionado.value}`
+  if (!r) {
+    return `Esto estima el cierre del mes según el promedio diario actual (solo días ya transcurridos). Aún no hay días con datos para calcular una proyección de ${mesLabel}.`
+  }
+  const promedioTotal = (r.promedio_diario_livianos + r.promedio_diario_motos).toFixed(1)
+  if (r.pct_proyeccion_total === null) {
+    return `Esto estima el cierre del mes según el promedio diario actual (solo días ya transcurridos, sin contar días futuros en cero). Con el promedio actual de ${promedioTotal} turnos/día, se proyecta cerrar el mes en ${formatNum(r.proyeccion_cierre_total)} turnos. Aún no hay una meta configurada para ${mesLabel} — configúrala en la pestaña "Meta" para saber si esa proyección alcanza.`
+  }
+  const alcanza = r.pct_proyeccion_total >= 100
+  return `Esto estima el cierre del mes según el promedio diario actual (solo días ya transcurridos, sin contar días futuros en cero). Con el promedio actual de ${promedioTotal} turnos/día, se proyecta cerrar el mes en ${formatNum(r.proyeccion_cierre_total)} turnos — ${alcanza ? 'alcanza' : 'no alcanza'} la meta de ${formatNum(proyectado.value.meta_total)}.`
+})
 
 const FUENTE_LABEL: Record<FuenteMetaMensual, string> = {
   real: 'Datos reales (turnos_rtms)',
@@ -471,8 +875,7 @@ const headersDiario = [
   { title: 'Acum. Motos', key: 'acumulado_motos' },
   { title: 'Acum. Total', key: 'acumulado_total' },
   { title: '% vs Meta', key: 'pct_vs_meta' },
-  { title: 'Año anterior', key: 'total_anio_anterior' },
-  { title: 'Diferencia', key: 'diferencia_vs_anio_anterior' },
+  { title: 'vs. Año anterior', key: 'vs_anio_anterior', sortable: false },
 ]
 
 const headersSemanal = [
@@ -561,4 +964,9 @@ onMounted(() => {
 .border-verde { border-left-color: #2e7d32; }
 .border-amarillo { border-left-color: #ff8f00; }
 .border-rojo { border-left-color: #c62828; }
+.border-sin_meta { border-left-color: #9e9e9e; }
+
+:deep(.tabla-zebra tbody tr:nth-child(even)) {
+  background-color: rgba(0, 0, 0, 0.025);
+}
 </style>

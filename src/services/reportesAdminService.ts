@@ -536,7 +536,7 @@ export async function getDetalleComisionesPorConvenio(
 /* ======================= Reporte Meta Mensual ======================= */
 
 export type FuenteMetaMensual = 'real' | 'historico' | 'sin_datos'
-export type SemaforoColor = 'VERDE' | 'AMARILLO' | 'ROJO'
+export type SemaforoColor = 'VERDE' | 'AMARILLO' | 'ROJO' | 'SIN_META'
 
 export interface MetaMensualConfig {
   mes: number
@@ -550,9 +550,9 @@ export interface MetaMensualConfig {
 export interface MetaMensualKpi {
   meta: number
   avance: number
-  pct_avance: number
+  pct_avance: number | null
   proyeccion_cierre: number
-  pct_proyeccion: number
+  pct_proyeccion: number | null
 }
 
 export interface MetaMensualResumenResponse {
@@ -583,7 +583,7 @@ export interface MetaMensualDiarioDia {
   acumulado_livianos: number
   acumulado_motos: number
   acumulado_total: number
-  pct_vs_meta: number
+  pct_vs_meta: number | null
   total_anio_anterior: number | null
   diferencia_vs_anio_anterior: number | null
 }
@@ -603,8 +603,8 @@ export interface MetaMensualSemana {
   livianos: number
   motos: number
   total: number
-  pct_livianos: number
-  pct_motos: number
+  pct_livianos: number | null
+  pct_motos: number | null
 }
 
 export interface MetaMensualSemanalResponse {
@@ -643,7 +643,7 @@ export interface MetaMensualProyectadoResponse {
     proyeccion_cierre_livianos: number
     proyeccion_cierre_motos: number
     proyeccion_cierre_total: number
-    pct_proyeccion_total: number
+    pct_proyeccion_total: number | null
   } | null
   dias: MetaMensualProyectadoDia[]
 }
