@@ -186,17 +186,65 @@
             <div class="text-body-2 text-medium-emphasis mb-3">{{ textoNarrativoDiario }}</div>
 
             <v-row class="mb-4" dense>
-              <v-col cols="12" md="6">
-                <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoAcumulado }}</div>
-                <div style="height: 220px;">
-                  <Line :data="chartDataAcumuladoMes" :options="chartOptionsAcumulado" />
-                </div>
-              </v-col>
-              <v-col cols="12" md="6">
-                <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoComparativo }}</div>
-                <div style="height: 220px;">
-                  <Bar :data="chartDataComparativoAnio" :options="chartOptionsComparativo" />
-                </div>
+              <v-col cols="12">
+                <v-btn-toggle
+                  v-model="tipoGraficoDiario"
+                  color="primary"
+                  density="compact"
+                  variant="outlined"
+                  mandatory
+                  class="mb-2 flex-wrap"
+                >
+                  <v-btn value="tendencia">Tendencia</v-btn>
+                  <v-btn value="barras">Barras</v-btn>
+                  <v-btn value="comparativo">Comparativo año anterior</v-btn>
+                  <v-btn value="composicion">Composición</v-btn>
+                  <v-btn value="medidor">Medidor</v-btn>
+                </v-btn-toggle>
+
+                <template v-if="tipoGraficoDiario === 'tendencia'">
+                  <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoDiarioLinea }}</div>
+                  <div style="height: 220px;">
+                    <Line :data="chartDataDiarioLinea" :options="chartOptionsAcumulado" />
+                  </div>
+                </template>
+                <template v-else-if="tipoGraficoDiario === 'barras'">
+                  <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoDiarioBarras }}</div>
+                  <div style="height: 220px;">
+                    <Bar :data="chartDataDiarioBarras" :options="chartOptionsSemanal" />
+                  </div>
+                </template>
+                <template v-else-if="tipoGraficoDiario === 'comparativo'">
+                  <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoComparativo }}</div>
+                  <div style="height: 220px;">
+                    <Bar :data="chartDataComparativoAnio" :options="chartOptionsComparativo" />
+                  </div>
+                </template>
+                <template v-else-if="tipoGraficoDiario === 'composicion'">
+                  <div v-if="acumuladoTotalDiario > 0">
+                    <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoDiarioComposicion }}</div>
+                    <div style="height: 220px;">
+                      <Doughnut :data="chartDataDiarioComposicion" :options="chartOptionsMeta" />
+                    </div>
+                  </div>
+                  <v-alert v-else-if="!loading" type="info" variant="tonal" density="compact">
+                    Aún no hay turnos este mes.
+                  </v-alert>
+                </template>
+                <template v-else-if="tipoGraficoDiario === 'medidor'">
+                  <div v-if="pctAvanceGauge !== null" style="height: 220px; position: relative;">
+                    <Doughnut :data="chartDataDiarioGauge" :options="chartOptionsProyectado" />
+                    <div
+                      class="text-h4 font-weight-bold text-center"
+                      style="position: absolute; left: 0; right: 0; bottom: 8px; pointer-events: none;"
+                    >
+                      {{ formatPct(pctAvanceGauge) }}
+                    </div>
+                  </div>
+                  <v-alert v-else-if="!loading" type="info" variant="tonal" density="compact">
+                    {{ resumen ? 'Aún no hay una meta configurada para calcular el % de avance.' : 'Aún no hay datos para calcular el avance.' }}
+                  </v-alert>
+                </template>
               </v-col>
             </v-row>
 
@@ -328,6 +376,70 @@
           <!-- TAB SEMANAL -->
           <v-window-item value="semanal">
             <div class="text-body-2 text-medium-emphasis mb-3">{{ textoNarrativoSemanal }}</div>
+
+            <v-row class="mb-4" dense>
+              <v-col cols="12">
+                <v-btn-toggle
+                  v-model="tipoGraficoSemanal"
+                  color="primary"
+                  density="compact"
+                  variant="outlined"
+                  mandatory
+                  class="mb-2 flex-wrap"
+                >
+                  <v-btn value="tendencia">Tendencia</v-btn>
+                  <v-btn value="barras">Barras</v-btn>
+                  <v-btn value="comparativo">Comparativo año anterior</v-btn>
+                  <v-btn value="composicion">Composición</v-btn>
+                  <v-btn value="medidor">Medidor</v-btn>
+                </v-btn-toggle>
+
+                <template v-if="tipoGraficoSemanal === 'tendencia'">
+                  <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoSemanal }}</div>
+                  <div style="height: 220px;">
+                    <Line :data="chartDataSemanal" :options="chartOptionsAcumulado" />
+                  </div>
+                </template>
+                <template v-else-if="tipoGraficoSemanal === 'barras'">
+                  <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoSemanalBarras }}</div>
+                  <div style="height: 220px;">
+                    <Bar :data="chartDataSemanalBarras" :options="chartOptionsSemanal" />
+                  </div>
+                </template>
+                <template v-else-if="tipoGraficoSemanal === 'comparativo'">
+                  <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoSemanalComparativo }}</div>
+                  <div style="height: 220px;">
+                    <Bar :data="chartDataSemanalComparativo" :options="chartOptionsComparativo" />
+                  </div>
+                </template>
+                <template v-else-if="tipoGraficoSemanal === 'composicion'">
+                  <div v-if="avanceTotalMeta > 0">
+                    <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoMeta }}</div>
+                    <div style="height: 220px;">
+                      <Doughnut :data="chartDataMeta" :options="chartOptionsMeta" />
+                    </div>
+                  </div>
+                  <v-alert v-else-if="!loading" type="info" variant="tonal" density="compact">
+                    Aún no hay turnos este mes.
+                  </v-alert>
+                </template>
+                <template v-else-if="tipoGraficoSemanal === 'medidor'">
+                  <div v-if="pctAvanceGauge !== null" style="height: 220px; position: relative;">
+                    <Doughnut :data="chartDataDiarioGauge" :options="chartOptionsProyectado" />
+                    <div
+                      class="text-h4 font-weight-bold text-center"
+                      style="position: absolute; left: 0; right: 0; bottom: 8px; pointer-events: none;"
+                    >
+                      {{ formatPct(pctAvanceGauge) }}
+                    </div>
+                  </div>
+                  <v-alert v-else-if="!loading" type="info" variant="tonal" density="compact">
+                    {{ resumen ? 'Aún no hay una meta configurada para calcular el % de avance.' : 'Aún no hay datos para calcular el avance.' }}
+                  </v-alert>
+                </template>
+              </v-col>
+            </v-row>
+
             <v-data-table
               class="tabla-zebra"
               :headers="headersSemanal"
@@ -377,6 +489,70 @@
           <!-- TAB META (configuración) -->
           <v-window-item value="meta">
             <div class="text-body-2 text-medium-emphasis mb-3">{{ textoNarrativoMeta }}</div>
+
+            <v-row class="mb-4" dense>
+              <v-col cols="12">
+                <v-btn-toggle
+                  v-model="tipoGraficoMeta"
+                  color="primary"
+                  density="compact"
+                  variant="outlined"
+                  mandatory
+                  class="mb-2 flex-wrap"
+                >
+                  <v-btn value="tendencia">Tendencia</v-btn>
+                  <v-btn value="barras">Barras</v-btn>
+                  <v-btn value="comparativo">Comparativo año anterior</v-btn>
+                  <v-btn value="composicion">Composición</v-btn>
+                  <v-btn value="medidor">Medidor</v-btn>
+                </v-btn-toggle>
+
+                <template v-if="tipoGraficoMeta === 'tendencia'">
+                  <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoMetaLinea }}</div>
+                  <div style="height: 220px;">
+                    <Line :data="chartDataMetaLinea" :options="chartOptionsAcumulado" />
+                  </div>
+                </template>
+                <template v-else-if="tipoGraficoMeta === 'barras'">
+                  <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoMetaBarras }}</div>
+                  <div style="height: 220px;">
+                    <Bar :data="chartDataMetaBarras" :options="chartOptionsMetaBarras" />
+                  </div>
+                </template>
+                <template v-else-if="tipoGraficoMeta === 'comparativo'">
+                  <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoComparativo }}</div>
+                  <div style="height: 220px;">
+                    <Bar :data="chartDataComparativoAnio" :options="chartOptionsComparativo" />
+                  </div>
+                </template>
+                <template v-else-if="tipoGraficoMeta === 'composicion'">
+                  <div v-if="avanceTotalMeta > 0">
+                    <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoMeta }}</div>
+                    <div style="height: 220px;">
+                      <Doughnut :data="chartDataMeta" :options="chartOptionsMeta" />
+                    </div>
+                  </div>
+                  <v-alert v-else-if="!loading" type="info" variant="tonal" density="compact">
+                    Aún no hay turnos este mes.
+                  </v-alert>
+                </template>
+                <template v-else-if="tipoGraficoMeta === 'medidor'">
+                  <div v-if="pctAvanceGauge !== null" style="height: 220px; position: relative;">
+                    <Doughnut :data="chartDataDiarioGauge" :options="chartOptionsProyectado" />
+                    <div
+                      class="text-h4 font-weight-bold text-center"
+                      style="position: absolute; left: 0; right: 0; bottom: 8px; pointer-events: none;"
+                    >
+                      {{ formatPct(pctAvanceGauge) }}
+                    </div>
+                  </div>
+                  <v-alert v-else-if="!loading" type="info" variant="tonal" density="compact">
+                    {{ resumen ? 'Aún no hay una meta configurada para calcular el % de avance.' : 'Aún no hay datos para calcular el avance.' }}
+                  </v-alert>
+                </template>
+              </v-col>
+            </v-row>
+
             <v-row>
               <v-col cols="12" md="6">
                 <v-card variant="outlined" class="rounded-xl">
@@ -503,6 +679,73 @@
               </v-col>
             </v-row>
 
+            <v-row class="mb-4" dense>
+              <v-col cols="12">
+                <v-btn-toggle
+                  v-model="tipoGraficoProyectado"
+                  color="primary"
+                  density="compact"
+                  variant="outlined"
+                  mandatory
+                  class="mb-2 flex-wrap"
+                >
+                  <v-btn value="tendencia">Tendencia</v-btn>
+                  <v-btn value="barras">Barras</v-btn>
+                  <v-btn value="comparativo">Comparativo año anterior</v-btn>
+                  <v-btn value="composicion">Composición</v-btn>
+                  <v-btn value="medidor">Medidor</v-btn>
+                </v-btn-toggle>
+
+                <template v-if="tipoGraficoProyectado === 'tendencia'">
+                  <template v-if="proyectado?.resumen">
+                    <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoProyectadoLinea }}</div>
+                    <div style="height: 220px;">
+                      <Line :data="chartDataProyectadoLinea" :options="chartOptionsAcumulado" />
+                    </div>
+                  </template>
+                  <v-alert v-else-if="!loading" type="info" variant="tonal" density="compact">
+                    Aún no hay días con datos para calcular una proyección.
+                  </v-alert>
+                </template>
+                <template v-else-if="tipoGraficoProyectado === 'barras'">
+                  <div style="height: 220px;">
+                    <Bar :data="chartDataProyectadoBarras" :options="chartOptionsProyectadoBarras" />
+                  </div>
+                </template>
+                <template v-else-if="tipoGraficoProyectado === 'comparativo'">
+                  <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoComparativo }}</div>
+                  <div style="height: 220px;">
+                    <Bar :data="chartDataComparativoAnio" :options="chartOptionsComparativo" />
+                  </div>
+                </template>
+                <template v-else-if="tipoGraficoProyectado === 'composicion'">
+                  <div v-if="avanceTotalMeta > 0">
+                    <div class="text-body-2 text-medium-emphasis mb-2">{{ textoGraficoMeta }}</div>
+                    <div style="height: 220px;">
+                      <Doughnut :data="chartDataMeta" :options="chartOptionsMeta" />
+                    </div>
+                  </div>
+                  <v-alert v-else-if="!loading" type="info" variant="tonal" density="compact">
+                    Aún no hay turnos este mes.
+                  </v-alert>
+                </template>
+                <template v-else-if="tipoGraficoProyectado === 'medidor'">
+                  <div v-if="pctProyeccionGauge !== null" style="height: 220px; position: relative;">
+                    <Doughnut :data="chartDataProyectado" :options="chartOptionsProyectado" />
+                    <div
+                      class="text-h4 font-weight-bold text-center"
+                      style="position: absolute; left: 0; right: 0; bottom: 8px; pointer-events: none;"
+                    >
+                      {{ formatPct(pctProyeccionGauge) }}
+                    </div>
+                  </div>
+                  <v-alert v-else-if="!loading" type="info" variant="tonal" density="compact">
+                    {{ proyectado?.resumen ? 'Aún no hay meta configurada para calcular el % de proyección.' : 'Aún no hay días con datos para calcular una proyección.' }}
+                  </v-alert>
+                </template>
+              </v-col>
+            </v-row>
+
             <v-data-table
               :headers="headersProyectado"
               :items="proyectado?.dias ?? []"
@@ -540,6 +783,8 @@ import {
   type MetaMensualDiarioResponse,
   type MetaMensualSemanalResponse,
   type MetaMensualProyectadoResponse,
+  type MetaMensualSemana,
+  type MetaMensualDiarioDia,
   type FuenteMetaMensual,
   type SemaforoColor,
 } from '@/services/reportesAdminService'
@@ -555,8 +800,9 @@ import {
   BarElement,
   CategoryScale,
   LinearScale,
+  ArcElement,
 } from 'chart.js'
-import { Line, Bar } from 'vue-chartjs'
+import { Line, Bar, Doughnut } from 'vue-chartjs'
 
 ChartJS.register(
   Title,
@@ -569,6 +815,7 @@ ChartJS.register(
   BarElement,
   CategoryScale,
   LinearScale,
+  ArcElement,
 )
 
 /* ===== Selector mes/año ===== */
@@ -594,7 +841,13 @@ const hoy = new Date()
 const mesSeleccionado = ref(hoy.getMonth() + 1)
 const anioSeleccionado = ref(hoy.getFullYear())
 
+type TipoGrafico = 'tendencia' | 'barras' | 'comparativo' | 'composicion' | 'medidor'
+
 const tab = ref('diario')
+const tipoGraficoDiario = ref<TipoGrafico>('tendencia')
+const tipoGraficoSemanal = ref<TipoGrafico>('tendencia')
+const tipoGraficoMeta = ref<TipoGrafico>('composicion')
+const tipoGraficoProyectado = ref<TipoGrafico>('medidor')
 const loading = ref(false)
 const savingConfig = ref(false)
 const snack = reactive({ show: false, text: '' })
@@ -696,39 +949,18 @@ const textoNarrativoDiario = computed(() => {
 })
 
 /* ===== Gráficos tab Diario ===== */
-const CHART_COLORS = { esteAnio: '#42A5F5', anioAnterior: '#9E9E9E', metaLinea: '#9E9E9E' }
-
-const chartDataAcumuladoMes = computed(() => {
-  const dias = diario.value?.dias ?? []
-  const labels = dias.map((d) => formatFechaCorta(d.fecha))
-
-  const datasets: any[] = [
-    {
-      label: 'Acumulado del mes',
-      data: dias.map((d) => d.acumulado_total),
-      borderColor: CHART_COLORS.esteAnio,
-      backgroundColor: 'rgba(66, 165, 245, 0.25)',
-      fill: true,
-      tension: 0.3,
-      pointRadius: 2,
-    },
-  ]
-
-  const pctAvance = resumen.value?.kpis.total_general.pct_avance ?? null
-  const metaTotal = resumen.value?.kpis.total_general.meta ?? null
-  if (pctAvance !== null && metaTotal) {
-    datasets.push({
-      label: 'Meta del mes',
-      data: dias.map(() => metaTotal),
-      borderColor: CHART_COLORS.metaLinea,
-      borderDash: [6, 6],
-      fill: false,
-      pointRadius: 0,
-    })
-  }
-
-  return { labels, datasets }
-})
+const CHART_COLORS = {
+  esteAnio: '#42A5F5',
+  anioAnterior: '#9E9E9E',
+  metaLinea: '#9E9E9E',
+  motos: '#AB47BC',
+  // mismos hex que resuelve Vuetify para SEMAFORO_COLOR.VERDE/AMARILLO/ROJO
+  // (green-darken-1 / amber-darken-2 / red-darken-1), para que el gauge de
+  // Proyectado sea visualmente idéntico al semáforo y las mini-barras.
+  exito: '#43A047',
+  amarillo: '#FFA000',
+  rojo: '#E53935',
+}
 
 const chartOptionsAcumulado = {
   responsive: true,
@@ -779,19 +1011,6 @@ const chartOptionsComparativo = {
   },
 }
 
-const textoGraficoAcumulado = computed(() => {
-  if (!resumen.value || !diario.value) return ''
-  const pct = resumen.value.kpis.total_general.pct_avance
-  if (pct === null) {
-    return `El área muestra tu acumulado real del mes. Configura una meta en la pestaña "Meta" para ver la línea de referencia.`
-  }
-  const { meta, avance } = resumen.value.kpis.total_general
-  const { dias_del_mes: diasDelMes, dias_transcurridos: diasTranscurridos } = resumen.value
-  const ritmoEsperado = diasDelMes > 0 ? (meta * diasTranscurridos) / diasDelMes : 0
-  const vaBien = avance >= ritmoEsperado
-  return `El área muestra tu acumulado real; la línea punteada es la meta del mes. Hoy vas ${vaBien ? 'por encima' : 'por debajo'} del ritmo necesario para llegar a la meta.`
-})
-
 const textoGraficoComparativo = computed(() => {
   const dias = diario.value?.dias ?? []
   const conDato = dias.filter((d) => d.diferencia_vs_anio_anterior !== null)
@@ -800,6 +1019,119 @@ const textoGraficoComparativo = computed(() => {
   }
   const mejores = conDato.filter((d) => (d.diferencia_vs_anio_anterior as number) > 0).length
   return `Cada barra compara ese día contra el mismo día del año anterior. Vas mejor que el año pasado en ${mejores} de ${conDato.length} días.`
+})
+
+/* ===== Gráfico tab Diario — Tendencia (con año anterior) / Barras (sin acumular) ===== */
+const chartDataDiarioLinea = computed(() => {
+  const dias = diario.value?.dias ?? []
+  return {
+    labels: dias.map((d) => formatFechaCorta(d.fecha)),
+    datasets: [
+      {
+        label: 'Turnos por día',
+        borderColor: CHART_COLORS.esteAnio,
+        backgroundColor: CHART_COLORS.esteAnio,
+        fill: false,
+        tension: 0.3,
+        pointRadius: 2,
+        data: dias.map((d) => d.total),
+      },
+      {
+        label: 'Año anterior',
+        borderColor: CHART_COLORS.anioAnterior,
+        backgroundColor: CHART_COLORS.anioAnterior,
+        fill: false,
+        tension: 0.3,
+        pointRadius: 2,
+        data: dias.map((d) => d.total_anio_anterior),
+      },
+    ],
+  }
+})
+
+const chartDataDiarioBarras = computed(() => {
+  const dias = diario.value?.dias ?? []
+  return {
+    labels: dias.map((d) => formatFechaCorta(d.fecha)),
+    datasets: [
+      {
+        label: 'Turnos por día',
+        backgroundColor: CHART_COLORS.esteAnio,
+        data: dias.map((d) => d.total),
+      },
+    ],
+  }
+})
+
+const textoGraficoDiarioLinea = computed(() => {
+  const dias = diario.value?.dias ?? []
+  if (dias.length === 0) {
+    return 'La línea sólida es el total de turnos (livianos + motos) de ese día, sin acumular; la línea gris es el mismo día del año anterior (si un día no tiene dato del año pasado, queda un hueco).'
+  }
+  const mejor = dias.reduce((max, d) => (d.total > max.total ? d : max), dias[0])
+  return `La línea sólida es el total de turnos (livianos + motos) de ese día, sin acumular; la línea gris es el mismo día del año anterior (si un día no tiene dato del año pasado, queda un hueco). El día con más turnos fue ${formatFechaCorta(mejor.fecha)} con ${formatNum(mejor.total)}.`
+})
+
+const textoGraficoDiarioBarras = computed(() => {
+  const dias = diario.value?.dias ?? []
+  if (dias.length === 0) {
+    return 'Cada valor es el total de turnos (livianos + motos) de ese día, sin acumular.'
+  }
+  const mejor = dias.reduce((max, d) => (d.total > max.total ? d : max), dias[0])
+  return `Cada valor es el total de turnos (livianos + motos) de ese día, sin acumular. El día con más turnos fue ${formatFechaCorta(mejor.fecha)} con ${formatNum(mejor.total)}.`
+})
+
+/* ===== Gráfico tab Diario — Composición (acumulado a la fecha) ===== */
+const acumuladoActualDiario = computed(() => {
+  const dias = diario.value?.dias ?? []
+  const ultimo = dias[dias.length - 1]
+  if (!ultimo) return { livianos: 0, motos: 0 }
+  return { livianos: ultimo.acumulado_livianos, motos: ultimo.acumulado_motos }
+})
+
+const acumuladoTotalDiario = computed(
+  () => acumuladoActualDiario.value.livianos + acumuladoActualDiario.value.motos,
+)
+
+const chartDataDiarioComposicion = computed(() => {
+  const { livianos, motos } = acumuladoActualDiario.value
+  return {
+    labels: ['Livianos', 'Motos'],
+    datasets: [
+      {
+        backgroundColor: [CHART_COLORS.esteAnio, CHART_COLORS.motos],
+        data: [livianos, motos],
+      },
+    ],
+  }
+})
+
+const textoGraficoDiarioComposicion = computed(() => {
+  const total = acumuladoTotalDiario.value
+  if (total === 0) return ''
+  const { livianos } = acumuladoActualDiario.value
+  const pctLivianos = Math.round((livianos / total) * 100)
+  const pctMotos = 100 - pctLivianos
+  return `Del acumulado a la fecha (${formatNum(total)} turnos), ${pctLivianos}% son livianos y ${pctMotos}% motos.`
+})
+
+/* ===== Gráfico tab Diario — Medidor (% de avance vs meta) ===== */
+const pctAvanceGauge = computed(() => resumen.value?.kpis.total_general.pct_avance ?? null)
+
+const chartDataDiarioGauge = computed(() => {
+  const pct = pctAvanceGauge.value
+  if (pct === null) return { labels: [], datasets: [] }
+  const pctCapped = Math.min(100, pct)
+  return {
+    labels: ['Avance', 'Restante'],
+    datasets: [
+      {
+        backgroundColor: [colorGauge(pct), '#E0E0E0'],
+        borderWidth: 0,
+        data: [pctCapped, 100 - pctCapped],
+      },
+    ],
+  }
 })
 
 const textoNarrativoSemanal = computed(() => {
@@ -815,6 +1147,122 @@ const textoNarrativoSemanal = computed(() => {
     return `Estos son los turnos agrupados por semana (sábado a viernes) frente a la meta total del mes. Aún no hay una meta configurada para ${etiquetaMes(mesSeleccionado.value)} ${anioSeleccionado.value} — configúrala en la pestaña "Meta" para ver el % de cumplimiento. Llevas ${semanasCompletas} semana${plural} completa${plural} con un acumulado de ${formatNum(acumulado)} turnos.`
   }
   return `Estos son los turnos agrupados por semana (sábado a viernes) frente a la meta total del mes (${formatNum(resumen.value.kpis.total_general.meta)}). Llevas ${semanasCompletas} semana${plural} completa${plural} con un acumulado de ${formatNum(acumulado)} turnos.`
+})
+
+/* ===== Gráfico tab Semanal — Tendencia (con año anterior) / Comparativo ===== */
+function calcularTotalAnioAnteriorPorSemana(
+  semanas: MetaMensualSemana[],
+  dias: MetaMensualDiarioDia[],
+): (number | null)[] {
+  return semanas.map((s) => {
+    const diasSemana = dias.filter((d) => d.fecha >= s.inicio && d.fecha <= s.fin)
+    const conDato = diasSemana.filter((d) => d.total_anio_anterior !== null)
+    if (conDato.length === 0) return null
+    return conDato.reduce((acc, d) => acc + (d.total_anio_anterior as number), 0)
+  })
+}
+
+const chartDataSemanal = computed(() => {
+  const semanas = semanal.value?.semanas ?? []
+  const dias = diario.value?.dias ?? []
+  return {
+    labels: semanas.map((s) => `${formatFechaCorta(s.inicio)}–${formatFechaCorta(s.fin)}`),
+    datasets: [
+      {
+        label: 'Total semanal',
+        borderColor: CHART_COLORS.esteAnio,
+        backgroundColor: CHART_COLORS.esteAnio,
+        fill: false,
+        tension: 0.3,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        data: semanas.map((s) => s.total),
+      },
+      {
+        label: 'Año anterior',
+        borderColor: CHART_COLORS.anioAnterior,
+        backgroundColor: CHART_COLORS.anioAnterior,
+        fill: false,
+        tension: 0.3,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        data: calcularTotalAnioAnteriorPorSemana(semanas, dias),
+      },
+    ],
+  }
+})
+
+const chartOptionsSemanal = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+  },
+  scales: {
+    y: { beginAtZero: true },
+  },
+}
+
+const chartDataSemanalBarras = computed(() => {
+  const semanas = semanal.value?.semanas ?? []
+  return {
+    labels: semanas.map((s) => `${formatFechaCorta(s.inicio)}–${formatFechaCorta(s.fin)}`),
+    datasets: [
+      {
+        label: 'Total semanal',
+        backgroundColor: CHART_COLORS.esteAnio,
+        data: semanas.map((s) => s.total),
+      },
+    ],
+  }
+})
+
+const textoGraficoSemanal = computed(() => {
+  const semanas = semanal.value?.semanas ?? []
+  if (semanas.length === 0) {
+    return 'La línea sólida es el total de turnos (livianos + motos) de esa semana; la línea gris es el mismo rango de días del año anterior (si ninguno de esos días tiene dato del año pasado, queda un hueco).'
+  }
+  const mejor = semanas.reduce((max, s) => (s.total > max.total ? s : max), semanas[0])
+  return `La línea sólida es el total de turnos (livianos + motos) de esa semana; la línea gris es el mismo rango de días del año anterior (si ninguno de esos días tiene dato del año pasado, queda un hueco). La semana con más turnos fue ${formatFechaCorta(mejor.inicio)}–${formatFechaCorta(mejor.fin)} con ${formatNum(mejor.total)}.`
+})
+
+const textoGraficoSemanalBarras = computed(() => {
+  const semanas = semanal.value?.semanas ?? []
+  if (semanas.length === 0) {
+    return 'Cada valor es el total de turnos (livianos + motos) de esa semana.'
+  }
+  const mejor = semanas.reduce((max, s) => (s.total > max.total ? s : max), semanas[0])
+  return `Cada valor es el total de turnos (livianos + motos) de esa semana. La semana con más turnos fue ${formatFechaCorta(mejor.inicio)}–${formatFechaCorta(mejor.fin)} con ${formatNum(mejor.total)}.`
+})
+
+/* ===== Gráfico tab Semanal — Comparativo año anterior ===== */
+const chartDataSemanalComparativo = computed(() => {
+  const semanas = semanal.value?.semanas ?? []
+  const dias = diario.value?.dias ?? []
+
+  return {
+    labels: semanas.map((s) => `${formatFechaCorta(s.inicio)}–${formatFechaCorta(s.fin)}`),
+    datasets: [
+      {
+        label: `Este año (${anioSeleccionado.value})`,
+        backgroundColor: CHART_COLORS.esteAnio,
+        data: semanas.map((s) => s.total),
+      },
+      {
+        label: 'Año anterior',
+        backgroundColor: CHART_COLORS.anioAnterior,
+        data: calcularTotalAnioAnteriorPorSemana(semanas, dias),
+      },
+    ],
+  }
+})
+
+const textoGraficoSemanalComparativo = computed(() => {
+  const semanas = semanal.value?.semanas ?? []
+  if (semanas.length === 0) {
+    return 'Cada barra compara el total de esa semana contra el mismo rango de días del año anterior.'
+  }
+  return 'Cada barra compara el total de esa semana contra el mismo rango de días del año anterior. Si ningún día de esa semana tiene dato del año pasado, no se dibuja la barra de comparación.'
 })
 
 const textoNarrativoMeta = computed(() => {
@@ -833,6 +1281,151 @@ const textoNarrativoMeta = computed(() => {
   return `Aquí configuras la meta mensual de turnos RTM (livianos y motos) y ves cuánto falta para cumplirla. Llevas ${formatNum(avance)} de ${formatNum(meta)} turnos (${pct}%) — faltan ${formatNum(falta)} para completar la meta del mes.`
 })
 
+/* ===== Gráfico tab Meta ===== */
+const avanceTotalMeta = computed(() => {
+  const livianos = resumen.value?.kpis.livianos.avance ?? 0
+  const motos = resumen.value?.kpis.motos.avance ?? 0
+  return livianos + motos
+})
+
+const chartDataMeta = computed(() => {
+  const livianos = resumen.value?.kpis.livianos.avance ?? 0
+  const motos = resumen.value?.kpis.motos.avance ?? 0
+  return {
+    labels: ['Livianos', 'Motos'],
+    datasets: [
+      {
+        backgroundColor: [CHART_COLORS.esteAnio, CHART_COLORS.motos],
+        data: [livianos, motos],
+      },
+    ],
+  }
+})
+
+const chartOptionsMeta = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { position: 'top' as const },
+  },
+}
+
+const textoGraficoMeta = computed(() => {
+  const total = avanceTotalMeta.value
+  if (total === 0) return ''
+  const livianos = resumen.value?.kpis.livianos.avance ?? 0
+  const pctLivianos = Math.round((livianos / total) * 100)
+  const pctMotos = 100 - pctLivianos
+  return `De los ${formatNum(total)} turnos que llevas este mes, ${pctLivianos}% son livianos y ${pctMotos}% motos.`
+})
+
+/* ===== Gráfico tab Meta — Barras horizontales ===== */
+const chartDataMetaBarras = computed(() => {
+  const livianos = resumen.value?.kpis.livianos
+  const motos = resumen.value?.kpis.motos
+  return {
+    labels: ['Livianos', 'Motos'],
+    datasets: [
+      {
+        label: 'Avance',
+        backgroundColor: CHART_COLORS.esteAnio,
+        data: [livianos?.avance ?? null, motos?.avance ?? null],
+      },
+      {
+        label: 'Meta',
+        backgroundColor: CHART_COLORS.metaLinea,
+        data: [
+          livianos && livianos.pct_avance !== null ? livianos.meta : null,
+          motos && motos.pct_avance !== null ? motos.meta : null,
+        ],
+      },
+    ],
+  }
+})
+
+const chartOptionsMetaBarras = {
+  indexAxis: 'y' as const,
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { position: 'top' as const },
+    tooltip: {
+      callbacks: {
+        label: (context: { dataset: { label?: string }; parsed: { x: number | null } }) => {
+          const label = context.dataset.label ?? ''
+          if (context.parsed.x === null) return `${label}: sin meta configurada`
+          return `${label}: ${context.parsed.x}`
+        },
+      },
+    },
+  },
+  scales: {
+    x: { beginAtZero: true },
+  },
+}
+
+const textoGraficoMetaBarras = computed(() => {
+  const livianos = resumen.value?.kpis.livianos
+  const motos = resumen.value?.kpis.motos
+  if (!livianos || !motos) return ''
+  const sinMetaLivianos = livianos.pct_avance === null
+  const sinMetaMotos = motos.pct_avance === null
+  if (sinMetaLivianos && sinMetaMotos) {
+    return 'Compara el avance actual contra la meta por tipo de vehículo. Aún no hay meta configurada para ninguno de los dos — la barra de meta no se dibuja hasta que la configures abajo.'
+  }
+  if (sinMetaLivianos || sinMetaMotos) {
+    const cual = sinMetaLivianos ? 'Livianos' : 'Motos'
+    return `Compara el avance actual contra la meta por tipo de vehículo. ${cual} aún no tiene meta configurada — su barra de meta no se dibuja hasta que la configures abajo.`
+  }
+  return 'Compara el avance actual contra la meta por tipo de vehículo.'
+})
+
+/* ===== Gráfico tab Meta — Tendencia ===== */
+const chartDataMetaLinea = computed(() => {
+  const dias = diario.value?.dias ?? []
+  const labels = dias.map((d) => formatFechaCorta(d.fecha))
+
+  const datasets: any[] = [
+    {
+      label: 'Acumulado del mes',
+      data: dias.map((d) => d.acumulado_total),
+      borderColor: CHART_COLORS.esteAnio,
+      backgroundColor: CHART_COLORS.esteAnio,
+      fill: false,
+      tension: 0.3,
+      pointRadius: 2,
+    },
+  ]
+
+  const pctAvance = resumen.value?.kpis.total_general.pct_avance ?? null
+  const metaTotal = resumen.value?.kpis.total_general.meta ?? null
+  if (pctAvance !== null && metaTotal) {
+    datasets.push({
+      label: 'Meta del mes',
+      data: dias.map(() => metaTotal),
+      borderColor: CHART_COLORS.metaLinea,
+      borderDash: [6, 6],
+      fill: false,
+      pointRadius: 0,
+    })
+  }
+
+  return { labels, datasets }
+})
+
+const textoGraficoMetaLinea = computed(() => {
+  if (!resumen.value || !diario.value) return ''
+  const pct = resumen.value.kpis.total_general.pct_avance
+  if (pct === null) {
+    return 'La línea muestra tu acumulado real del mes. Configura una meta arriba para ver la línea de referencia.'
+  }
+  const { meta, avance } = resumen.value.kpis.total_general
+  const { dias_del_mes: diasDelMes, dias_transcurridos: diasTranscurridos } = resumen.value
+  const ritmoEsperado = diasDelMes > 0 ? (meta * diasTranscurridos) / diasDelMes : 0
+  const vaBien = avance >= ritmoEsperado
+  return `La línea sólida es tu acumulado real; la línea punteada es la meta del mes. Hoy vas ${vaBien ? 'por encima' : 'por debajo'} del ritmo necesario para llegar a la meta.`
+})
+
 const textoNarrativoProyectado = computed(() => {
   if (!proyectado.value) return ''
   const r = proyectado.value.resumen
@@ -847,6 +1440,139 @@ const textoNarrativoProyectado = computed(() => {
   const alcanza = r.pct_proyeccion_total >= 100
   return `Esto estima el cierre del mes según el promedio diario actual (solo días ya transcurridos, sin contar días futuros en cero). Con el promedio actual de ${promedioTotal} turnos/día, se proyecta cerrar el mes en ${formatNum(r.proyeccion_cierre_total)} turnos — ${alcanza ? 'alcanza' : 'no alcanza'} la meta de ${formatNum(proyectado.value.meta_total)}.`
 })
+
+/* ===== Gráfico tab Proyectado ===== */
+const pctProyeccionGauge = computed(() => proyectado.value?.resumen?.pct_proyeccion_total ?? null)
+
+function colorGauge(pct: number) {
+  if (pct >= 100) return CHART_COLORS.exito
+  if (pct >= 90) return CHART_COLORS.amarillo
+  return CHART_COLORS.rojo
+}
+
+const chartDataProyectado = computed(() => {
+  const pct = pctProyeccionGauge.value
+  if (pct === null) return { labels: [], datasets: [] }
+  const pctCapped = Math.min(100, pct)
+  return {
+    labels: ['Avance', 'Restante'],
+    datasets: [
+      {
+        backgroundColor: [colorGauge(pct), '#E0E0E0'],
+        borderWidth: 0,
+        data: [pctCapped, 100 - pctCapped],
+      },
+    ],
+  }
+})
+
+const chartOptionsProyectado = {
+  responsive: true,
+  maintainAspectRatio: false,
+  rotation: -90,
+  circumference: 180,
+  cutout: '75%',
+  plugins: {
+    legend: { display: false },
+    tooltip: { enabled: false },
+  },
+}
+
+/* ===== Gráfico tab Proyectado — Barras ===== */
+const chartDataProyectadoBarras = computed(() => {
+  const totalGeneral = resumen.value?.kpis.total_general
+  const pct = pctProyeccionGauge.value
+  const sinMeta = totalGeneral?.pct_avance === null
+
+  return {
+    labels: ['Avance actual', 'Proyección de cierre', 'Meta del mes'],
+    datasets: [
+      {
+        label: `${etiquetaMes(mesSeleccionado.value)} ${anioSeleccionado.value}`,
+        backgroundColor: [
+          CHART_COLORS.esteAnio,
+          pct === null ? CHART_COLORS.metaLinea : colorGauge(pct),
+          CHART_COLORS.metaLinea,
+        ],
+        data: [
+          totalGeneral?.avance ?? null,
+          proyectado.value?.resumen?.proyeccion_cierre_total ?? null,
+          sinMeta ? null : (proyectado.value?.meta_total ?? null),
+        ],
+      },
+    ],
+  }
+})
+
+const chartOptionsProyectadoBarras = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (context: { parsed: { y: number | null } }) =>
+          context.parsed.y === null ? 'Sin dato disponible' : `${context.parsed.y}`,
+      },
+    },
+  },
+  scales: {
+    y: { beginAtZero: true },
+  },
+}
+
+/* ===== Gráfico tab Proyectado — Tendencia ===== */
+const chartDataProyectadoLinea = computed(() => {
+  const diasDelMes = proyectado.value?.dias_del_mes ?? 0
+  const dias = proyectado.value?.dias ?? []
+  if (diasDelMes === 0 || dias.length === 0) return { labels: [], datasets: [] }
+
+  const labels = Array.from({ length: diasDelMes }, (_, i) => {
+    const dia = String(i + 1).padStart(2, '0')
+    const mes = String(mesSeleccionado.value).padStart(2, '0')
+    return formatFechaCorta(`${anioSeleccionado.value}-${mes}-${dia}`)
+  })
+
+  const acumuladoReal = labels.map((_, i) => {
+    const fechaEsperada = `${anioSeleccionado.value}-${String(mesSeleccionado.value).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
+    const d = dias.find((dia) => dia.fecha === fechaEsperada)
+    return d ? d.acumulado_livianos + d.acumulado_motos : null
+  })
+
+  const datasets: any[] = [
+    {
+      label: 'Acumulado real',
+      data: acumuladoReal,
+      borderColor: CHART_COLORS.esteAnio,
+      backgroundColor: CHART_COLORS.esteAnio,
+      fill: false,
+      tension: 0.3,
+      pointRadius: 2,
+    },
+  ]
+
+  const proyeccionFinal = proyectado.value?.resumen?.proyeccion_cierre_total ?? null
+  if (proyeccionFinal !== null) {
+    const proyeccionData: (number | null)[] = labels.map(() => null)
+    proyeccionData[dias.length - 1] = acumuladoReal[dias.length - 1]
+    proyeccionData[diasDelMes - 1] = proyeccionFinal
+    datasets.push({
+      label: 'Proyección de cierre',
+      data: proyeccionData,
+      borderColor: CHART_COLORS.metaLinea,
+      backgroundColor: CHART_COLORS.metaLinea,
+      borderDash: [6, 6],
+      fill: false,
+      spanGaps: true,
+      pointRadius: 0,
+    })
+  }
+
+  return { labels, datasets }
+})
+
+const textoGraficoProyectadoLinea =
+  'La línea sólida muestra el acumulado real día a día; el tramo punteado extiende la proyección hasta fin de mes según el ritmo actual.'
 
 const FUENTE_LABEL: Record<FuenteMetaMensual, string> = {
   real: 'Datos reales (turnos_rtms)',

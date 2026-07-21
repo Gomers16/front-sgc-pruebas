@@ -403,6 +403,17 @@ const routes: RouteRecordRaw[] = [
       roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
     },
   },
+  {
+    path: '/reportes-admin/meta-comercial',
+    name: 'ReporteMetaComercialAsesor',
+    component: () => import('@/views/reportes/ReporteMetaComercialAsesor.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Meta Comercial por Asesor',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
 ]
 
 const router = createRouter({

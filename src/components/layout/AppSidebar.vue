@@ -357,6 +357,13 @@
             link
             class="nav-item-child"
           />
+          <v-list-item
+            prepend-icon="mdi-account-cash"
+            title="Meta Comercial por Asesor"
+            :to="{ name: 'ReporteMetaComercialAsesor' }"
+            link
+            class="nav-item-child"
+          />
         </v-list-group>
 
         <!-- Comercial -->

@@ -705,3 +705,141 @@ export async function getMetaMensualProyectado(
     query: { mes, anio },
   })
 }
+
+/* ======================= Meta Comercial por Asesor ======================= */
+// Pesos ESTIMADOS con tarifa plana para meses históricos (antes de agosto/2026,
+// ver nota del backend) — no es cálculo de nómina, solo comparación vs. meta.
+
+export type FuenteMetaComercial = 'real' | 'historico'
+export type FuenteMetaComercialDiario = 'real' | 'historico_sin_detalle_diario'
+
+export interface MetaComercialAsesorResumen {
+  asesor_id: number
+  asesor_nombre: string
+  fuente: FuenteMetaComercial
+  es_estimado: boolean
+  cantidad_convenio: number | null
+  cantidad_comercial: number | null
+  pesos_convenio: number
+  pesos_comercial: number
+  pesos_total: number
+  meta_pesos: number | null
+  pct_avance: number | null
+  semaforo: SemaforoColor
+}
+
+export interface MetaComercialResumenResponse {
+  mes: number
+  anio: number
+  fuente: FuenteMetaComercial
+  nota: string | null
+  asesores: MetaComercialAsesorResumen[]
+}
+
+export interface MetaComercialDiarioDia {
+  fecha: string
+  pesos_convenio: number
+  pesos_comercial: number
+  pesos_total: number
+  acumulado_convenio: number
+  acumulado_comercial: number
+  acumulado_total: number
+  pct_vs_meta: number | null
+}
+
+export interface MetaComercialDiarioResponse {
+  mes: number
+  anio: number
+  asesor_id: number | null
+  asesor_nombre: string | null
+  fuente: FuenteMetaComercialDiario
+  nota: string | null
+  meta_pesos: number | null
+  dias: MetaComercialDiarioDia[]
+}
+
+export interface MetaComercialSemana {
+  inicio: string
+  fin: string
+  cantidad_convenio: number | null
+  cantidad_comercial: number | null
+  pesos_convenio: number
+  pesos_comercial: number
+  pesos_total: number
+  pct_vs_meta: number | null
+}
+
+export interface MetaComercialSemanalResponse {
+  mes: number
+  anio: number
+  asesor_id: number | null
+  asesor_nombre: string | null
+  fuente: FuenteMetaComercial
+  es_estimado: boolean
+  meta_pesos: number | null
+  semanas: MetaComercialSemana[]
+}
+
+export interface MetaComercialProyectadoPeriodo {
+  etiqueta: string
+  acumulado: number
+  promedio: number
+  proyeccion: number
+}
+
+export interface MetaComercialProyectadoResponse {
+  mes: number
+  anio: number
+  asesor_id: number | null
+  asesor_nombre: string | null
+  fuente: FuenteMetaComercial
+  granularidad: 'diaria' | 'semanal'
+  meta_pesos: number | null
+  periodos_transcurridos: number
+  periodos_totales: number
+  resumen: {
+    promedio_por_periodo: number
+    proyeccion_cierre: number
+    pct_proyeccion: number | null
+  } | null
+  periodos: MetaComercialProyectadoPeriodo[]
+}
+
+export async function getMetaComercialResumen(
+  mes: number,
+  anio: number
+): Promise<MetaComercialResumenResponse> {
+  return apiFetch<MetaComercialResumenResponse>('/reportes-admin/meta-comercial/resumen', {
+    query: { mes, anio },
+  })
+}
+
+export async function getMetaComercialDiario(
+  mes: number,
+  anio: number,
+  asesorId?: number | null
+): Promise<MetaComercialDiarioResponse> {
+  return apiFetch<MetaComercialDiarioResponse>('/reportes-admin/meta-comercial/diario', {
+    query: { mes, anio, asesor_id: asesorId ?? undefined },
+  })
+}
+
+export async function getMetaComercialSemanal(
+  mes: number,
+  anio: number,
+  asesorId?: number | null
+): Promise<MetaComercialSemanalResponse> {
+  return apiFetch<MetaComercialSemanalResponse>('/reportes-admin/meta-comercial/semanal', {
+    query: { mes, anio, asesor_id: asesorId ?? undefined },
+  })
+}
+
+export async function getMetaComercialProyectado(
+  mes: number,
+  anio: number,
+  asesorId?: number | null
+): Promise<MetaComercialProyectadoResponse> {
+  return apiFetch<MetaComercialProyectadoResponse>('/reportes-admin/meta-comercial/proyectado', {
+    query: { mes, anio, asesor_id: asesorId ?? undefined },
+  })
+}
