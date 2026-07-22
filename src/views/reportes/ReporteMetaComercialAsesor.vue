@@ -462,6 +462,10 @@
           <v-window-item value="proyectado">
             <div class="text-body-2 text-medium-emphasis mb-3">{{ textoNarrativoProyectado }}</div>
 
+            <v-alert v-if="proyectado?.nota" type="info" variant="tonal" density="compact" class="mb-3">
+              {{ proyectado.nota }}
+            </v-alert>
+
             <v-row v-if="proyectado?.resumen" class="mb-3" dense>
               <v-col cols="12" sm="4">
                 <v-card variant="tonal" class="rounded-xl">

@@ -794,6 +794,8 @@ export interface MetaComercialProyectadoResponse {
   asesor_nombre: string | null
   fuente: FuenteMetaComercial
   granularidad: 'diaria' | 'semanal'
+  es_estimado?: boolean
+  nota?: string | null
   meta_pesos: number | null
   periodos_transcurridos: number
   periodos_totales: number
