@@ -739,6 +739,11 @@ export interface MetaComercialResumenResponse {
 
 export interface MetaComercialDiarioDia {
   fecha: string
+  cantidad_total: number
+  cantidad_motos: number
+  cantidad_carros: number
+  cantidad_convenio: number
+  cantidad_comercial: number
   pesos_convenio: number
   pesos_comercial: number
   pesos_total: number
@@ -764,10 +769,17 @@ export interface MetaComercialSemana {
   fin: string
   cantidad_convenio: number | null
   cantidad_comercial: number | null
+  cantidad_total: number | null
+  cantidad_motos: number | null
+  cantidad_carros: number | null
   pesos_convenio: number
   pesos_comercial: number
   pesos_total: number
   pct_vs_meta: number | null
+  acumulado_convenio: number
+  acumulado_comercial: number
+  acumulado_total: number
+  pct_acumulado_vs_meta: number | null
 }
 
 export interface MetaComercialSemanalResponse {
@@ -777,6 +789,7 @@ export interface MetaComercialSemanalResponse {
   asesor_nombre: string | null
   fuente: FuenteMetaComercial
   es_estimado: boolean
+  cantidad_vehiculo_estimada: boolean
   meta_pesos: number | null
   semanas: MetaComercialSemana[]
 }
@@ -844,5 +857,33 @@ export async function getMetaComercialProyectado(
 ): Promise<MetaComercialProyectadoResponse> {
   return apiFetch<MetaComercialProyectadoResponse>('/reportes-admin/meta-comercial/proyectado', {
     query: { mes, anio, asesor_id: asesorId ?? undefined },
+  })
+}
+
+export interface MetaComercialDetalleVehiculoCategoria {
+  categoria: string
+  cantidad: number
+  tarifa: number
+  pesos: number
+}
+
+export interface MetaComercialDetalleVehiculoResponse {
+  mes: number
+  anio: number
+  asesor_id: number
+  asesor_nombre: string
+  disponible: boolean
+  categorias: MetaComercialDetalleVehiculoCategoria[] | null
+  total: { cantidad: number; pesos: number } | null
+  meta_pesos: number | null
+}
+
+export async function getMetaComercialDetalleVehiculo(
+  mes: number,
+  anio: number,
+  asesorId: number
+): Promise<MetaComercialDetalleVehiculoResponse> {
+  return apiFetch<MetaComercialDetalleVehiculoResponse>('/reportes-admin/meta-comercial/detalle-vehiculo', {
+    query: { mes, anio, asesor_id: asesorId },
   })
 }

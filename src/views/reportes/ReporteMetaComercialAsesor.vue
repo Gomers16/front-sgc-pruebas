@@ -237,9 +237,16 @@
                 :items-per-page="-1"
               >
                 <template #item.fecha="{ item }">{{ formatFechaCorta(item.fecha) }}</template>
-                <template #item.pesos_convenio="{ item }">{{ formatMoney(item.pesos_convenio) }}</template>
-                <template #item.pesos_comercial="{ item }">{{ formatMoney(item.pesos_comercial) }}</template>
-                <template #item.pesos_total="{ item }">{{ formatMoney(item.pesos_total) }}</template>
+                <template #item.cantidad_total="{ item }">{{ item.cantidad_total }}</template>
+                <template #item.cantidad_motos="{ item }">{{ item.cantidad_motos }}</template>
+                <template #item.cantidad_carros="{ item }">{{ item.cantidad_carros }}</template>
+                <template #item.pesos_convenio="{ item }">
+                  <span class="text-secondary">{{ formatMoney(item.pesos_convenio) }} <span class="text-caption">({{ item.cantidad_convenio }})</span></span>
+                </template>
+                <template #item.pesos_comercial="{ item }">
+                  <span class="text-secondary">{{ formatMoney(item.pesos_comercial) }} <span class="text-caption">({{ item.cantidad_comercial }})</span></span>
+                </template>
+                <template #item.pesos_total="{ item }"><span class="text-secondary">{{ formatMoney(item.pesos_total) }}</span></template>
                 <template #item.acumulado_total="{ item }">{{ formatMoney(item.acumulado_total) }}</template>
                 <template #item.pct_vs_meta="{ item }">
                   <span v-if="item.pct_vs_meta === null" class="text-caption text-medium-emphasis">Sin meta</span>
@@ -314,6 +321,13 @@
               </v-col>
             </v-row>
 
+            <v-alert
+              v-if="semanal?.cantidad_vehiculo_estimada"
+              type="info" variant="tonal" density="compact" class="mb-2"
+            >
+              Motos/Carros estimados por prorrateo mensual (no hay detalle real por semana antes de junio/2026).
+            </v-alert>
+
             <v-data-table
               class="tabla-zebra"
               :headers="headersSemanal"
@@ -325,15 +339,22 @@
               :items-per-page="-1"
             >
               <template #item.semana="{ item }">{{ formatFechaCorta(item.inicio) }} — {{ formatFechaCorta(item.fin) }}</template>
+              <template #item.cantidad_total="{ item }">{{ item.cantidad_total ?? '—' }}</template>
+              <template #item.cantidad_motos="{ item }">{{ item.cantidad_motos ?? '—' }}</template>
+              <template #item.cantidad_carros="{ item }">{{ item.cantidad_carros ?? '—' }}</template>
               <template #item.pesos_convenio="{ item }">
-                {{ formatMoney(item.pesos_convenio) }}
-                <span v-if="item.cantidad_convenio !== null" class="text-caption text-medium-emphasis">({{ item.cantidad_convenio }})</span>
+                <span class="text-secondary">
+                  {{ formatMoney(item.pesos_convenio) }}
+                  <span v-if="item.cantidad_convenio !== null" class="text-caption">({{ item.cantidad_convenio }})</span>
+                </span>
               </template>
               <template #item.pesos_comercial="{ item }">
-                {{ formatMoney(item.pesos_comercial) }}
-                <span v-if="item.cantidad_comercial !== null" class="text-caption text-medium-emphasis">({{ item.cantidad_comercial }})</span>
+                <span class="text-secondary">
+                  {{ formatMoney(item.pesos_comercial) }}
+                  <span v-if="item.cantidad_comercial !== null" class="text-caption">({{ item.cantidad_comercial }})</span>
+                </span>
               </template>
-              <template #item.pesos_total="{ item }">{{ formatMoney(item.pesos_total) }}</template>
+              <template #item.pesos_total="{ item }"><span class="text-secondary">{{ formatMoney(item.pesos_total) }}</span></template>
               <template #item.pct_vs_meta="{ item }">
                 <span v-if="item.pct_vs_meta === null" class="text-caption text-medium-emphasis">Sin meta</span>
                 <div v-else class="d-flex align-center ga-2">
@@ -341,6 +362,18 @@
                   <v-progress-linear
                     :model-value="Math.min(100, item.pct_vs_meta)"
                     height="5" rounded :color="colorPctVsMeta(item.pct_vs_meta)"
+                    style="flex: 1; max-width: 70px;"
+                  />
+                </div>
+              </template>
+              <template #item.acumulado_total="{ item }">{{ formatMoney(item.acumulado_total) }}</template>
+              <template #item.pct_acumulado_vs_meta="{ item }">
+                <span v-if="item.pct_acumulado_vs_meta === null" class="text-caption text-medium-emphasis">Sin meta</span>
+                <div v-else class="d-flex align-center ga-2">
+                  <span class="text-caption" style="min-width: 40px;">{{ formatPct(item.pct_acumulado_vs_meta) }}</span>
+                  <v-progress-linear
+                    :model-value="Math.min(100, item.pct_acumulado_vs_meta)"
+                    height="5" rounded :color="colorPctVsMeta(item.pct_acumulado_vs_meta)"
                     style="flex: 1; max-width: 70px;"
                   />
                 </div>
@@ -435,6 +468,40 @@
             <v-alert v-else type="info" variant="tonal" class="mt-2">
               Sin meta ni datos configurados para {{ etiquetaMes(mesSeleccionado) }} {{ anioSeleccionado }}.
             </v-alert>
+
+            <v-card
+              v-if="detalleVehiculo?.disponible"
+              variant="outlined"
+              class="rounded-xl mt-4"
+            >
+              <v-card-title class="text-subtitle-1">
+                Detalle real por tipo de vehículo — {{ detalleVehiculo.asesor_nombre }}
+              </v-card-title>
+              <v-card-text>
+                <v-data-table
+                  class="tabla-zebra"
+                  :headers="headersDetalleVehiculo"
+                  :items="filasDetalleVehiculo"
+                  item-key="categoria"
+                  hover
+                  hide-default-footer
+                  :items-per-page="-1"
+                >
+                  <template #item.categoria="{ item }">
+                    <span :class="{ 'font-weight-bold': item.esTotal }">{{ item.categoria }}</span>
+                  </template>
+                  <template #item.cantidad="{ item }">
+                    <span :class="{ 'font-weight-bold': item.esTotal }">{{ item.cantidad ?? '—' }}</span>
+                  </template>
+                  <template #item.tarifa="{ item }">
+                    <span :class="{ 'font-weight-bold': item.esTotal }">{{ item.tarifa !== null ? formatMoney(item.tarifa) : '—' }}</span>
+                  </template>
+                  <template #item.pesos="{ item }">
+                    <span :class="{ 'font-weight-bold': item.esTotal }">{{ formatMoney(item.pesos) }}</span>
+                  </template>
+                </v-data-table>
+              </v-card-text>
+            </v-card>
 
             <v-data-table
               v-if="asesorSeleccionado === null"
@@ -577,10 +644,12 @@ import {
   getMetaComercialDiario,
   getMetaComercialSemanal,
   getMetaComercialProyectado,
+  getMetaComercialDetalleVehiculo,
   type MetaComercialResumenResponse,
   type MetaComercialDiarioResponse,
   type MetaComercialSemanalResponse,
   type MetaComercialProyectadoResponse,
+  type MetaComercialDetalleVehiculoResponse,
   type MetaComercialAsesorResumen,
   type FuenteMetaComercial,
   type SemaforoColor,
@@ -652,6 +721,7 @@ const resumenGeneral = ref<MetaComercialResumenResponse | null>(null)
 const diario = ref<MetaComercialDiarioResponse | null>(null)
 const semanal = ref<MetaComercialSemanalResponse | null>(null)
 const proyectado = ref<MetaComercialProyectadoResponse | null>(null)
+const detalleVehiculo = ref<MetaComercialDetalleVehiculoResponse | null>(null)
 const fuenteDatos = ref<FuenteMetaComercial>('historico')
 
 /* ===== Fila "actual" (asesor puntual o agregado de todos) ===== */
@@ -940,18 +1010,26 @@ const chartProyectadoBarras = computed(() => {
 /* ===== Headers ===== */
 const headersDiario = [
   { title: 'Fecha', key: 'fecha' },
-  { title: 'Convenio', key: 'pesos_convenio' },
-  { title: 'Propio', key: 'pesos_comercial' },
-  { title: 'Total día', key: 'pesos_total' },
+  { title: 'Total', key: 'cantidad_total' },
+  { title: 'Motos', key: 'cantidad_motos' },
+  { title: 'Carros', key: 'cantidad_carros' },
+  { title: '$ Convenio', key: 'pesos_convenio' },
+  { title: '$ Propio', key: 'pesos_comercial' },
+  { title: '$ Total', key: 'pesos_total' },
   { title: 'Acumulado', key: 'acumulado_total' },
   { title: '% vs Meta', key: 'pct_vs_meta' },
 ]
 const headersSemanal = [
   { title: 'Semana', key: 'semana', sortable: false },
-  { title: 'Convenio', key: 'pesos_convenio' },
-  { title: 'Propio', key: 'pesos_comercial' },
-  { title: 'Total', key: 'pesos_total' },
-  { title: '% vs Meta', key: 'pct_vs_meta' },
+  { title: 'Total', key: 'cantidad_total' },
+  { title: 'Motos', key: 'cantidad_motos' },
+  { title: 'Carros', key: 'cantidad_carros' },
+  { title: '$ Convenio', key: 'pesos_convenio' },
+  { title: '$ Propio', key: 'pesos_comercial' },
+  { title: '$ Total semana', key: 'pesos_total' },
+  { title: '% semana vs Meta', key: 'pct_vs_meta' },
+  { title: 'Acumulado mes', key: 'acumulado_total' },
+  { title: '% Acumulado vs Meta', key: 'pct_acumulado_vs_meta' },
 ]
 const headersResumenAsesores = [
   { title: 'Asesor', key: 'asesor_nombre' },
@@ -968,21 +1046,43 @@ const headersProyectado = [
   { title: 'Proyección', key: 'proyeccion' },
 ]
 
+/* ===== Tab Meta — Detalle por tipo de vehículo ===== */
+const headersDetalleVehiculo = [
+  { title: 'Categoría', key: 'categoria', sortable: false },
+  { title: 'Cantidad', key: 'cantidad' },
+  { title: 'Tarifa', key: 'tarifa' },
+  { title: 'Pesos', key: 'pesos' },
+]
+const filasDetalleVehiculo = computed(() => {
+  const d = detalleVehiculo.value
+  if (!d?.disponible || !d.categorias || !d.total) return []
+  return [
+    ...d.categorias.map((c) => ({ ...c, esTotal: false })),
+    { categoria: 'Total', cantidad: d.total.cantidad, tarifa: null, pesos: d.total.pesos, esTotal: true },
+    { categoria: 'Meta del mes', cantidad: null, tarifa: null, pesos: d.meta_pesos, esTotal: true },
+  ]
+})
+
 /* ===== Carga de datos ===== */
 async function cargarTodo() {
   loading.value = true
+  detalleVehiculo.value = null
   try {
-    const [resumenResp, diarioResp, semanalResp, proyectadoResp] = await Promise.all([
+    const [resumenResp, diarioResp, semanalResp, proyectadoResp, detalleVehiculoResp] = await Promise.all([
       getMetaComercialResumen(mesSeleccionado.value, anioSeleccionado.value),
       getMetaComercialDiario(mesSeleccionado.value, anioSeleccionado.value, asesorSeleccionado.value),
       getMetaComercialSemanal(mesSeleccionado.value, anioSeleccionado.value, asesorSeleccionado.value),
       getMetaComercialProyectado(mesSeleccionado.value, anioSeleccionado.value, asesorSeleccionado.value),
+      asesorSeleccionado.value !== null
+        ? getMetaComercialDetalleVehiculo(mesSeleccionado.value, anioSeleccionado.value, asesorSeleccionado.value)
+        : Promise.resolve(null),
     ])
 
     resumenGeneral.value = resumenResp
     diario.value = diarioResp
     semanal.value = semanalResp
     proyectado.value = proyectadoResp
+    detalleVehiculo.value = detalleVehiculoResp
     fuenteDatos.value = resumenResp.fuente
   } catch (err) {
     console.error('Error cargando reporte Meta Comercial:', err)
