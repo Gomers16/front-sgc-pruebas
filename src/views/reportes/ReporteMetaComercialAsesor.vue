@@ -678,7 +678,7 @@ const resumenActual = computed<MetaComercialAsesorResumen | null>(() => {
     asesor_id: -1,
     asesor_nombre: 'Todos los asesores',
     fuente: lista[0].fuente,
-    es_estimado: lista[0].es_estimado,
+    es_estimado: lista.every((a) => a.es_estimado),
     cantidad_convenio: agregado.cantidad_convenio,
     cantidad_comercial: agregado.cantidad_comercial,
     pesos_convenio: agregado.pesos_convenio,

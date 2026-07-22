@@ -732,6 +732,7 @@ export interface MetaComercialResumenResponse {
   mes: number
   anio: number
   fuente: FuenteMetaComercial
+  es_estimado: boolean
   nota: string | null
   asesores: MetaComercialAsesorResumen[]
 }
