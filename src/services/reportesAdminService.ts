@@ -887,3 +887,44 @@ export async function getMetaComercialDetalleVehiculo(
     query: { mes, anio, asesor_id: asesorId },
   })
 }
+
+export interface MetaComercialIngresoRealDateoItem {
+  dateo_id: number
+  fecha: string
+  tipo_captacion: 'NUEVO_DIRECTO' | 'CONVENIO'
+  tipo_vehiculo: 'CARRO' | 'MOTO' | null
+  ingreso_real: number
+  tuvo_descuento: boolean
+  descuento_nombre: string | null
+  descuento_monto: number
+  descuento_verificado: number
+}
+
+export interface MetaComercialIngresoRealDateoBucket {
+  cantidad: number
+  ingreso_real: number
+}
+
+export interface MetaComercialIngresoRealDateoResponse {
+  mes: number
+  anio: number
+  asesor_id: number
+  asesor_nombre: string
+  detalle: MetaComercialIngresoRealDateoItem[]
+  acumulado: {
+    nuevo_directo: MetaComercialIngresoRealDateoBucket
+    convenio: MetaComercialIngresoRealDateoBucket
+    total: MetaComercialIngresoRealDateoBucket
+  }
+}
+
+export async function getMetaComercialIngresoRealDateo(
+  mes: number,
+  anio: number,
+  asesorId: number
+): Promise<MetaComercialIngresoRealDateoResponse> {
+  return apiFetch<MetaComercialIngresoRealDateoResponse>(
+    '/reportes-admin/meta-comercial/ingreso-real-dateo',
+    { query: { mes, anio, asesor_id: asesorId } }
+  )
+}

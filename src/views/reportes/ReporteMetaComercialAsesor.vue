@@ -162,6 +162,9 @@
           Proyectado
           <v-icon :color="colorSemaforo(semaforoProyectado)" size="10" class="ml-1">mdi-circle</v-icon>
         </v-tab>
+        <v-tab value="dateos" :disabled="asesorSeleccionado === null">
+          Detalle de Dateos
+        </v-tab>
       </v-tabs>
 
       <v-divider />
@@ -629,6 +632,89 @@
               Sin datos disponibles para {{ etiquetaMes(mesSeleccionado) }} {{ anioSeleccionado }}.
             </v-alert>
           </v-window-item>
+
+          <!-- TAB DETALLE DE DATEOS -->
+          <v-window-item value="dateos">
+            <v-alert v-if="asesorSeleccionado === null" type="info" variant="tonal">
+              Selecciona un asesor específico para ver este detalle.
+            </v-alert>
+
+            <template v-else>
+              <div class="text-body-2 text-medium-emphasis mb-3">{{ textoNarrativoDateos }}</div>
+
+              <v-data-table
+                class="tabla-zebra"
+                :headers="headersIngresoRealDateo"
+                :items="filasIngresoRealDateo"
+                :loading="loadingIngresoRealDateo"
+                item-key="dateo_id"
+                hover
+                hide-default-footer
+                :items-per-page="-1"
+              >
+                <template #item.fecha="{ item }">{{ formatFechaCorta(item.fecha) }}</template>
+                <template #item.tipo_captacion="{ item }">
+                  <v-chip
+                    size="small"
+                    :color="item.tipo_captacion === 'CONVENIO' ? COLORS.convenio : COLORS.comercial"
+                    variant="tonal"
+                  >
+                    {{ item.tipo_captacion === 'CONVENIO' ? 'Convenio' : 'Nuevo Directo' }}
+                  </v-chip>
+                </template>
+                <template #item.tipo_vehiculo="{ item }">
+                  {{ item.tipo_vehiculo === 'CARRO' ? 'Carro' : item.tipo_vehiculo === 'MOTO' ? 'Moto' : '—' }}
+                </template>
+                <template #item.ingreso_real="{ item }">
+                  <span class="text-secondary">{{ formatMoney(item.ingreso_real) }}</span>
+                </template>
+                <template #item.descuento="{ item }">
+                  <v-chip v-if="item.tuvo_descuento" size="small" color="amber-darken-2" variant="tonal">
+                    Sí: {{ item.descuento_nombre ?? 'Descuento' }} -{{ formatMoney(item.descuento_monto) }}
+                  </v-chip>
+                  <v-chip v-else size="small" color="grey" variant="tonal">No</v-chip>
+                </template>
+                <template #item.acumulado="{ item }">{{ formatMoney(item.acumulado) }}</template>
+              </v-data-table>
+
+              <v-alert
+                v-if="!loadingIngresoRealDateo && !ingresoRealDateo?.detalle.length"
+                type="info" variant="tonal" class="mt-4"
+              >
+                Sin dateos exitosos con factura confirmada para {{ etiquetaMes(mesSeleccionado) }} {{ anioSeleccionado }}.
+              </v-alert>
+
+              <v-row v-if="ingresoRealDateo" class="mt-4" dense>
+                <v-col cols="12" sm="4">
+                  <v-card variant="tonal" class="rounded-xl">
+                    <v-card-text>
+                      <div class="text-caption">Nuevo Directo</div>
+                      <div class="text-h6">{{ formatMoney(ingresoRealDateo.acumulado.nuevo_directo.ingreso_real) }}</div>
+                      <div class="text-caption">{{ ingresoRealDateo.acumulado.nuevo_directo.cantidad }} dateos</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+                <v-col cols="12" sm="4">
+                  <v-card variant="tonal" class="rounded-xl">
+                    <v-card-text>
+                      <div class="text-caption">Convenio</div>
+                      <div class="text-h6">{{ formatMoney(ingresoRealDateo.acumulado.convenio.ingreso_real) }}</div>
+                      <div class="text-caption">{{ ingresoRealDateo.acumulado.convenio.cantidad }} dateos</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+                <v-col cols="12" sm="4">
+                  <v-card variant="tonal" class="rounded-xl">
+                    <v-card-text>
+                      <div class="text-caption">Total General</div>
+                      <div class="text-h6">{{ formatMoney(ingresoRealDateo.acumulado.total.ingreso_real) }}</div>
+                      <div class="text-caption">{{ ingresoRealDateo.acumulado.total.cantidad }} dateos</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+              </v-row>
+            </template>
+          </v-window-item>
         </v-window>
       </v-card-text>
     </v-card>
@@ -638,18 +724,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import {
   getMetaComercialResumen,
   getMetaComercialDiario,
   getMetaComercialSemanal,
   getMetaComercialProyectado,
   getMetaComercialDetalleVehiculo,
+  getMetaComercialIngresoRealDateo,
   type MetaComercialResumenResponse,
   type MetaComercialDiarioResponse,
   type MetaComercialSemanalResponse,
   type MetaComercialProyectadoResponse,
   type MetaComercialDetalleVehiculoResponse,
+  type MetaComercialIngresoRealDateoResponse,
   type MetaComercialAsesorResumen,
   type FuenteMetaComercial,
   type SemaforoColor,
@@ -722,6 +810,8 @@ const diario = ref<MetaComercialDiarioResponse | null>(null)
 const semanal = ref<MetaComercialSemanalResponse | null>(null)
 const proyectado = ref<MetaComercialProyectadoResponse | null>(null)
 const detalleVehiculo = ref<MetaComercialDetalleVehiculoResponse | null>(null)
+const ingresoRealDateo = ref<MetaComercialIngresoRealDateoResponse | null>(null)
+const loadingIngresoRealDateo = ref(false)
 const fuenteDatos = ref<FuenteMetaComercial>('historico')
 
 /* ===== Fila "actual" (asesor puntual o agregado de todos) ===== */
@@ -844,6 +934,11 @@ const textoNarrativoProyectado = computed(() => {
   if (!p.resumen) return 'Aún no hay periodos con datos para proyectar el cierre del mes.'
   const unidad = p.granularidad === 'diaria' ? 'día' : 'semana'
   return `Proyección de cierre según el promedio por ${unidad} (${formatMoney(p.resumen.promedio_por_periodo)}/${unidad}): ${formatMoney(p.resumen.proyeccion_cierre)} — ${formatPct(p.resumen.pct_proyeccion)} de la meta.`
+})
+const textoNarrativoDateos = computed(() => {
+  const d = ingresoRealDateo.value
+  if (!d) return ''
+  return `Ingreso real de caja (facturación confirmada) por cada dateo exitoso de ${d.asesor_nombre} en ${etiquetaMes(mesSeleccionado.value)} ${anioSeleccionado.value}.`
 })
 
 /* ===== Colores / opciones de gráficos ===== */
@@ -1045,6 +1140,14 @@ const headersProyectado = [
   { title: 'Promedio', key: 'promedio' },
   { title: 'Proyección', key: 'proyeccion' },
 ]
+const headersIngresoRealDateo = [
+  { title: 'Fecha', key: 'fecha' },
+  { title: 'Tipo Captación', key: 'tipo_captacion' },
+  { title: 'Vehículo', key: 'tipo_vehiculo' },
+  { title: 'Ingreso Real', key: 'ingreso_real' },
+  { title: 'Descuento', key: 'descuento', sortable: false },
+  { title: 'Acumulado', key: 'acumulado' },
+]
 
 /* ===== Tab Meta — Detalle por tipo de vehículo ===== */
 const headersDetalleVehiculo = [
@@ -1063,7 +1166,43 @@ const filasDetalleVehiculo = computed(() => {
   ]
 })
 
+/* ===== Tab Detalle de Dateos ===== */
+const filasIngresoRealDateo = computed(() => {
+  let acumulado = 0
+  return (ingresoRealDateo.value?.detalle ?? []).map((d) => {
+    acumulado += d.ingreso_real
+    return { ...d, acumulado }
+  })
+})
+
 /* ===== Carga de datos ===== */
+async function cargarIngresoRealDateo() {
+  if (asesorSeleccionado.value === null) return
+  loadingIngresoRealDateo.value = true
+  try {
+    ingresoRealDateo.value = await getMetaComercialIngresoRealDateo(
+      mesSeleccionado.value,
+      anioSeleccionado.value,
+      asesorSeleccionado.value
+    )
+  } catch (err) {
+    console.error('Error cargando detalle de dateos:', err)
+    snack.text = '❌ Error al cargar el detalle de dateos'
+    snack.show = true
+  } finally {
+    loadingIngresoRealDateo.value = false
+  }
+}
+
+// Solo se pide al entrar a la pestaña con un asesor puntual ya elegido —
+// evita sumar una petición en cada cargarTodo() si nadie la está viendo.
+watch(tab, (nuevo) => {
+  if (nuevo === 'dateos' && asesorSeleccionado.value !== null) cargarIngresoRealDateo()
+})
+watch(asesorSeleccionado, (nuevo) => {
+  if (nuevo === null) ingresoRealDateo.value = null
+})
+
 async function cargarTodo() {
   loading.value = true
   detalleVehiculo.value = null
@@ -1084,6 +1223,10 @@ async function cargarTodo() {
     proyectado.value = proyectadoResp
     detalleVehiculo.value = detalleVehiculoResp
     fuenteDatos.value = resumenResp.fuente
+
+    if (tab.value === 'dateos' && asesorSeleccionado.value !== null) {
+      await cargarIngresoRealDateo()
+    }
   } catch (err) {
     console.error('Error cargando reporte Meta Comercial:', err)
     snack.text = '❌ Error al generar el reporte'
