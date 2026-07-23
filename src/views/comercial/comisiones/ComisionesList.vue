@@ -210,6 +210,97 @@
       <!-- ====== TAB DETALLE ====================================== -->
       <template v-if="activeTab === 'detalle'">
 
+        <!-- Resumen KPI: tipo de captación y estado (mismo patrón visual que ReporteComisiones.vue) -->
+        <v-card-text class="pt-4 pb-2 px-6">
+          <div class="text-caption text-medium-emphasis mb-2">Por tipo de captación</div>
+          <v-row dense class="mb-4">
+            <v-col cols="12" sm="4">
+              <v-card elevation="4" class="rounded-xl kpi-card" color="primary" variant="tonal">
+                <v-card-text class="text-center">
+                  <div class="text-overline font-weight-bold">Nuevo Directo</div>
+                  <div class="text-h5 font-weight-bold">{{ resumenPorTipo.nuevo_directo.cantidad }}</div>
+                  <div class="text-subtitle-2 font-weight-medium mt-1">{{ formatCOP(resumenPorTipo.nuevo_directo.monto) }}</div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-card elevation="4" class="rounded-xl kpi-card" color="deep-purple" variant="tonal">
+                <v-card-text class="text-center">
+                  <div class="text-overline font-weight-bold">Convenio</div>
+                  <div class="text-h5 font-weight-bold">{{ resumenPorTipo.convenio.cantidad }}</div>
+                  <div class="text-subtitle-2 font-weight-medium mt-1">{{ formatCOP(resumenPorTipo.convenio.monto) }}</div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <v-card elevation="4" class="rounded-xl kpi-card" color="grey-darken-1" variant="tonal">
+                <v-card-text class="text-center">
+                  <div class="text-overline font-weight-bold">Total General</div>
+                  <div class="text-h5 font-weight-bold">{{ resumenPorTipo.total.cantidad }}</div>
+                  <div class="text-subtitle-2 font-weight-medium mt-1">{{ formatCOP(resumenPorTipo.total.monto) }}</div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+
+          <div class="text-caption text-medium-emphasis mb-2">Por estado</div>
+
+          <v-card elevation="6" class="rounded-xl kpi-card mb-4" color="teal-darken-1" variant="tonal">
+            <v-card-text class="text-center">
+              <div class="text-overline font-weight-bold">Total generado en el período (sin anular)</div>
+              <div class="text-h4 font-weight-bold">{{ formatCOP(totalGeneradoSinAnuladas.monto) }}</div>
+              <div class="text-subtitle-2 font-weight-medium mt-1">
+                {{ totalGeneradoSinAnuladas.cantidad }} comisiones (pendiente + aprobada + pagada)
+              </div>
+            </v-card-text>
+          </v-card>
+
+          <v-row dense>
+            <v-col cols="12" sm="6" md="3">
+              <v-card elevation="4" class="rounded-xl kpi-card kpi-clickable" color="warning" variant="tonal" @click="filtrarPorEstadoComision('PENDIENTE')">
+                <v-card-text class="text-center">
+                  <v-icon size="28" color="warning" class="mb-1">mdi-clock-outline</v-icon>
+                  <div class="text-overline font-weight-bold">Pendiente</div>
+                  <div class="text-h5 font-weight-bold">{{ resumenPorEstadoComisiones.PENDIENTE.cantidad }}</div>
+                  <div class="text-subtitle-2 font-weight-medium mt-1">{{ formatCOP(resumenPorEstadoComisiones.PENDIENTE.monto) }}</div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" sm="6" md="3">
+              <v-card elevation="4" class="rounded-xl kpi-card kpi-clickable" color="info" variant="tonal" @click="filtrarPorEstadoComision('APROBADA')">
+                <v-card-text class="text-center">
+                  <v-icon size="28" color="info" class="mb-1">mdi-check-circle-outline</v-icon>
+                  <div class="text-overline font-weight-bold">Aprobada</div>
+                  <div class="text-h5 font-weight-bold">{{ resumenPorEstadoComisiones.APROBADA.cantidad }}</div>
+                  <div class="text-subtitle-2 font-weight-medium mt-1">{{ formatCOP(resumenPorEstadoComisiones.APROBADA.monto) }}</div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" sm="6" md="3">
+              <v-card elevation="4" class="rounded-xl kpi-card kpi-clickable" color="success" variant="tonal" @click="filtrarPorEstadoComision('PAGADA')">
+                <v-card-text class="text-center">
+                  <v-icon size="28" color="success" class="mb-1">mdi-cash-check</v-icon>
+                  <div class="text-overline font-weight-bold">Pagada</div>
+                  <div class="text-h5 font-weight-bold">{{ resumenPorEstadoComisiones.PAGADA.cantidad }}</div>
+                  <div class="text-subtitle-2 font-weight-medium mt-1">{{ formatCOP(resumenPorEstadoComisiones.PAGADA.monto) }}</div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" sm="6" md="3">
+              <v-card elevation="4" class="rounded-xl kpi-card kpi-clickable" color="error" variant="tonal" @click="filtrarPorEstadoComision('ANULADA')">
+                <v-card-text class="text-center">
+                  <v-icon size="28" color="error" class="mb-1">mdi-close-circle-outline</v-icon>
+                  <div class="text-overline font-weight-bold">Anulada</div>
+                  <div class="text-h5 font-weight-bold">{{ resumenPorEstadoComisiones.ANULADA.cantidad }}</div>
+                  <div class="text-subtitle-2 font-weight-medium mt-1">{{ formatCOP(resumenPorEstadoComisiones.ANULADA.monto) }}</div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </v-card-text>
+
+        <v-divider />
+
         <!-- Tabs de tipo (no TODOS): lista expandible por asesor/convenio -->
         <template v-if="filters.tipoAsesor">
           <v-card-text class="pt-4 pb-2 px-6">
@@ -245,6 +336,7 @@
                         color="success"
                         variant="elevated"
                         prepend-icon="mdi-cash-multiple"
+                        :disabled="panelAbierto === panelKey(item) && panelDetalle.truncado"
                         @click="pagarTodasDelPanel(item)"
                       >
                         Pagar todas
@@ -278,6 +370,17 @@
                       </div>
                     </v-expand-transition>
 
+                    <v-alert
+                      v-if="panelDetalle.truncado"
+                      type="warning"
+                      variant="tonal"
+                      density="compact"
+                      class="mb-3"
+                    >
+                      Se muestran las primeras {{ panelDetalle.rows.length }} comisiones de {{ panelDetalle.totalReal }} totales —
+                      usa filtros más específicos (fechas, estado) para ver el resto. "Pagar todas" está bloqueado mientras esto ocurra.
+                    </v-alert>
+
                     <v-data-table
                       :headers="headersPanel"
                       :items="panelDetalle.rows"
@@ -287,7 +390,6 @@
                       show-select
                       return-object
                       density="compact"
-                      hide-default-footer
                     >
                       <template #item.estado="{ item: fila }">
                         <v-chip size="small" :color="estadoColor(fila.estado)" variant="flat">{{ fila.estado }}</v-chip>
@@ -1847,6 +1949,7 @@ import {
   anularComision,
   pagarMasivoComisiones,
   getResumenPorAsesor,
+  getResumenComisiones,
   patchComisionEditar,
   listConveniosDeAsesor,
   listAgentesCaptacion,
@@ -1864,6 +1967,7 @@ import {
   type ConvenioItem,
   type TurnoParaComision,
   type ResumenAsesorItem,
+  type ResumenComisionesResponse,
 } from '@/services/comisionesService'
 import { createComprobantes, type ComprobantePago as ComprobantePagoDto } from '@/services/comprobantesService'
 import { ClientesService, type ClienteDetalle } from '@/services/clientes_service'
@@ -2002,18 +2106,13 @@ const selectedItemsData = computed<ComisionListItemExtended[]>(() => selectedIds
 const filteredRows = computed<ComisionListItemExtended[]>(() => {
   let items = rows.value
 
+  // NOTA: el filtro por descuentoCodigo sigue siendo client-side sobre la
+  // página ya paginada (bug conocido, pendiente aparte — no incluido en este
+  // lote). El filtro por tipoAsesor ya se envía al backend (ver loadItems),
+  // así que rows.value ya viene filtrado por tipo y no hay que repetirlo acá.
   if (filters.value.descuentoCodigo) {
     const codigo = filters.value.descuentoCodigo.toUpperCase()
     items = items.filter((item) => item.descuento?.codigo?.toUpperCase() === codigo)
-  }
-
-  const tab = filters.value.tipoAsesor
-  if (tab === 'ASESOR_COMERCIAL') {
-    items = items.filter((item) => item.asesor?.tipo === 'ASESOR_COMERCIAL')
-  } else if (tab === 'ASESOR_CONVENIO') {
-    items = items.filter((item) => item.asesor?.tipo === 'ASESOR_CONVENIO')
-  } else if (tab === 'CONVENIO') {
-    items = items.filter((item) => item.convenio != null)
   }
 
   return items.map((item) => ({
@@ -2033,6 +2132,70 @@ const canPagarSelected = computed(() =>
   selectedItemsData.value.some((i) => i.estado === 'PENDIENTE' || i.estado === 'APROBADA')
 )
 
+/* ── Resumen agregado (tarjetas KPI: tipo de captación / estado) ──
+   A propósito, esta llamada NUNCA incluye filters.value.estado: las
+   tarjetas (tipo de captación, por estado, total generado) deben mostrar
+   siempre los números reales completos, sin colapsar cuando el usuario
+   hace clic en una tarjeta de estado (eso solo filtra la tabla de abajo,
+   vía filtrarPorEstadoComision -> applyFilters -> loadItems). */
+const resumenBucketVacio = { cantidad: 0, monto: 0 }
+const resumenComisiones = ref<ResumenComisionesResponse | null>(null)
+const resumenComisionesLoading = ref(false)
+
+async function loadResumen() {
+  resumenComisionesLoading.value = true
+  try {
+    resumenComisiones.value = await getResumenComisiones({
+      desde: filters.value.desde || undefined,
+      hasta: filters.value.hasta || undefined,
+      asesorId: filters.value.asesorId || undefined,
+      convenioId: filters.value.convenioId || undefined,
+      tipoVehiculo: (filters.value.tipoVehiculo as 'MOTO' | 'VEHICULO') || undefined,
+      placa: filters.value.placa || undefined,
+      tipoAsesor: filters.value.tipoAsesor || undefined,
+    })
+  } catch {
+    resumenComisiones.value = null
+  } finally {
+    resumenComisionesLoading.value = false
+  }
+}
+
+const resumenPorTipo = computed(
+  () =>
+    resumenComisiones.value?.por_tipo_captacion ?? {
+      nuevo_directo: resumenBucketVacio,
+      convenio: resumenBucketVacio,
+      total: resumenBucketVacio,
+    }
+)
+const resumenPorEstadoComisiones = computed(
+  () =>
+    resumenComisiones.value?.por_estado ?? {
+      PENDIENTE: resumenBucketVacio,
+      APROBADA: resumenBucketVacio,
+      PAGADA: resumenBucketVacio,
+      ANULADA: resumenBucketVacio,
+      total: resumenBucketVacio,
+    }
+)
+
+// Suma Pendiente+Aprobada+Pagada (excluye Anulada) — resumenComisiones ya no
+// depende de filters.value.estado, así que esto tampoco cambia con el clic.
+const totalGeneradoSinAnuladas = computed(() => {
+  const r = resumenComisiones.value?.por_estado
+  if (!r) return { cantidad: 0, monto: 0 }
+  return {
+    cantidad: r.PENDIENTE.cantidad + r.APROBADA.cantidad + r.PAGADA.cantidad,
+    monto: r.PENDIENTE.monto + r.APROBADA.monto + r.PAGADA.monto,
+  }
+})
+
+function filtrarPorEstadoComision(estado: ComisionEstado) {
+  filters.value.estado = estado
+  applyFilters()
+}
+
 /* ── Resumen por asesor (lista expandible, pagos masivos) ── */
 const resumenPorAsesorList = ref<ResumenAsesorItem[]>([])
 const resumenPorAsesorLoading = ref(false)
@@ -2041,8 +2204,11 @@ const panelAbierto = ref<string | null>(null)
 interface PanelDetalleState {
   loading: boolean
   rows: ComisionListItemExtended[]
+  /** true si se alcanzó PANEL_DETALLE_MAX_PAGINAS sin agotar el resultado real */
+  truncado: boolean
+  totalReal: number
 }
-const panelDetalle = ref<PanelDetalleState>({ loading: false, rows: [] })
+const panelDetalle = ref<PanelDetalleState>({ loading: false, rows: [], truncado: false, totalReal: 0 })
 const panelSeleccionIds = ref<ComisionListItemExtended[]>([])
 
 function panelKey(item: ResumenAsesorItem): string {
@@ -2090,7 +2256,16 @@ async function cargarResumenPorAsesor() {
   resumenPorAsesorLoading.value = true
   panelAbierto.value = null
   try {
-    const resp = await getResumenPorAsesor(tab, filters.value.desde || undefined, filters.value.hasta || undefined)
+    const resp = await getResumenPorAsesor({
+      tipo: tab,
+      fechaInicio: filters.value.desde || undefined,
+      fechaFin: filters.value.hasta || undefined,
+      estado: filters.value.estado || undefined,
+      tipoVehiculo: filters.value.tipoVehiculo || undefined,
+      placa: filters.value.placa || undefined,
+      asesorId: filters.value.asesorId || undefined,
+      convenioId: filters.value.convenioId || undefined,
+    })
     resumenPorAsesorList.value = resp.asesores
   } catch (err) {
     resumenPorAsesorList.value = []
@@ -2102,27 +2277,64 @@ async function cargarResumenPorAsesor() {
   }
 }
 
+// Tope de seguridad del loop multi-página: 20 páginas * 100 = 2000 filas.
+// Si se alcanza sin agotar el resultado real, se marca panelDetalle.truncado
+// para que el template avise y bloquee "Pagar todas" (ver PanelDetalleState).
+const PANEL_DETALLE_MAX_PAGINAS = 20
+const PANEL_DETALLE_PER_PAGE = 100
+
 async function cargarPanelDetalle(item: ResumenAsesorItem) {
-  panelDetalle.value = { loading: true, rows: [] }
+  panelDetalle.value = { loading: true, rows: [], truncado: false, totalReal: 0 }
   panelSeleccionIds.value = []
   try {
     // ASESOR_COMERCIAL/ASESOR_CONVENIO: la fila es por asesor (puede abarcar
     // varios convenios) -> filtrar solo por asesorId, sin acotar convenio.
     // CONVENIO: la fila es por convenio (puede abarcar varios asesores) ->
     // filtrar solo por convenioId, sin acotar asesor.
-    const query: Record<string, unknown> = { perPage: 100, page: 1 }
-    if (filters.value.tipoAsesor === 'CONVENIO') {
-      query.convenioId = item.convenio_id ?? undefined
-    } else {
-      query.asesorId = item.asesor_id
+    const baseQuery: Record<string, unknown> = {
+      perPage: PANEL_DETALLE_PER_PAGE,
+      desde: filters.value.desde || undefined,
+      hasta: filters.value.hasta || undefined,
+      estado: filters.value.estado || undefined,
+      tipoVehiculo: filters.value.tipoVehiculo || undefined,
+      placa: filters.value.placa || undefined,
     }
-    const res = await listComisiones(query as any)
+    if (filters.value.tipoAsesor === 'CONVENIO') {
+      baseQuery.convenioId = item.convenio_id ?? undefined
+    } else {
+      baseQuery.asesorId = item.asesor_id
+    }
+
+    // Trae TODAS las páginas (el backend limita perPage a 100 por request),
+    // no solo la primera — "Pagar todas" depende de tener el set completo,
+    // no solo lo que entra en una página.
+    let acumulado: ComisionListItem[] = []
+    let total = Infinity
+    let pagina = 1
+    let truncado = false
+    while (acumulado.length < total && pagina <= PANEL_DETALLE_MAX_PAGINAS) {
+      const res = await listComisiones({ ...baseQuery, page: pagina } as any)
+      acumulado = acumulado.concat(res.data)
+      total = res.total
+      if (res.data.length === 0) break
+      pagina++
+    }
+    if (acumulado.length < total) truncado = true
+
+    if (truncado) {
+      snack.text = `Se muestran las primeras ${acumulado.length} comisiones de ${total} totales — usa filtros más específicos (fechas, estado) para ver el resto.`
+      snack.color = 'warning'
+      snack.show = true
+    }
+
     panelDetalle.value = {
       loading: false,
-      rows: res.data.map((r) => ({ ...r, _selectable: r.estado === 'PENDIENTE' || r.estado === 'APROBADA' })),
+      rows: acumulado.map((r) => ({ ...r, _selectable: r.estado === 'PENDIENTE' || r.estado === 'APROBADA' })),
+      truncado,
+      totalReal: total,
     }
   } catch (err) {
-    panelDetalle.value = { loading: false, rows: [] }
+    panelDetalle.value = { loading: false, rows: [], truncado: false, totalReal: 0 }
     snack.text = 'Error al cargar el detalle del asesor'
     snack.color = 'error'
     snack.show = true
@@ -2131,7 +2343,7 @@ async function cargarPanelDetalle(item: ResumenAsesorItem) {
 
 watch(panelAbierto, (key) => {
   if (!key) {
-    panelDetalle.value = { loading: false, rows: [] }
+    panelDetalle.value = { loading: false, rows: [], truncado: false, totalReal: 0 }
     panelSeleccionIds.value = []
     return
   }
@@ -2141,6 +2353,9 @@ watch(panelAbierto, (key) => {
 
 function onCambiarTabTipo() {
   panelAbierto.value = null
+  page.value = 1
+  loadItems()
+  loadResumen()
   if (filters.value.tipoAsesor) cargarResumenPorAsesor()
   else resumenPorAsesorList.value = []
 }
@@ -2173,6 +2388,14 @@ function panelConfirmarPagar(item: ResumenAsesorItem) {
 async function pagarTodasDelPanel(item: ResumenAsesorItem) {
   panelAbierto.value = panelKey(item)
   await cargarPanelDetalle(item)
+  // No pagar "todas" si el fetch se truncó (tope de seguridad de páginas):
+  // pagar solo lo cargado sería pagar de menos sin que el usuario lo note.
+  if (panelDetalle.value.truncado) {
+    snack.text = `"Pagar todas" se bloqueó: solo se cargaron ${panelDetalle.value.rows.length} de ${panelDetalle.value.totalReal} comisiones de este asesor. Aplica filtros más específicos (fechas, estado) para reducir el volumen antes de pagar en masa.`
+    snack.color = 'error'
+    snack.show = true
+    return
+  }
   const elegibles = panelDetalle.value.rows.filter((r) => r.estado === 'PENDIENTE' || r.estado === 'APROBADA')
   panelSeleccionIds.value = elegibles
   panelConfirmarPagar(item)
@@ -2232,13 +2455,18 @@ const conveniosFiltroLoading = ref(false)
 async function onFiltroAsesorChange(asesorId: number | null) {
   filters.value.convenioId = null
   conveniosFiltroComercial.value = []
-  if (!asesorId || filters.value.tipoAsesor !== 'ASESOR_COMERCIAL') return
-  conveniosFiltroLoading.value = true
-  try {
-    conveniosFiltroComercial.value = await listConveniosDeAsesor(asesorId)
-  } finally {
-    conveniosFiltroLoading.value = false
+  if (asesorId && filters.value.tipoAsesor === 'ASESOR_COMERCIAL') {
+    conveniosFiltroLoading.value = true
+    try {
+      conveniosFiltroComercial.value = await listConveniosDeAsesor(asesorId)
+    } finally {
+      conveniosFiltroLoading.value = false
+    }
   }
+  page.value = 1
+  loadItems()
+  loadResumen()
+  if (filters.value.tipoAsesor) cargarResumenPorAsesor()
 }
 
 const descuentosLoading = ref(false)
@@ -2554,6 +2782,7 @@ async function loadItems() {
   estado: filters.value.estado || undefined,
   tipoVehiculo: (filters.value.tipoVehiculo as 'MOTO' | 'VEHICULO') || undefined,
   placa: filters.value.placa || undefined,
+  tipoAsesor: filters.value.tipoAsesor || undefined,
   sortBy: sort.key,
   order: sort.order,
 })
@@ -2571,6 +2800,8 @@ function applyFilters() {
   page.value = 1
   selectedIds.value = []
   loadItems()
+  loadResumen()
+  if (filters.value.tipoAsesor) cargarResumenPorAsesor()
 }
 
 async function loadMetas() {
@@ -2600,8 +2831,14 @@ async function loadMetas() {
 }
 
 function reload() {
-  if (activeTab.value === 'detalle') { page.value = 1; loadItems() }
-  else loadMetas()
+  if (activeTab.value === 'detalle') {
+    page.value = 1
+    loadItems()
+    loadResumen()
+    if (filters.value.tipoAsesor) cargarResumenPorAsesor()
+  } else {
+    loadMetas()
+  }
 }
 
 function resetFilters() {
@@ -2813,6 +3050,7 @@ async function ejecutarAccionMasiva() {
     panelAbierto.value = null
     await loadItems()
     await cargarResumenPorAsesor()
+    await loadResumen()
   } catch (err) {
     snack.text = err instanceof Error ? err.message : 'Error al procesar la acción masiva'
     snack.color = 'error'
@@ -3534,6 +3772,7 @@ watch(activeTab, (val) => {
 /* ── Init ── */
 loadCatalogos()
 loadItems()
+loadResumen()
 </script>
 
 <style scoped>
@@ -3547,4 +3786,12 @@ loadItems()
 .scroll-content {
   overflow-x: auto;
 }
+
+.rounded-xl { border-radius: 16px; }
+.kpi-card { height: 100%; }
+.kpi-clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.kpi-clickable:hover { transform: translateY(-2px); }
 </style>

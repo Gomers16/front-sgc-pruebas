@@ -10,9 +10,6 @@
           </v-avatar>
           <div>
             <div class="text-h5 font-weight-bold">Meta Comercial por Asesor</div>
-            <div class="text-medium-emphasis">
-              Avance de captaciones (convenio + propio) vs. meta del mes, por asesor
-            </div>
           </div>
         </div>
 
@@ -642,6 +639,141 @@
             <template v-else>
               <div class="text-body-2 text-medium-emphasis mb-3">{{ textoNarrativoDateos }}</div>
 
+              <v-row class="mb-4" dense align="center">
+                <v-col cols="12" sm="4" md="3">
+                  <v-text-field
+                    v-model="fechaDesde"
+                    label="Desde"
+                    type="date"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                  />
+                </v-col>
+                <v-col cols="12" sm="4" md="3">
+                  <v-text-field
+                    v-model="fechaHasta"
+                    label="Hasta"
+                    type="date"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                  />
+                </v-col>
+                <v-col cols="12" sm="8" md="4">
+                  <v-select
+                    v-model="tiposDescuentoSeleccionados"
+                    :items="tiposDescuentoDisponibles"
+                    label="Tipo de descuento"
+                    multiple
+                    chips
+                    closable-chips
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                  />
+                </v-col>
+                <v-col cols="12" sm="4" md="2">
+                  <v-btn variant="tonal" prepend-icon="mdi-filter-off" @click="limpiarFiltros" block>
+                    Limpiar filtro
+                  </v-btn>
+                </v-col>
+              </v-row>
+
+              <v-row class="mb-4" dense>
+                <v-col cols="12" class="d-flex flex-wrap" style="gap:8px">
+                  <v-btn size="small" variant="outlined" @click="aplicarRangoHoy">Hoy</v-btn>
+                  <v-btn size="small" variant="outlined" @click="aplicarRangoQuincena">Quincena</v-btn>
+                  <v-btn size="small" variant="outlined" @click="aplicarRangoMesCompleto">Mes completo</v-btn>
+                </v-col>
+              </v-row>
+
+              <v-row v-if="ingresoRealDateo" class="mb-4" dense>
+                <v-col cols="12" sm="4">
+                  <v-card variant="tonal" class="rounded-xl">
+                    <v-card-text>
+                      <div class="text-caption">Nuevo Directo</div>
+                      <div class="text-h6">{{ formatMoney(acumuladoFiltrado.nuevo_directo.ingreso_real) }}</div>
+                      <div class="text-caption">{{ acumuladoFiltrado.nuevo_directo.cantidad }} dateos</div>
+                      <v-divider class="my-1" />
+                      <div class="text-caption text-medium-emphasis">Comisión Asesor</div>
+                      <div class="text-subtitle-1 font-weight-medium">{{ formatMoney(acumuladoFiltrado.nuevo_directo.comision_asesor_total) }}</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+                <v-col cols="12" sm="4">
+                  <v-card variant="tonal" class="rounded-xl">
+                    <v-card-text>
+                      <div class="text-caption">Convenio</div>
+                      <div class="text-h6">{{ formatMoney(acumuladoFiltrado.convenio.ingreso_real) }}</div>
+                      <div class="text-caption">{{ acumuladoFiltrado.convenio.cantidad }} dateos</div>
+                      <v-divider class="my-1" />
+                      <div class="text-caption text-medium-emphasis">Comisión Asesor</div>
+                      <div class="text-subtitle-1 font-weight-medium">{{ formatMoney(acumuladoFiltrado.convenio.comision_asesor_total) }}</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+                <v-col cols="12" sm="4">
+                  <v-card variant="tonal" class="rounded-xl">
+                    <v-card-text>
+                      <div class="text-caption">Total General</div>
+                      <div class="text-h6">{{ formatMoney(acumuladoFiltrado.total.ingreso_real) }}</div>
+                      <div class="text-caption">{{ acumuladoFiltrado.total.cantidad }} dateos</div>
+                      <v-divider class="my-1" />
+                      <div class="text-caption text-medium-emphasis">Comisión Asesor</div>
+                      <div class="text-subtitle-1 font-weight-medium">{{ formatMoney(acumuladoFiltrado.total.comision_asesor_total) }}</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+              </v-row>
+
+              <v-row v-if="resumenDescuentosFiltrado.total.cantidad" class="mb-4" dense>
+                <v-col cols="12">
+                  <v-card variant="tonal" class="rounded-xl">
+                    <v-card-title class="text-subtitle-2 pb-0">Descuentos aplicados por tipo</v-card-title>
+                    <v-card-text>
+                      <v-table density="compact">
+                        <thead>
+                          <tr>
+                            <th>Tipo de descuento</th>
+                            <th class="text-right">Dateos</th>
+                            <th class="text-right">Monto total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr
+                            v-for="d in resumenDescuentosFiltrado.por_tipo"
+                            :key="d.descuento_nombre"
+                          >
+                            <td>{{ d.descuento_nombre }}</td>
+                            <td class="text-right">
+                              <v-btn
+                                variant="text"
+                                size="small"
+                                density="compact"
+                                class="pa-0"
+                                style="min-width:0"
+                                @click="abrirDetalleTipoDescuento(d.descuento_nombre)"
+                              >
+                                {{ d.cantidad }}
+                              </v-btn>
+                            </td>
+                            <td class="text-right">{{ formatMoney(d.monto_total) }}</td>
+                          </tr>
+                        </tbody>
+                        <tfoot>
+                          <tr class="font-weight-bold">
+                            <td>Total</td>
+                            <td class="text-right">{{ resumenDescuentosFiltrado.total.cantidad }}</td>
+                            <td class="text-right">{{ formatMoney(resumenDescuentosFiltrado.total.monto_total) }}</td>
+                          </tr>
+                        </tfoot>
+                      </v-table>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+              </v-row>
+
               <v-data-table
                 class="tabla-zebra"
                 :headers="headersIngresoRealDateo"
@@ -668,6 +800,7 @@
                 <template #item.ingreso_real="{ item }">
                   <span class="text-secondary">{{ formatMoney(item.ingreso_real) }}</span>
                 </template>
+                <template #item.comision_asesor="{ item }">{{ formatMoney(item.comision_asesor) }}</template>
                 <template #item.descuento="{ item }">
                   <v-chip v-if="item.tuvo_descuento" size="small" color="amber-darken-2" variant="tonal">
                     Sí: {{ item.descuento_nombre ?? 'Descuento' }} -{{ formatMoney(item.descuento_monto) }}
@@ -678,46 +811,63 @@
               </v-data-table>
 
               <v-alert
-                v-if="!loadingIngresoRealDateo && !ingresoRealDateo?.detalle.length"
+                v-if="!loadingIngresoRealDateo && !detalleFiltrado.length"
                 type="info" variant="tonal" class="mt-4"
               >
-                Sin dateos exitosos con factura confirmada para {{ etiquetaMes(mesSeleccionado) }} {{ anioSeleccionado }}.
+                Sin dateos exitosos con factura confirmada para el rango de fechas seleccionado.
               </v-alert>
-
-              <v-row v-if="ingresoRealDateo" class="mt-4" dense>
-                <v-col cols="12" sm="4">
-                  <v-card variant="tonal" class="rounded-xl">
-                    <v-card-text>
-                      <div class="text-caption">Nuevo Directo</div>
-                      <div class="text-h6">{{ formatMoney(ingresoRealDateo.acumulado.nuevo_directo.ingreso_real) }}</div>
-                      <div class="text-caption">{{ ingresoRealDateo.acumulado.nuevo_directo.cantidad }} dateos</div>
-                    </v-card-text>
-                  </v-card>
-                </v-col>
-                <v-col cols="12" sm="4">
-                  <v-card variant="tonal" class="rounded-xl">
-                    <v-card-text>
-                      <div class="text-caption">Convenio</div>
-                      <div class="text-h6">{{ formatMoney(ingresoRealDateo.acumulado.convenio.ingreso_real) }}</div>
-                      <div class="text-caption">{{ ingresoRealDateo.acumulado.convenio.cantidad }} dateos</div>
-                    </v-card-text>
-                  </v-card>
-                </v-col>
-                <v-col cols="12" sm="4">
-                  <v-card variant="tonal" class="rounded-xl">
-                    <v-card-text>
-                      <div class="text-caption">Total General</div>
-                      <div class="text-h6">{{ formatMoney(ingresoRealDateo.acumulado.total.ingreso_real) }}</div>
-                      <div class="text-caption">{{ ingresoRealDateo.acumulado.total.cantidad }} dateos</div>
-                    </v-card-text>
-                  </v-card>
-                </v-col>
-              </v-row>
             </template>
           </v-window-item>
         </v-window>
       </v-card-text>
     </v-card>
+
+    <v-dialog v-model="dialogDetalleDescuento.open" max-width="900">
+      <v-card>
+        <v-card-title class="d-flex align-center justify-space-between flex-wrap" style="gap:8px">
+          <div class="d-flex align-center flex-wrap" style="gap:10px">
+            <v-icon>mdi-format-list-bulleted</v-icon>
+            <span>Detalle — {{ dialogDetalleDescuento.titulo }}</span>
+          </div>
+          <v-btn icon="mdi-close" variant="text" density="comfortable" @click="dialogDetalleDescuento.open = false" />
+        </v-card-title>
+
+        <v-card-subtitle class="pb-2">
+          {{ detalleDialogDescuento.length }} dateos — {{ formatMoney(totalDialogDescuento) }} total descuento
+        </v-card-subtitle>
+
+        <v-divider />
+
+        <v-card-text>
+          <v-data-table
+            :headers="headersDialogDescuento"
+            :items="detalleDialogDescuento"
+            item-key="dateo_id"
+            hover
+            density="compact"
+            hide-default-footer
+            :items-per-page="-1"
+          >
+            <template #item.fecha="{ item }">{{ formatFechaCorta(item.fecha) }}</template>
+            <template #item.placa="{ item }">{{ item.placa ?? '—' }}</template>
+            <template #item.tipo_captacion="{ item }">
+              {{ item.tipo_captacion === 'CONVENIO' ? 'Convenio' : 'Nuevo Directo' }}
+            </template>
+            <template #item.descuento_monto="{ item }">{{ formatMoney(item.descuento_monto) }}</template>
+            <template #item.ingreso_real="{ item }">{{ formatMoney(item.ingreso_real) }}</template>
+          </v-data-table>
+
+          <v-alert v-if="!detalleDialogDescuento.length" type="info" variant="tonal" class="mt-4">
+            No hay dateos para este tipo de descuento en el rango filtrado.
+          </v-alert>
+        </v-card-text>
+
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="dialogDetalleDescuento.open = false">Cerrar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-snackbar v-model="snack.show" :timeout="3000">{{ snack.text }}</v-snackbar>
   </v-container>
@@ -941,6 +1091,158 @@ const textoNarrativoDateos = computed(() => {
   return `Ingreso real de caja (facturación confirmada) por cada dateo exitoso de ${d.asesor_nombre} en ${etiquetaMes(mesSeleccionado.value)} ${anioSeleccionado.value}.`
 })
 
+/* ===== Filtro de fechas (Detalle de Dateos) — filtra en memoria, sin pedir nada al backend ===== */
+function primerDiaMes(mes: number, anio: number): string {
+  return `${anio}-${String(mes).padStart(2, '0')}-01`
+}
+function ultimoDiaMes(mes: number, anio: number): string {
+  const ultimoDia = new Date(anio, mes, 0).getDate()
+  return `${anio}-${String(mes).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`
+}
+
+const fechaDesde = ref(primerDiaMes(mesSeleccionado.value, anioSeleccionado.value))
+const fechaHasta = ref(ultimoDiaMes(mesSeleccionado.value, anioSeleccionado.value))
+const tiposDescuentoSeleccionados = ref<string[]>([])
+
+function limpiarFiltros() {
+  fechaDesde.value = primerDiaMes(mesSeleccionado.value, anioSeleccionado.value)
+  fechaHasta.value = ultimoDiaMes(mesSeleccionado.value, anioSeleccionado.value)
+  tiposDescuentoSeleccionados.value = []
+}
+
+function hoyISO(): string {
+  const hoy = new Date()
+  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+}
+
+function aplicarRangoHoy() {
+  const hoy = hoyISO()
+  fechaDesde.value = hoy
+  fechaHasta.value = hoy
+}
+
+function aplicarRangoQuincena() {
+  const dia = new Date().getDate()
+  const mes = mesSeleccionado.value
+  const anio = anioSeleccionado.value
+  if (dia <= 15) {
+    fechaDesde.value = `${anio}-${String(mes).padStart(2, '0')}-01`
+    fechaHasta.value = `${anio}-${String(mes).padStart(2, '0')}-15`
+  } else {
+    fechaDesde.value = `${anio}-${String(mes).padStart(2, '0')}-16`
+    fechaHasta.value = ultimoDiaMes(mes, anio)
+  }
+}
+
+function aplicarRangoMesCompleto() {
+  fechaDesde.value = primerDiaMes(mesSeleccionado.value, anioSeleccionado.value)
+  fechaHasta.value = ultimoDiaMes(mesSeleccionado.value, anioSeleccionado.value)
+}
+
+// Filtro solo por fecha — base para las opciones del v-select de tipo de descuento
+const detalleFiltradoPorFecha = computed(() => {
+  const detalle = ingresoRealDateo.value?.detalle ?? []
+  return detalle.filter((d) => {
+    if (fechaDesde.value && d.fecha < fechaDesde.value) return false
+    if (fechaHasta.value && d.fecha > fechaHasta.value) return false
+    return true
+  })
+})
+
+const tiposDescuentoDisponibles = computed(() => {
+  const nombres = new Set<string>()
+  for (const d of detalleFiltradoPorFecha.value) {
+    if (d.descuento_nombre) nombres.add(d.descuento_nombre)
+  }
+  return Array.from(nombres).sort()
+})
+
+// Filtro final (fecha + tipo de descuento) — usado por tarjetas, tabla de descuentos,
+// tabla principal, acumulado corrido y el modal de drill-down
+const detalleFiltrado = computed(() => {
+  if (!tiposDescuentoSeleccionados.value.length) return detalleFiltradoPorFecha.value
+  return detalleFiltradoPorFecha.value.filter(
+    (d) => d.descuento_nombre !== null && tiposDescuentoSeleccionados.value.includes(d.descuento_nombre)
+  )
+})
+
+const acumuladoFiltrado = computed(() => {
+  const acumulado = {
+    nuevo_directo: { cantidad: 0, ingreso_real: 0, comision_asesor_total: 0 },
+    convenio: { cantidad: 0, ingreso_real: 0, comision_asesor_total: 0 },
+    total: { cantidad: 0, ingreso_real: 0, comision_asesor_total: 0 },
+  }
+  for (const fila of detalleFiltrado.value) {
+    const bucket = fila.tipo_captacion === 'CONVENIO' ? acumulado.convenio : acumulado.nuevo_directo
+    bucket.cantidad += 1
+    bucket.ingreso_real += fila.ingreso_real
+    acumulado.total.cantidad += 1
+    acumulado.total.ingreso_real += fila.ingreso_real
+
+    // Comisiones ANULADAS no se le pagan al asesor: se excluyen del acumulado.
+    if (fila.comision_asesor !== null && !fila.comision_anulada) {
+      bucket.comision_asesor_total += fila.comision_asesor
+      acumulado.total.comision_asesor_total += fila.comision_asesor
+    }
+  }
+  return acumulado
+})
+
+const resumenDescuentosFiltrado = computed(() => {
+  const porNombre = new Map<string, { cantidad: number; monto_total: number }>()
+  for (const fila of detalleFiltrado.value) {
+    if (!fila.tuvo_descuento) continue
+    const nombre = fila.descuento_nombre ?? 'Sin nombre'
+    const actual = porNombre.get(nombre) ?? { cantidad: 0, monto_total: 0 }
+    actual.cantidad += 1
+    actual.monto_total += fila.descuento_monto
+    porNombre.set(nombre, actual)
+  }
+  const porTipo = Array.from(porNombre.entries())
+    .map(([descuento_nombre, v]) => ({
+      descuento_nombre,
+      cantidad: v.cantidad,
+      monto_total: Math.round(v.monto_total * 100) / 100,
+    }))
+    .sort((a, b) => b.monto_total - a.monto_total)
+  const total = porTipo.reduce(
+    (acc, r) => {
+      acc.cantidad += r.cantidad
+      acc.monto_total += r.monto_total
+      return acc
+    },
+    { cantidad: 0, monto_total: 0 }
+  )
+  return { por_tipo: porTipo, total }
+})
+
+/* ===== Drill-down: detalle de dateos de un tipo de descuento puntual ===== */
+const headersDialogDescuento = [
+  { title: 'Fecha', key: 'fecha' },
+  { title: 'Turno/Placa', key: 'placa' },
+  { title: 'Tipo Captación', key: 'tipo_captacion' },
+  { title: 'Monto Descuento', key: 'descuento_monto' },
+  { title: 'Total Factura', key: 'ingreso_real' },
+]
+
+const dialogDetalleDescuento = reactive({ open: false, titulo: '' })
+
+function abrirDetalleTipoDescuento(nombre: string) {
+  dialogDetalleDescuento.titulo = nombre
+  dialogDetalleDescuento.open = true
+}
+
+const detalleDialogDescuento = computed(() => {
+  if (!dialogDetalleDescuento.open) return []
+  return detalleFiltrado.value.filter(
+    (d) => (d.descuento_nombre ?? 'Sin nombre') === dialogDetalleDescuento.titulo
+  )
+})
+
+const totalDialogDescuento = computed(() =>
+  detalleDialogDescuento.value.reduce((acc, d) => acc + d.descuento_monto, 0)
+)
+
 /* ===== Colores / opciones de gráficos ===== */
 const COLORS = { convenio: '#42A5F5', comercial: '#AB47BC', meta: '#9E9E9E', exito: '#43A047', amarillo: '#FFA000', rojo: '#E53935' }
 function colorGauge(pct: number) {
@@ -1145,6 +1447,7 @@ const headersIngresoRealDateo = [
   { title: 'Tipo Captación', key: 'tipo_captacion' },
   { title: 'Vehículo', key: 'tipo_vehiculo' },
   { title: 'Ingreso Real', key: 'ingreso_real' },
+  { title: 'Comisión Asesor', key: 'comision_asesor' },
   { title: 'Descuento', key: 'descuento', sortable: false },
   { title: 'Acumulado', key: 'acumulado' },
 ]
@@ -1169,7 +1472,7 @@ const filasDetalleVehiculo = computed(() => {
 /* ===== Tab Detalle de Dateos ===== */
 const filasIngresoRealDateo = computed(() => {
   let acumulado = 0
-  return (ingresoRealDateo.value?.detalle ?? []).map((d) => {
+  return detalleFiltrado.value.map((d) => {
     acumulado += d.ingreso_real
     return { ...d, acumulado }
   })
@@ -1185,6 +1488,7 @@ async function cargarIngresoRealDateo() {
       anioSeleccionado.value,
       asesorSeleccionado.value
     )
+    limpiarFiltros()
   } catch (err) {
     console.error('Error cargando detalle de dateos:', err)
     snack.text = '❌ Error al cargar el detalle de dateos'

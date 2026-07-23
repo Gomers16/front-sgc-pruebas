@@ -898,11 +898,26 @@ export interface MetaComercialIngresoRealDateoItem {
   descuento_nombre: string | null
   descuento_monto: number
   descuento_verificado: number
+  placa: string | null
+  comision_asesor: number | null
+  comision_anulada: boolean
 }
 
 export interface MetaComercialIngresoRealDateoBucket {
   cantidad: number
   ingreso_real: number
+  comision_asesor_total: number
+}
+
+export interface MetaComercialResumenDescuentoPorTipo {
+  descuento_nombre: string
+  cantidad: number
+  monto_total: number
+}
+
+export interface MetaComercialResumenDescuentos {
+  por_tipo: MetaComercialResumenDescuentoPorTipo[]
+  total: { cantidad: number; monto_total: number }
 }
 
 export interface MetaComercialIngresoRealDateoResponse {
@@ -916,6 +931,7 @@ export interface MetaComercialIngresoRealDateoResponse {
     convenio: MetaComercialIngresoRealDateoBucket
     total: MetaComercialIngresoRealDateoBucket
   }
+  resumen_descuentos: MetaComercialResumenDescuentos
 }
 
 export async function getMetaComercialIngresoRealDateo(
