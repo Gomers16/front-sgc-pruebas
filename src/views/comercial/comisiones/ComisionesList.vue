@@ -215,8 +215,16 @@
           <div class="text-caption text-medium-emphasis mb-2">Por tipo de captación</div>
           <v-row dense class="mb-4">
             <v-col cols="12" sm="4">
-              <v-card elevation="4" class="rounded-xl kpi-card" color="primary" variant="tonal">
-                <v-card-text class="text-center">
+              <v-card
+                elevation="4"
+                class="rounded-xl kpi-card kpi-clickable"
+                :class="{ 'kpi-active': filters.tipoCaptacion === 'NUEVO_DIRECTO' }"
+                color="primary"
+                :variant="filters.tipoCaptacion === 'NUEVO_DIRECTO' ? 'flat' : 'tonal'"
+                @click="filtrarPorTipoCaptacion('NUEVO_DIRECTO')"
+              >
+                <v-card-text class="text-center position-relative">
+                  <v-icon v-if="filters.tipoCaptacion === 'NUEVO_DIRECTO'" size="18" class="kpi-active-check">mdi-check-circle</v-icon>
                   <div class="text-overline font-weight-bold">Nuevo Directo</div>
                   <div class="text-h5 font-weight-bold">{{ resumenPorTipo.nuevo_directo.cantidad }}</div>
                   <div class="text-subtitle-2 font-weight-medium mt-1">{{ formatCOP(resumenPorTipo.nuevo_directo.monto) }}</div>
@@ -224,8 +232,16 @@
               </v-card>
             </v-col>
             <v-col cols="12" sm="4">
-              <v-card elevation="4" class="rounded-xl kpi-card" color="deep-purple" variant="tonal">
-                <v-card-text class="text-center">
+              <v-card
+                elevation="4"
+                class="rounded-xl kpi-card kpi-clickable"
+                :class="{ 'kpi-active': filters.tipoCaptacion === 'CONVENIO' }"
+                color="deep-purple"
+                :variant="filters.tipoCaptacion === 'CONVENIO' ? 'flat' : 'tonal'"
+                @click="filtrarPorTipoCaptacion('CONVENIO')"
+              >
+                <v-card-text class="text-center position-relative">
+                  <v-icon v-if="filters.tipoCaptacion === 'CONVENIO'" size="18" class="kpi-active-check">mdi-check-circle</v-icon>
                   <div class="text-overline font-weight-bold">Convenio</div>
                   <div class="text-h5 font-weight-bold">{{ resumenPorTipo.convenio.cantidad }}</div>
                   <div class="text-subtitle-2 font-weight-medium mt-1">{{ formatCOP(resumenPorTipo.convenio.monto) }}</div>
@@ -238,6 +254,39 @@
                   <div class="text-overline font-weight-bold">Total General</div>
                   <div class="text-h5 font-weight-bold">{{ resumenPorTipo.total.cantidad }}</div>
                   <div class="text-subtitle-2 font-weight-medium mt-1">{{ formatCOP(resumenPorTipo.total.monto) }}</div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+
+          <v-row v-if="resumenPorDescuentos.total.cantidad" dense class="mb-4">
+            <v-col cols="12">
+              <v-card variant="tonal" class="rounded-xl">
+                <v-card-title class="text-subtitle-2 pb-0">Descuentos aplicados por tipo</v-card-title>
+                <v-card-text>
+                  <v-table density="compact">
+                    <thead>
+                      <tr>
+                        <th>Tipo de descuento</th>
+                        <th class="text-right">Cantidad</th>
+                        <th class="text-right">Monto total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="d in resumenPorDescuentos.por_tipo" :key="d.descuento_id">
+                        <td>{{ d.nombre }}</td>
+                        <td class="text-right">{{ d.cantidad }}</td>
+                        <td class="text-right">{{ formatCOP(d.monto) }}</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr class="font-weight-bold">
+                        <td>Total</td>
+                        <td class="text-right">{{ resumenPorDescuentos.total.cantidad }}</td>
+                        <td class="text-right">{{ formatCOP(resumenPorDescuentos.total.monto) }}</td>
+                      </tr>
+                    </tfoot>
+                  </v-table>
                 </v-card-text>
               </v-card>
             </v-col>
@@ -496,7 +545,7 @@
           </v-expand-transition>
 
           <!-- ── TABLA ──────────────────────────────────────────── -->
-          <div class="scroll-wrapper" ref="scrollWrapper">
+          <div class="scroll-wrapper tabla-ancha-breakout" ref="scrollWrapper">
             <div class="scroll-top" ref="scrollTop">
               <div :style="{ width: innerWidth + 'px', height: '1px' }"></div>
             </div>
@@ -2036,6 +2085,7 @@ const filters = ref<{
   tipoVehiculo: 'MOTO' | 'VEHICULO' | ''
   descuentoCodigo: string
   tipoAsesor: '' | 'ASESOR_COMERCIAL' | 'ASESOR_CONVENIO' | 'CONVENIO'
+  tipoCaptacion: '' | 'NUEVO_DIRECTO' | 'CONVENIO'
   placa: string
 }>({
   desde: '',
@@ -2046,6 +2096,7 @@ const filters = ref<{
   tipoVehiculo: '',
   descuentoCodigo: '',
   tipoAsesor: '',
+  tipoCaptacion: '',
   placa: '',
 })
 
@@ -2085,8 +2136,8 @@ const headers = [
   { title: 'Asesor', key: 'asesor', sortable: false },
   { title: 'Convenio', key: 'convenio', sortable: false },
   { title: 'Descuento', key: 'descuento', sortable: false },
-  { title: 'Dateo (asesor)', key: 'valor_unitario', sortable: true },
-  { title: 'Incentivo (convenio)', key: 'valor_cliente', sortable: false },
+  { title: 'Dateo', key: 'valor_unitario', sortable: true },
+  { title: 'Incentivo', key: 'valor_cliente', sortable: false },
   { title: 'Total', key: 'valor_total', sortable: true },
   { title: 'Fecha', key: 'generado_at', sortable: true },
   { title: 'Rep General', key: 'rep_general', sortable: false },
@@ -2169,6 +2220,13 @@ const resumenPorTipo = computed(
       total: resumenBucketVacio,
     }
 )
+const resumenPorDescuentos = computed(
+  () =>
+    resumenComisiones.value?.resumen_descuentos ?? {
+      total: { cantidad: 0, monto: 0 },
+      por_tipo: [] as { descuento_id: number; nombre: string; cantidad: number; monto: number }[],
+    }
+)
 const resumenPorEstadoComisiones = computed(
   () =>
     resumenComisiones.value?.por_estado ?? {
@@ -2193,6 +2251,15 @@ const totalGeneradoSinAnuladas = computed(() => {
 
 function filtrarPorEstadoComision(estado: ComisionEstado) {
   filters.value.estado = estado
+  applyFilters()
+}
+
+// Igual que filtrarPorEstadoComision: filtra la tabla/acordeón de abajo,
+// pero las tarjetas de arriba (resumenPorTipo, resumenPorEstadoComisiones,
+// totalGeneradoSinAnuladas) no cambian porque loadResumen() nunca envía
+// tipoCaptacion (ver nota en loadResumen).
+function filtrarPorTipoCaptacion(tipo: 'NUEVO_DIRECTO' | 'CONVENIO') {
+  filters.value.tipoCaptacion = filters.value.tipoCaptacion === tipo ? '' : tipo
   applyFilters()
 }
 
@@ -2265,6 +2332,7 @@ async function cargarResumenPorAsesor() {
       placa: filters.value.placa || undefined,
       asesorId: filters.value.asesorId || undefined,
       convenioId: filters.value.convenioId || undefined,
+      tipoCaptacion: filters.value.tipoCaptacion || undefined,
     })
     resumenPorAsesorList.value = resp.asesores
   } catch (err) {
@@ -2298,6 +2366,7 @@ async function cargarPanelDetalle(item: ResumenAsesorItem) {
       estado: filters.value.estado || undefined,
       tipoVehiculo: filters.value.tipoVehiculo || undefined,
       placa: filters.value.placa || undefined,
+      tipoCaptacion: filters.value.tipoCaptacion || undefined,
     }
     if (filters.value.tipoAsesor === 'CONVENIO') {
       baseQuery.convenioId = item.convenio_id ?? undefined
@@ -2783,6 +2852,7 @@ async function loadItems() {
   tipoVehiculo: (filters.value.tipoVehiculo as 'MOTO' | 'VEHICULO') || undefined,
   placa: filters.value.placa || undefined,
   tipoAsesor: filters.value.tipoAsesor || undefined,
+  tipoCaptacion: filters.value.tipoCaptacion || undefined,
   sortBy: sort.key,
   order: sort.order,
 })
@@ -2842,7 +2912,7 @@ function reload() {
 }
 
 function resetFilters() {
-  filters.value = { desde: '', hasta: '', asesorId: null, convenioId: null, estado: '', tipoVehiculo: '', descuentoCodigo: '', tipoAsesor: '', placa: '' }
+  filters.value = { desde: '', hasta: '', asesorId: null, convenioId: null, estado: '', tipoVehiculo: '', descuentoCodigo: '', tipoAsesor: '', tipoCaptacion: '', placa: '' }
   conveniosFiltroComercial.value = []
   selectedIds.value = []
   reload()
@@ -3779,6 +3849,34 @@ loadResumen()
 .scroll-wrapper {
   position: relative;
 }
+
+/*
+ * Rompe SOLO el ancho del v-container padre (tope de 1250px fijado en
+ * App.vue) para esta tabla puntual, sin tocar el resto de la vista
+ * (título, filtros, tarjetas KPI, tabla de descuentos) ni el padding
+ * global de MainLayout.vue (pa-15, se queda fijo para toda la app).
+ *
+ * El borde IZQUIERDO se queda fijo (mismo margin-left que sus hermanos,
+ * el checkbox/ID no se mueven de su posición actual): todo el espacio
+ * extra se gana solo hacia la derecha, vía margin-right negativo + un
+ * width mayor al 100%.
+ *
+ * --espacio-extra es el espacio "sobrante" (a un solo lado, por eso sin
+ * dividir entre 2) entre el borde del v-container (tope 1250px) y el
+ * borde del padding del v-main (pa-15 = 60px por lado + sidebar rail
+ * 64px): 1250 (cap del v-container) + 120 (pa-15 x2) + 64 (sidebar rail)
+ * = 1434. Por debajo de ese ancho de viewport el v-container ya no llega
+ * a tocar su tope de 1250px (está limitado por el padre, no por el cap),
+ * así que clamp() devuelve 0 y la tabla no se mueve — sin riesgo de
+ * desbordar el padding de v-main en pantallas más angostas. El tope de
+ * 440px es el mismo ancho total ganado que la versión repartida a 2
+ * lados (2 x 220px), solo que ahora va entero hacia la derecha.
+ */
+.tabla-ancha-breakout {
+  --espacio-extra: clamp(0px, calc(100vw - 1434px), 440px);
+  margin-right: calc(-1 * var(--espacio-extra));
+  width: calc(100% + var(--espacio-extra));
+}
 .scroll-top {
   overflow-x: auto;
   overflow-y: hidden;
@@ -3794,4 +3892,13 @@ loadResumen()
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .kpi-clickable:hover { transform: translateY(-2px); }
+.kpi-active {
+  border: 2px solid rgba(var(--v-theme-on-surface), 0.87);
+}
+.kpi-active-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: white;
+}
 </style>

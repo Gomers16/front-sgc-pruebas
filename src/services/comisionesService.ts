@@ -195,6 +195,7 @@ export interface ListParams {
   tipoVehiculo?: 'MOTO' | 'VEHICULO' | ''
   placa?: string
   tipoAsesor?: 'ASESOR_COMERCIAL' | 'ASESOR_CONVENIO' | 'CONVENIO' | ''
+  tipoCaptacion?: 'NUEVO_DIRECTO' | 'CONVENIO' | ''
 }
 
 export interface ListResponse<T> {
@@ -683,6 +684,10 @@ export interface ResumenComisionesResponse {
     ANULADA: ResumenComisionesBucket
     total: ResumenComisionesBucket
   }
+  resumen_descuentos: {
+    total: { cantidad: number; monto: number }
+    por_tipo: { descuento_id: number; nombre: string; cantidad: number; monto: number }[]
+  }
 }
 
 export async function getResumenComisiones(
@@ -769,6 +774,7 @@ export interface ResumenPorAsesorParams {
   placa?: string
   asesorId?: number
   convenioId?: number
+  tipoCaptacion?: string
 }
 
 export async function getResumenPorAsesor(
@@ -784,6 +790,7 @@ export async function getResumenPorAsesor(
       placa: params.placa,
       asesorId: params.asesorId,
       convenioId: params.convenioId,
+      tipoCaptacion: params.tipoCaptacion,
     },
   })
 }
