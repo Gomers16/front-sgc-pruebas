@@ -31,8 +31,339 @@
           <v-btn color="primary" size="small" :loading="loading || metaLoading" @click="reload" prepend-icon="mdi-refresh">
             <span class="d-none d-sm-inline">Actualizar</span>
           </v-btn>
+          <v-btn
+            color="deep-purple"
+            size="small"
+            variant="flat"
+            prepend-icon="mdi-cash-check"
+            @click="abrirLiquidacion"
+          >
+            Liquidar
+          </v-btn>
         </div>
       </v-card-title>
+
+      <!-- ── MODAL LIQUIDACIÓN RTM ─────────────────────────────── -->
+      <v-dialog v-model="liquidacion.open" max-width="1100" scrollable>
+        <v-card>
+          <v-card-title class="d-flex align-center justify-space-between">
+            <span>Liquidación RTM — {{ liquidacion.desde }} a {{ liquidacion.hasta }}</span>
+            <v-btn icon="mdi-close" variant="text" size="small" @click="liquidacion.open = false" />
+          </v-card-title>
+          <v-divider />
+          <v-card-text style="max-height: 75vh">
+            <!-- Filtro rápido de fecha DEL MODAL (independiente del de la vista principal) -->
+            <div class="d-flex align-center gap-1 mb-4" style="flex-wrap:wrap">
+              <v-btn
+                size="small"
+                :color="liquidacionFiltroRapido === 'DIARIO' ? 'primary' : undefined"
+                :variant="liquidacionFiltroRapido === 'DIARIO' ? 'flat' : 'outlined'"
+                @click="aplicarFiltroRapidoLiquidacion('DIARIO')"
+              >
+                Diario
+              </v-btn>
+
+              <v-menu v-model="liquidacionMenuSemanal" :close-on-content-click="true">
+                <template #activator="{ props: menuProps }">
+                  <v-btn
+                    v-bind="menuProps"
+                    size="small"
+                    append-icon="mdi-menu-down"
+                    :color="liquidacionFiltroRapido === 'SEMANAL' ? 'primary' : undefined"
+                    :variant="liquidacionFiltroRapido === 'SEMANAL' ? 'flat' : 'outlined'"
+                    @click="onClickBotonConMenuLiquidacion('SEMANAL')"
+                  >
+                    Semanal
+                  </v-btn>
+                </template>
+                <v-list density="compact" min-width="200">
+                  <v-list-item
+                    v-for="op in liquidacionOpcionesSemanales"
+                    :key="op.desde"
+                    :active="op.desde === liquidacion.desde && op.hasta === liquidacion.hasta"
+                    color="primary"
+                    @click="seleccionarRangoRapidoLiquidacion('SEMANAL', op)"
+                  >
+                    <v-list-item-title>{{ op.label }}</v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
+
+              <v-menu v-model="liquidacionMenuQuincenal" :close-on-content-click="true">
+                <template #activator="{ props: menuProps }">
+                  <v-btn
+                    v-bind="menuProps"
+                    size="small"
+                    append-icon="mdi-menu-down"
+                    :color="liquidacionFiltroRapido === 'QUINCENAL' ? 'primary' : undefined"
+                    :variant="liquidacionFiltroRapido === 'QUINCENAL' ? 'flat' : 'outlined'"
+                    @click="onClickBotonConMenuLiquidacion('QUINCENAL')"
+                  >
+                    Quincenal
+                  </v-btn>
+                </template>
+                <v-list density="compact" min-width="200">
+                  <v-list-item
+                    v-for="op in liquidacionOpcionesQuincenales"
+                    :key="op.desde"
+                    :active="op.desde === liquidacion.desde && op.hasta === liquidacion.hasta"
+                    color="primary"
+                    @click="seleccionarRangoRapidoLiquidacion('QUINCENAL', op)"
+                  >
+                    <v-list-item-title>{{ op.label }}</v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
+
+              <v-menu v-model="menuMensualLiquidacion" :close-on-content-click="true">
+                <template #activator="{ props: menuProps }">
+                  <v-btn
+                    v-bind="menuProps"
+                    size="small"
+                    append-icon="mdi-menu-down"
+                    :color="liquidacionFiltroRapido === 'MENSUAL' ? 'primary' : undefined"
+                    :variant="liquidacionFiltroRapido === 'MENSUAL' ? 'flat' : 'outlined'"
+                    @click="onClickBotonMensualLiquidacion()"
+                  >
+                    Mensual
+                  </v-btn>
+                </template>
+                <v-list density="compact" min-width="180" max-height="320" style="overflow-y:auto">
+                  <v-list-item
+                    v-for="op in liquidacionOpcionesMensuales"
+                    :key="op.desde"
+                    :active="op.desde === liquidacion.desde && op.hasta === liquidacion.hasta"
+                    color="primary"
+                    @click="seleccionarRangoRapidoLiquidacion('MENSUAL', op)"
+                  >
+                    <v-list-item-title>{{ op.label }}</v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
+            </div>
+
+            <div v-if="liquidacion.loading && !liquidacion.data" class="text-center py-10">
+              <v-progress-circular indeterminate color="primary" size="40" />
+            </div>
+            <template v-else-if="liquidacion.data">
+              <v-alert
+                v-if="liquidacion.error"
+                type="error"
+                variant="tonal"
+                density="compact"
+                closable
+                class="mb-4"
+                @click:close="liquidacion.error = ''"
+              >
+                {{ liquidacion.error }}
+              </v-alert>
+              <!--
+                Al cambiar de periodo dentro del modal (Diario/Semanal/Quincenal/
+                Mensual) NO se reemplaza este bloque por un spinner en blanco:
+                eso colapsaba la altura del modal (tablas altas -> spinner chico
+                -> tablas altas de nuevo) y el espacio liberado dejaba ver el
+                scrim/fondo por una fraccion de segundo (parecia que el modal se
+                cerraba y reabria). En vez de eso, el contenido anterior se
+                mantiene visible (atenuado) mientras se recarga, sin cambios de
+                altura ni parpadeo.
+              -->
+              <div :style="liquidacion.loading ? 'opacity:0.45; pointer-events:none;' : ''">
+                <div v-if="liquidacion.loading" class="d-flex justify-center py-2">
+                  <v-progress-circular indeterminate color="primary" size="22" width="2" />
+                </div>
+                <!-- Resumen general -->
+                <v-card variant="tonal" color="deep-purple" class="rounded-xl mb-4">
+                <v-card-text class="text-center">
+                  <div class="text-overline font-weight-bold">Total generado RTM en el período</div>
+                  <div class="text-h4 font-weight-bold">{{ formatCOP(liquidacion.data.resumen.total_monto) }}</div>
+                  <div class="text-subtitle-2 font-weight-medium mt-1">
+                    {{ liquidacion.data.resumen.total_comisiones }} comisiones RTM
+                  </div>
+                </v-card-text>
+              </v-card>
+
+              <!-- Por canal de captación -->
+              <div class="text-caption text-medium-emphasis mb-2">Por canal de captación</div>
+              <v-table density="compact" class="mb-4">
+                <thead>
+                  <tr>
+                    <th>Canal</th>
+                    <th class="text-right">Turnos</th>
+                    <th class="text-right">Monto</th>
+                    <th class="text-right">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="c in liquidacion.data.por_canal" :key="c.canal">
+                    <td>{{ CANAL_LABELS_LIQUIDACION[c.canal] ?? c.canal }}</td>
+                    <td class="text-right">{{ c.cantidad }}</td>
+                    <td class="text-right">{{ formatCOP(c.monto) }}</td>
+                    <td class="text-right">{{ c.porcentaje }}%</td>
+                  </tr>
+                </tbody>
+              </v-table>
+
+              <!-- Desglose individual: 3 secciones, cada una con su propia selección y pago -->
+              <div class="d-flex align-center justify-space-between mb-2">
+                <div class="text-caption text-medium-emphasis">Asesores Comerciales</div>
+                <v-btn
+                  size="x-small"
+                  color="success"
+                  variant="elevated"
+                  :disabled="!resumenSeleccionSeccion('comerciales').ids.length"
+                  @click="pagarSeleccionSeccion('comerciales')"
+                >
+                  Pagar seleccionados{{ resumenSeleccionSeccion('comerciales').ids.length ? ` (${formatCOP(resumenSeleccionSeccion('comerciales').total)})` : '' }}
+                </v-btn>
+              </div>
+              <v-table density="compact" class="mb-4">
+                <thead>
+                  <tr>
+                    <th style="width:36px">
+                      <v-checkbox-btn
+                        density="compact"
+                        :model-value="seccionTodosSeleccionados('comerciales')"
+                        @update:model-value="toggleSeleccionarTodos('comerciales')"
+                      />
+                    </th>
+                    <th>Asesor</th>
+                    <th class="text-right">Turnos</th>
+                    <th class="text-right">Monto</th>
+                    <th>Estados</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(r, i) in liquidacion.data.comerciales" :key="r.asesor_id">
+                    <td>
+                      <v-checkbox-btn
+                        v-if="r.comision_ids_pagables.length"
+                        density="compact"
+                        :model-value="liquidacionSel.comerciales.has(i)"
+                        @update:model-value="toggleFila('comerciales', i)"
+                      />
+                    </td>
+                    <td>{{ r.asesor_nombre }}</td>
+                    <td class="text-right">{{ r.cantidad_vehiculos }}</td>
+                    <td class="text-right">{{ formatCOP(r.total_asesor) }}</td>
+                    <td>{{ r.estados }}</td>
+                  </tr>
+                  <tr v-if="!liquidacion.data.comerciales.length">
+                    <td colspan="5" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
+                  </tr>
+                </tbody>
+              </v-table>
+
+              <div class="d-flex align-center justify-space-between mb-2">
+                <div class="text-caption text-medium-emphasis">Asesores Convenio</div>
+                <v-btn
+                  size="x-small"
+                  color="success"
+                  variant="elevated"
+                  :disabled="!resumenSeleccionSeccion('asesoresConvenio').ids.length"
+                  @click="pagarSeleccionSeccion('asesoresConvenio')"
+                >
+                  Pagar seleccionados{{ resumenSeleccionSeccion('asesoresConvenio').ids.length ? ` (${formatCOP(resumenSeleccionSeccion('asesoresConvenio').total)})` : '' }}
+                </v-btn>
+              </div>
+              <v-table density="compact" class="mb-4">
+                <thead>
+                  <tr>
+                    <th style="width:36px">
+                      <v-checkbox-btn
+                        density="compact"
+                        :model-value="seccionTodosSeleccionados('asesoresConvenio')"
+                        @update:model-value="toggleSeleccionarTodos('asesoresConvenio')"
+                      />
+                    </th>
+                    <th>Asesor</th>
+                    <th>Convenio</th>
+                    <th class="text-right">Turnos</th>
+                    <th class="text-right">Monto asesor</th>
+                    <th class="text-right">Monto convenio</th>
+                    <th>Estados</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(r, i) in liquidacion.data.asesores_convenio" :key="`${r.asesor_id}-${i}`">
+                    <td>
+                      <v-checkbox-btn
+                        v-if="r.comision_ids_pagables.length"
+                        density="compact"
+                        :model-value="liquidacionSel.asesoresConvenio.has(i)"
+                        @update:model-value="toggleFila('asesoresConvenio', i)"
+                      />
+                    </td>
+                    <td>{{ r.asesor_nombre }}</td>
+                    <td>{{ r.convenio_nombre ?? '—' }}</td>
+                    <td class="text-right">{{ r.cantidad_vehiculos }}</td>
+                    <td class="text-right">{{ formatCOP(r.total_asesor) }}</td>
+                    <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
+                    <td>{{ r.estados }}</td>
+                  </tr>
+                  <tr v-if="!liquidacion.data.asesores_convenio.length">
+                    <td colspan="7" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
+                  </tr>
+                </tbody>
+              </v-table>
+
+              <div class="d-flex align-center justify-space-between mb-2">
+                <div class="text-caption text-medium-emphasis">Convenios</div>
+                <v-btn
+                  size="x-small"
+                  color="success"
+                  variant="elevated"
+                  :disabled="!resumenSeleccionSeccion('convenios').ids.length"
+                  @click="pagarSeleccionSeccion('convenios')"
+                >
+                  Pagar seleccionados{{ resumenSeleccionSeccion('convenios').ids.length ? ` (${formatCOP(resumenSeleccionSeccion('convenios').total)})` : '' }}
+                </v-btn>
+              </div>
+              <v-table density="compact">
+                <thead>
+                  <tr>
+                    <th style="width:36px">
+                      <v-checkbox-btn
+                        density="compact"
+                        :model-value="seccionTodosSeleccionados('convenios')"
+                        @update:model-value="toggleSeleccionarTodos('convenios')"
+                      />
+                    </th>
+                    <th>Convenio</th>
+                    <th>Asesor comercial</th>
+                    <th class="text-right">Turnos</th>
+                    <th class="text-right">Monto convenio</th>
+                    <th>Estados</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(r, i) in liquidacion.data.convenios" :key="`${r.convenio_id}-${i}`">
+                    <td>
+                      <v-checkbox-btn
+                        v-if="r.comision_ids_pagables.length"
+                        density="compact"
+                        :model-value="liquidacionSel.convenios.has(i)"
+                        @update:model-value="toggleFila('convenios', i)"
+                      />
+                    </td>
+                    <td>{{ r.convenio_nombre }}</td>
+                    <td>{{ r.asesor_comercial_nombre }}</td>
+                    <td class="text-right">{{ r.cantidad_vehiculos }}</td>
+                    <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
+                    <td>{{ r.estados }}</td>
+                  </tr>
+                  <tr v-if="!liquidacion.data.convenios.length">
+                    <td colspan="6" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
+                  </tr>
+                </tbody>
+              </v-table>
+              </div>
+            </template>
+            <v-alert v-else-if="liquidacion.error" type="error" variant="tonal">
+              {{ liquidacion.error }}
+            </v-alert>
+          </v-card-text>
+        </v-card>
+      </v-dialog>
 
       <!-- ── PANEL DE FILTROS (colapsable) ─────────────────────── -->
       <v-expand-transition>
@@ -62,6 +393,79 @@
                   variant="outlined"
                   hide-details
                 />
+              </v-col>
+
+              <!-- Filtro rápido de fecha -->
+              <v-col cols="12" md="5" class="d-flex align-center gap-1" style="flex-wrap:wrap">
+                <v-btn
+                  size="small"
+                  :color="filtroRapidoFecha === 'DIARIO' ? 'primary' : undefined"
+                  :variant="filtroRapidoFecha === 'DIARIO' ? 'flat' : 'outlined'"
+                  @click="aplicarFiltroRapido('DIARIO')"
+                >
+                  Diario
+                </v-btn>
+
+                <v-menu v-model="menuSemanal" :close-on-content-click="true">
+                  <template #activator="{ props: menuProps }">
+                    <v-btn
+                      v-bind="menuProps"
+                      size="small"
+                      append-icon="mdi-menu-down"
+                      :color="filtroRapidoFecha === 'SEMANAL' ? 'primary' : undefined"
+                      :variant="filtroRapidoFecha === 'SEMANAL' ? 'flat' : 'outlined'"
+                      @click="onClickBotonConMenu('SEMANAL')"
+                    >
+                      Semanal
+                    </v-btn>
+                  </template>
+                  <v-list density="compact" min-width="200">
+                    <v-list-item
+                      v-for="op in opcionesSemanales"
+                      :key="op.desde"
+                      :active="op.desde === filters.desde && op.hasta === filters.hasta"
+                      color="primary"
+                      @click="seleccionarRangoRapido('SEMANAL', op)"
+                    >
+                      <v-list-item-title>{{ op.label }}</v-list-item-title>
+                    </v-list-item>
+                  </v-list>
+                </v-menu>
+
+                <v-menu v-model="menuQuincenal" :close-on-content-click="true">
+                  <template #activator="{ props: menuProps }">
+                    <v-btn
+                      v-bind="menuProps"
+                      size="small"
+                      append-icon="mdi-menu-down"
+                      :color="filtroRapidoFecha === 'QUINCENAL' ? 'primary' : undefined"
+                      :variant="filtroRapidoFecha === 'QUINCENAL' ? 'flat' : 'outlined'"
+                      @click="onClickBotonConMenu('QUINCENAL')"
+                    >
+                      Quincenal
+                    </v-btn>
+                  </template>
+                  <v-list density="compact" min-width="200">
+                    <v-list-item
+                      v-for="op in opcionesQuincenales"
+                      :key="op.desde"
+                      :active="op.desde === filters.desde && op.hasta === filters.hasta"
+                      color="primary"
+                      @click="seleccionarRangoRapido('QUINCENAL', op)"
+                    >
+                      <v-list-item-title>{{ op.label }}</v-list-item-title>
+                    </v-list-item>
+                  </v-list>
+                </v-menu>
+
+                <v-btn
+                  size="small"
+                  :color="filtroRapidoFecha === 'MENSUAL' ? 'primary' : undefined"
+                  :variant="filtroRapidoFecha === 'MENSUAL' ? 'flat' : 'outlined'"
+                  @click="aplicarFiltroRapido('MENSUAL')"
+                >
+                  Mensual
+                </v-btn>
               </v-col>
 
               <!-- Estado -->
@@ -203,6 +607,7 @@
       <v-tabs v-model="activeTab" density="comfortable" class="px-4 mt-1">
         <v-tab value="detalle">Detalle comisiones</v-tab>
         <v-tab value="metas">Metas mensuales</v-tab>
+        <v-tab value="historial">Historial de Liquidaciones</v-tab>
       </v-tabs>
 
       <v-divider />
@@ -430,8 +835,9 @@
                       usa filtros más específicos (fechas, estado) para ver el resto. "Pagar todas" está bloqueado mientras esto ocurra.
                     </v-alert>
 
+                    <div class="scroll-content">
                     <v-data-table
-                      :headers="headersPanel"
+                      :headers="headers"
                       :items="panelDetalle.rows"
                       item-key="id"
                       item-selectable="_selectable"
@@ -440,20 +846,126 @@
                       return-object
                       density="compact"
                     >
-                      <template #item.estado="{ item: fila }">
-                        <v-chip size="small" :color="estadoColor(fila.estado)" variant="flat">{{ fila.estado }}</v-chip>
-                      </template>
-                      <template #item.placa="{ item: fila }">{{ fila.turno?.placa ?? '—' }}</template>
-                      <template #item.tipo_vehiculo="{ item: fila }">{{ fila.tipo_vehiculo ?? '—' }}</template>
-                      <template #item.tipo_cliente="{ item: fila }">
-                        <v-chip size="x-small" :color="tipoClienteColor(fila.turno)" variant="tonal">
-                          {{ tipoClienteLabel(fila.turno) }}
+                      <template #item.estado="{ item }">
+                        <v-chip :color="estadoColor(item.estado)" size="small" variant="flat">
+                          {{ item.estado }}
                         </v-chip>
                       </template>
-                      <template #item.convenio="{ item: fila }">{{ fila.convenio?.nombre ?? '—' }}</template>
-                      <template #item.monto="{ item: fila }">{{ formatCOP(calcTotalItem(fila)) }}</template>
-                      <template #item.generado_at="{ item: fila }">{{ formatDate(fila.generado_at) }}</template>
+
+                      <template #item.tipo_vehiculo="{ item }">
+                        <v-chip
+                          v-if="item.tipo_vehiculo"
+                          size="x-small"
+                          :color="item.tipo_vehiculo === 'MOTO' ? 'deep-purple' : 'teal'"
+                          variant="tonal"
+                          :prepend-icon="item.tipo_vehiculo === 'MOTO' ? 'mdi-motorbike' : 'mdi-car'"
+                        >
+                          {{ item.tipo_vehiculo === 'MOTO' ? 'Moto' : 'Vehículo' }}
+                        </v-chip>
+                        <span v-else class="text-medium-emphasis text-caption">—</span>
+                      </template>
+
+                      <template #item.tipo_cliente="{ item }">
+                        <v-chip size="x-small" :color="tipoClienteColor(item.turno)" variant="tonal">
+                          {{ tipoClienteLabel(item.turno) }}
+                        </v-chip>
+                      </template>
+
+                      <template #item.turno="{ item }">
+                        <div class="d-flex flex-column">
+                          <span>
+                            Turno #{{ item.turno?.numero_global || item.turno?.numero || item.turno?.id || '—' }}
+                          </span>
+                          <span class="text-caption text-medium-emphasis">
+                            {{ item.turno?.placa || '—' }} ·
+                            {{ item.turno?.servicio?.nombre || item.turno?.servicio?.codigo || '—' }}
+                          </span>
+                        </div>
+                      </template>
+
+                      <template #item.descuento="{ item }">
+                        <template v-if="item.descuento">
+                          <v-chip size="x-small" color="orange-darken-2" variant="tonal" prepend-icon="mdi-tag-check" class="descuento-chip">
+                            {{ item.descuento.nombre }}
+                          </v-chip>
+                          <div class="text-caption text-medium-emphasis mt-1">
+                            <v-icon size="12" class="mr-1">
+                              {{ item.descuento_origen === 'dateo' ? 'mdi-calendar-check' : 'mdi-cash-register' }}
+                            </v-icon>
+                            {{ item.descuento_origen === 'dateo' ? 'Pre-marcado' : 'En caja' }}
+                          </div>
+                        </template>
+                        <span v-else class="text-medium-emphasis text-caption">—</span>
+                      </template>
+
+                      <template #item.valor_unitario="{ item }">
+                        {{ formatCOP(Number(item.monto_asesor ?? item.valor_unitario ?? 0)) }}
+                      </template>
+
+                      <template #item.valor_cliente="{ item }">
+                        {{ formatCOP(Number(item.monto_convenio ?? item.valor_cliente ?? 0)) }}
+                      </template>
+
+                      <template #item.valor_total="{ item }">
+                        <strong>{{ formatCOP(calcTotalItem(item)) }}</strong>
+                      </template>
+
+                      <template #item.asesor="{ item }"><span class="cell-wrap">{{ item.asesor?.nombre || '—' }}</span></template>
+                      <template #item.convenio="{ item }"><span class="cell-wrap">{{ item.convenio?.nombre || '—' }}</span></template>
+                      <template #item.generado_at="{ item }">{{ formatDate(item.generado_at) }}</template>
+
+                      <template #item.rep_general="{ item }">
+                        <v-chip
+                          v-if="item.turno?.rep_general_verificado"
+                          size="x-small"
+                          color="success"
+                          variant="tonal"
+                          prepend-icon="mdi-check-circle"
+                        >
+                          Verificado
+                        </v-chip>
+                        <v-chip
+                          v-else
+                          size="x-small"
+                          color="warning"
+                          variant="tonal"
+                          prepend-icon="mdi-clock-outline"
+                        >
+                          Sin Rep
+                        </v-chip>
+                      </template>
+
+                      <template #item.acciones="{ item }">
+                        <div class="d-flex acciones-cell">
+                          <v-btn size="x-small" density="compact" variant="text" icon="mdi-eye" @click="verDetalle(item)" />
+                          <v-btn
+                            v-if="item.estado === 'PENDIENTE'"
+                            size="x-small" density="compact" variant="text" color="primary"
+                            icon="mdi-pencil"
+                            @click="abrirEditar(item)"
+                          />
+                          <v-btn
+                            v-if="item.estado === 'PENDIENTE'"
+                            size="x-small" density="compact" variant="text" color="warning"
+                            icon="mdi-check-decagram"
+                            @click="confirmAprobar(item.id)"
+                          />
+                          <v-btn
+                            v-if="item.estado === 'APROBADA'"
+                            size="x-small" density="compact" variant="text" color="success"
+                            icon="mdi-cash-multiple"
+                            @click="confirmPagar(item.id)"
+                          />
+                          <v-btn
+                            v-if="item.estado === 'PENDIENTE' || item.estado === 'APROBADA'"
+                            size="x-small" density="compact" variant="text" color="error"
+                            icon="mdi-cancel"
+                            @click="confirmAnular(item.id)"
+                          />
+                        </div>
+                      </template>
                     </v-data-table>
+                    </div>
 
                     <v-alert v-if="!panelDetalle.rows.length" type="info" variant="tonal" density="compact" class="mt-3">
                       Este asesor no tiene comisiones registradas.
@@ -545,14 +1057,14 @@
           </v-expand-transition>
 
           <!-- ── TABLA ──────────────────────────────────────────── -->
-          <div class="scroll-wrapper tabla-ancha-breakout" ref="scrollWrapper">
+          <div class="scroll-wrapper" ref="scrollWrapper">
             <div class="scroll-top" ref="scrollTop">
               <div :style="{ width: innerWidth + 'px', height: '1px' }"></div>
             </div>
             <div class="scroll-content" ref="scrollContent" @scroll="syncScroll('content')">
           <v-data-table-server
             class="px-4 pb-4"
-            style="min-width: 1400px"
+            density="compact"
             :headers="headers"
             :items="filteredRows"
             :items-length="totalItems"
@@ -591,10 +1103,6 @@
                 {{ tipoClienteLabel(item.turno) }}
               </v-chip>
             </template>
-            <template #item.placa="{ item }">
-    <span class="font-weight-medium">{{ item.turno?.placa || '—' }}</span>
-  </template>
-
             <template #item.turno="{ item }">
               <div class="d-flex flex-column">
                 <span>
@@ -609,7 +1117,7 @@
 
             <template #item.descuento="{ item }">
               <template v-if="item.descuento">
-                <v-chip size="x-small" color="orange-darken-2" variant="tonal" prepend-icon="mdi-tag-check">
+                <v-chip size="x-small" color="orange-darken-2" variant="tonal" prepend-icon="mdi-tag-check" class="descuento-chip">
                   {{ item.descuento.nombre }}
                 </v-chip>
                 <div class="text-caption text-medium-emphasis mt-1">
@@ -634,8 +1142,8 @@
               <strong>{{ formatCOP(calcTotalItem(item)) }}</strong>
             </template>
 
-            <template #item.asesor="{ item }">{{ item.asesor?.nombre || '—' }}</template>
-            <template #item.convenio="{ item }">{{ item.convenio?.nombre || '—' }}</template>
+            <template #item.asesor="{ item }"><span class="cell-wrap">{{ item.asesor?.nombre || '—' }}</span></template>
+            <template #item.convenio="{ item }"><span class="cell-wrap">{{ item.convenio?.nombre || '—' }}</span></template>
             <template #item.generado_at="{ item }">{{ formatDate(item.generado_at) }}</template>
             <template #item.rep_general="{ item }">
               <v-chip
@@ -659,29 +1167,29 @@
             </template>
 
             <template #item.acciones="{ item }">
-    <div class="d-flex gap-1">
-      <v-btn size="small" variant="text" icon="mdi-eye" @click="verDetalle(item)" />
+    <div class="d-flex acciones-cell">
+      <v-btn size="x-small" density="compact" variant="text" icon="mdi-eye" @click="verDetalle(item)" />
       <v-btn
         v-if="item.estado === 'PENDIENTE'"
-        size="small" variant="text" color="primary"
+        size="x-small" density="compact" variant="text" color="primary"
         icon="mdi-pencil"
         @click="abrirEditar(item)"
       />
       <v-btn
         v-if="item.estado === 'PENDIENTE'"
-        size="small" variant="text" color="warning"
+        size="x-small" density="compact" variant="text" color="warning"
                   icon="mdi-check-decagram"
                   @click="confirmAprobar(item.id)"
                 />
                 <v-btn
                   v-if="item.estado === 'APROBADA'"
-                  size="small" variant="text" color="success"
+                  size="x-small" density="compact" variant="text" color="success"
                   icon="mdi-cash-multiple"
                   @click="confirmPagar(item.id)"
                 />
                 <v-btn
                   v-if="item.estado === 'PENDIENTE' || item.estado === 'APROBADA'"
-                  size="small" variant="text" color="error"
+                  size="x-small" density="compact" variant="text" color="error"
                   icon="mdi-cancel"
                   @click="confirmAnular(item.id)"
                 />
@@ -694,7 +1202,7 @@
       </template>
 
       <!-- ====== TAB METAS ======================================== -->
-      <template v-else>
+      <template v-else-if="activeTab === 'metas'">
         <v-card-text class="pt-5">
           <div class="mb-4 text-subtitle-1 font-weight-medium">
             Metas mensuales de RTM por asesor
@@ -752,6 +1260,300 @@
             {{ formatCOP(calcComisionMeta(item)) }}
           </template>
         </v-data-table>
+      </template>
+
+      <!-- ====== TAB HISTORIAL DE LIQUIDACIONES ==================== -->
+      <template v-else-if="activeTab === 'historial'">
+        <v-card-text class="pt-5">
+          <div class="mb-4 text-subtitle-1 font-weight-medium">
+            Eventos de liquidación (pagos ejecutados)
+          </div>
+
+          <v-table density="compact" class="mb-2">
+            <thead>
+              <tr>
+                <th style="width:36px"></th>
+                <th>Fecha</th>
+                <th>Origen</th>
+                <th>Periodo</th>
+                <th class="text-right">Monto total</th>
+                <th class="text-right">Comisiones</th>
+                <th>Usuario</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="ev in historial.items" :key="ev.id">
+                <tr style="cursor:pointer" @click="toggleHistorialExpand(ev.id)">
+                  <td>
+                    <v-icon size="18">{{ historialExpandido === ev.id ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                  </td>
+                  <td>{{ ev.fecha_evento }}</td>
+                  <td>
+                    <v-chip size="x-small" :color="ORIGEN_COLORS[ev.tipo_origen]" variant="tonal">
+                      {{ ORIGEN_LABELS[ev.tipo_origen] }}
+                    </v-chip>
+                  </td>
+                  <td>{{ ev.tipo_periodo ?? '—' }}</td>
+                  <td class="text-right">{{ formatCOP(ev.monto_total) }}</td>
+                  <td class="text-right">{{ ev.cantidad_comisiones }}</td>
+                  <td>{{ ev.usuario ?? '—' }}</td>
+                </tr>
+                <tr v-if="historialExpandido === ev.id">
+                  <td colspan="7" class="pa-0">
+                    <div class="pa-4" style="background:rgba(128,128,128,0.08)">
+                      <div v-if="historialDetalleLoading" class="text-center py-4">
+                        <v-progress-circular indeterminate color="primary" size="24" />
+                      </div>
+                      <v-table v-else density="compact">
+                        <thead>
+                          <tr>
+                            <th>Comisión</th>
+                            <th>Asesor</th>
+                            <th>Convenio</th>
+                            <th>Vehículo</th>
+                            <th>Fecha</th>
+                            <th class="text-right">Monto</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="d in historialDetalle" :key="d.comision_id">
+                            <td>#{{ d.comision_id }}</td>
+                            <td>{{ d.asesor_nombre ?? '—' }}</td>
+                            <td>{{ d.convenio_nombre ?? '—' }}</td>
+                            <td>{{ d.tipo_vehiculo ?? '—' }}</td>
+                            <td>{{ String(d.fecha_calculo).slice(0, 10) }}</td>
+                            <td class="text-right">{{ formatCOP(d.monto) }}</td>
+                          </tr>
+                          <tr v-if="!historialDetalle.length">
+                            <td colspan="6" class="text-center text-medium-emphasis">Sin comisiones en este evento</td>
+                          </tr>
+                        </tbody>
+                      </v-table>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <tr v-if="!historial.items.length && !historial.loading">
+                <td colspan="7" class="text-center text-medium-emphasis">Sin liquidaciones registradas</td>
+              </tr>
+              <tr v-if="historial.loading">
+                <td colspan="7" class="text-center py-4"><v-progress-circular indeterminate color="primary" size="24" /></td>
+              </tr>
+            </tbody>
+          </v-table>
+
+          <div class="d-flex align-center justify-space-between mb-6">
+            <div class="text-caption text-medium-emphasis">{{ historial.total }} evento(s)</div>
+            <div class="d-flex align-center gap-2">
+              <v-btn size="small" variant="text" :disabled="historial.page <= 1" @click="cambiarPaginaHistorial(-1)">Anterior</v-btn>
+              <span class="text-caption">Página {{ historial.page }}</span>
+              <v-btn size="small" variant="text" :disabled="historial.items.length < historial.perPage" @click="cambiarPaginaHistorial(1)">Siguiente</v-btn>
+            </div>
+          </div>
+
+          <v-divider class="mb-6" />
+
+          <div class="mb-4 text-subtitle-1 font-weight-medium">
+            Trazabilidad histórica RTM (solo comisiones PAGADAS)
+          </div>
+          <div class="d-flex align-center gap-1 mb-4" style="flex-wrap:wrap">
+            <v-btn
+              size="small"
+              :color="trazabilidadFiltroRapido === 'DIARIO' ? 'primary' : undefined"
+              :variant="trazabilidadFiltroRapido === 'DIARIO' ? 'flat' : 'outlined'"
+              @click="aplicarFiltroRapidoTrazabilidad('DIARIO')"
+            >
+              Diario
+            </v-btn>
+
+            <v-menu v-model="trazabilidadMenuSemanal" :close-on-content-click="true">
+              <template #activator="{ props: menuProps }">
+                <v-btn
+                  v-bind="menuProps"
+                  size="small"
+                  append-icon="mdi-menu-down"
+                  :color="trazabilidadFiltroRapido === 'SEMANAL' ? 'primary' : undefined"
+                  :variant="trazabilidadFiltroRapido === 'SEMANAL' ? 'flat' : 'outlined'"
+                  @click="onClickBotonConMenuTrazabilidad('SEMANAL')"
+                >
+                  Semanal
+                </v-btn>
+              </template>
+              <v-list density="compact" min-width="200">
+                <v-list-item
+                  v-for="op in trazabilidadOpcionesSemanales"
+                  :key="op.desde"
+                  :active="op.desde === trazabilidadDesde && op.hasta === trazabilidadHasta"
+                  color="primary"
+                  @click="seleccionarRangoRapidoTrazabilidad('SEMANAL', op)"
+                >
+                  <v-list-item-title>{{ op.label }}</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
+
+            <v-menu v-model="trazabilidadMenuQuincenal" :close-on-content-click="true">
+              <template #activator="{ props: menuProps }">
+                <v-btn
+                  v-bind="menuProps"
+                  size="small"
+                  append-icon="mdi-menu-down"
+                  :color="trazabilidadFiltroRapido === 'QUINCENAL' ? 'primary' : undefined"
+                  :variant="trazabilidadFiltroRapido === 'QUINCENAL' ? 'flat' : 'outlined'"
+                  @click="onClickBotonConMenuTrazabilidad('QUINCENAL')"
+                >
+                  Quincenal
+                </v-btn>
+              </template>
+              <v-list density="compact" min-width="200">
+                <v-list-item
+                  v-for="op in trazabilidadOpcionesQuincenales"
+                  :key="op.desde"
+                  :active="op.desde === trazabilidadDesde && op.hasta === trazabilidadHasta"
+                  color="primary"
+                  @click="seleccionarRangoRapidoTrazabilidad('QUINCENAL', op)"
+                >
+                  <v-list-item-title>{{ op.label }}</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
+
+            <v-menu v-model="trazabilidadMenuMensual" :close-on-content-click="true">
+              <template #activator="{ props: menuProps }">
+                <v-btn
+                  v-bind="menuProps"
+                  size="small"
+                  append-icon="mdi-menu-down"
+                  :color="trazabilidadFiltroRapido === 'MENSUAL' ? 'primary' : undefined"
+                  :variant="trazabilidadFiltroRapido === 'MENSUAL' ? 'flat' : 'outlined'"
+                  @click="onClickBotonMensualTrazabilidad()"
+                >
+                  Mensual
+                </v-btn>
+              </template>
+              <v-list density="compact" min-width="180" max-height="320" style="overflow-y:auto">
+                <v-list-item
+                  v-for="op in trazabilidadOpcionesMensuales"
+                  :key="op.desde"
+                  :active="op.desde === trazabilidadDesde && op.hasta === trazabilidadHasta"
+                  color="primary"
+                  @click="seleccionarRangoRapidoTrazabilidad('MENSUAL', op)"
+                >
+                  <v-list-item-title>{{ op.label }}</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
+          </div>
+
+          <div v-if="trazabilidad.loading" class="text-center py-10">
+            <v-progress-circular indeterminate color="primary" size="40" />
+          </div>
+          <template v-else-if="trazabilidad.data">
+            <v-card variant="tonal" color="deep-purple" class="rounded-xl mb-4">
+              <v-card-text class="text-center">
+                <div class="text-overline font-weight-bold">
+                  Total pagado RTM ({{ trazabilidad.data.fecha_inicio }} a {{ trazabilidad.data.fecha_fin }})
+                </div>
+                <div class="text-h4 font-weight-bold">{{ formatCOP(trazabilidad.data.resumen.total_monto) }}</div>
+                <div class="text-subtitle-2 font-weight-medium mt-1">
+                  {{ trazabilidad.data.resumen.total_comisiones }} comisiones PAGADAS
+                </div>
+              </v-card-text>
+            </v-card>
+
+            <!--
+              "Por canal" = facturación REAL generada (facturacion_tickets),
+              SIN filtrar por estado de comisión — incluye Fachada/Tele/Redes,
+              que no tienen fila en comisiones. Las 3 secciones de abajo son
+              lo YA PAGADO en comisiones (filtrado a estado PAGADA), una
+              fuente distinta — por eso las etiquetas dicen "generado" vs
+              "pagado" para no confundirlas.
+            -->
+            <div class="text-caption text-medium-emphasis mb-2">
+              Por canal de captación (total <strong>generado</strong>, todos los estados)
+            </div>
+            <v-table density="compact" class="mb-4">
+              <thead>
+                <tr><th>Canal</th><th class="text-right">Turnos</th><th class="text-right">Monto</th><th class="text-right">%</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="c in trazabilidad.data.por_canal" :key="c.canal">
+                  <td>{{ CANAL_LABELS_LIQUIDACION[c.canal] ?? c.canal }}</td>
+                  <td class="text-right">{{ c.cantidad }}</td>
+                  <td class="text-right">{{ formatCOP(c.monto) }}</td>
+                  <td class="text-right">{{ c.porcentaje }}%</td>
+                </tr>
+                <tr v-if="!trazabilidad.data.por_canal.length">
+                  <td colspan="4" class="text-center text-medium-emphasis">Sin facturación RTM confirmada en este rango</td>
+                </tr>
+              </tbody>
+            </v-table>
+
+            <div class="text-caption text-medium-emphasis mb-2">
+              Asesores Comerciales (total <strong>pagado</strong>)
+            </div>
+            <v-table density="compact" class="mb-4">
+              <thead>
+                <tr><th>Asesor</th><th class="text-right">Turnos</th><th class="text-right">Monto</th><th>Estados</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in trazabilidad.data.comerciales" :key="r.asesor_id">
+                  <td>{{ r.asesor_nombre }}</td>
+                  <td class="text-right">{{ r.cantidad_vehiculos }}</td>
+                  <td class="text-right">{{ formatCOP(r.total_asesor) }}</td>
+                  <td>{{ r.estados }}</td>
+                </tr>
+                <tr v-if="!trazabilidad.data.comerciales.length">
+                  <td colspan="4" class="text-center text-medium-emphasis">Sin comisiones PAGADAS en este rango</td>
+                </tr>
+              </tbody>
+            </v-table>
+
+            <div class="text-caption text-medium-emphasis mb-2">
+              Asesores Convenio (total <strong>pagado</strong>)
+            </div>
+            <v-table density="compact" class="mb-4">
+              <thead>
+                <tr><th>Asesor</th><th>Convenio</th><th class="text-right">Turnos</th><th class="text-right">Monto asesor</th><th class="text-right">Monto convenio</th><th>Estados</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="(r, i) in trazabilidad.data.asesores_convenio" :key="`${r.asesor_id}-${i}`">
+                  <td>{{ r.asesor_nombre }}</td>
+                  <td>{{ r.convenio_nombre ?? '—' }}</td>
+                  <td class="text-right">{{ r.cantidad_vehiculos }}</td>
+                  <td class="text-right">{{ formatCOP(r.total_asesor) }}</td>
+                  <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
+                  <td>{{ r.estados }}</td>
+                </tr>
+                <tr v-if="!trazabilidad.data.asesores_convenio.length">
+                  <td colspan="6" class="text-center text-medium-emphasis">Sin comisiones PAGADAS en este rango</td>
+                </tr>
+              </tbody>
+            </v-table>
+
+            <div class="text-caption text-medium-emphasis mb-2">
+              Convenios (total <strong>pagado</strong>)
+            </div>
+            <v-table density="compact" class="mb-4">
+              <thead>
+                <tr><th>Convenio</th><th>Asesor comercial</th><th class="text-right">Turnos</th><th class="text-right">Monto convenio</th><th>Estados</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="(r, i) in trazabilidad.data.convenios" :key="`${r.convenio_id}-${i}`">
+                  <td>{{ r.convenio_nombre }}</td>
+                  <td>{{ r.asesor_comercial_nombre }}</td>
+                  <td class="text-right">{{ r.cantidad_vehiculos }}</td>
+                  <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
+                  <td>{{ r.estados }}</td>
+                </tr>
+                <tr v-if="!trazabilidad.data.convenios.length">
+                  <td colspan="5" class="text-center text-medium-emphasis">Sin comisiones PAGADAS en este rango</td>
+                </tr>
+              </tbody>
+            </v-table>
+          </template>
+          <v-alert v-else-if="trazabilidad.error" type="error" variant="tonal">{{ trazabilidad.error }}</v-alert>
+        </v-card-text>
       </template>
     </v-card>
 
@@ -1989,7 +2791,7 @@
 </v-container>
 </template>
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import {
   listComisiones,
   getComision,
@@ -2020,6 +2822,15 @@ import {
 } from '@/services/comisionesService'
 import { createComprobantes, type ComprobantePago as ComprobantePagoDto } from '@/services/comprobantesService'
 import { ClientesService, type ClienteDetalle } from '@/services/clientes_service'
+import { getLiquidacionRtm, type LiquidacionRtmResponse } from '@/services/reportesAdminService'
+import {
+  getHistorialLiquidaciones,
+  getHistorialLiquidacionDetalle,
+  getTrazabilidadRtm,
+  type HistorialLiquidacionItem,
+  type HistorialLiquidacionDetalleFila,
+  type TrazabilidadRtmResponse,
+} from '@/services/reportesAdminService'
 
 /* ── Extended types ── */
 interface ComisionListItemExtended extends ComisionListItem {
@@ -2073,7 +2884,7 @@ interface ConfirmComprobanteGroup {
 }
 
 /* ── Estado general ── */
-const activeTab = ref<'detalle' | 'metas'>('detalle')
+const activeTab = ref<'detalle' | 'metas' | 'historial'>('detalle')
 const showFilters = ref(true)
 
 const filters = ref<{
@@ -2110,7 +2921,8 @@ const activeFiltersCount = computed(() =>
 const scrollWrapper = ref<HTMLDivElement | null>(null)
 const scrollTop = ref<HTMLDivElement | null>(null)
 const scrollContent = ref<HTMLDivElement | null>(null)
-const innerWidth = ref(1400)
+const innerWidth = ref(0)
+let tableResizeObserver: ResizeObserver | null = null
 
 function syncScroll(source: 'top' | 'content') {
   if (!scrollTop.value || !scrollContent.value) return
@@ -2121,8 +2933,33 @@ function syncScroll(source: 'top' | 'content') {
   }
 }
 
+/*
+ * innerWidth alimenta la barra de scroll falsa de arriba (scroll-top):
+ * antes era un valor fijo en 1400 que coincidía por casualidad con el
+ * min-width fijo de la tabla. Ahora que la tabla se dimensiona por su
+ * contenido real (sin min-width forzado), se mide con ResizeObserver
+ * sobre el <table> real para que la barra de arriba siempre coincida
+ * con el ancho verdadero, sin importar cuántas columnas quepan.
+ */
+function updateInnerWidth() {
+  const table = scrollContent.value?.querySelector('table')
+  if (table) innerWidth.value = table.scrollWidth
+}
+
 onMounted(() => {
   scrollTop.value?.addEventListener('scroll', () => syncScroll('top'))
+  nextTick(() => {
+    const table = scrollContent.value?.querySelector('table')
+    updateInnerWidth()
+    if (table) {
+      tableResizeObserver = new ResizeObserver(updateInnerWidth)
+      tableResizeObserver.observe(table)
+    }
+  })
+})
+
+onUnmounted(() => {
+  tableResizeObserver?.disconnect()
 })
 
 /* ── Tabla detalle ── */
@@ -2132,7 +2969,6 @@ const headers = [
   { title: 'Vehículo', key: 'tipo_vehiculo', sortable: false },
   { title: 'Tipo cliente', key: 'tipo_cliente', sortable: false },
   { title: 'Turno', key: 'turno', sortable: false },
-{ title: 'Placa', key: 'placa', sortable: false },
   { title: 'Asesor', key: 'asesor', sortable: false },
   { title: 'Convenio', key: 'convenio', sortable: false },
   { title: 'Descuento', key: 'descuento', sortable: false },
@@ -2441,7 +3277,8 @@ function panelConfirmarAprobar(item: ResumenAsesorItem) {
     'APROBAR',
     elegibles.map((i) => i.id),
     elegibles.reduce((acc, i) => acc + calcTotalItem(i), 0),
-    nombreItem(item)
+    nombreItem(item),
+    'PANEL_ASESOR'
   )
 }
 function panelConfirmarPagar(item: ResumenAsesorItem) {
@@ -2450,7 +3287,8 @@ function panelConfirmarPagar(item: ResumenAsesorItem) {
     'PAGAR',
     elegibles.map((i) => i.id),
     elegibles.reduce((acc, i) => acc + calcTotalItem(i), 0),
-    nombreItem(item)
+    nombreItem(item),
+    'PANEL_ASESOR'
   )
 }
 
@@ -2469,17 +3307,6 @@ async function pagarTodasDelPanel(item: ResumenAsesorItem) {
   panelSeleccionIds.value = elegibles
   panelConfirmarPagar(item)
 }
-
-const headersPanel = [
-  { title: 'ID', key: 'id' },
-  { title: 'Estado', key: 'estado' },
-  { title: 'Placa', key: 'placa' },
-  { title: 'Tipo Vehículo', key: 'tipo_vehiculo' },
-  { title: 'Tipo Cliente', key: 'tipo_cliente' },
-  { title: 'Convenio', key: 'convenio' },
-  { title: 'Monto', key: 'monto' },
-  { title: 'Fecha', key: 'generado_at' },
-]
 
 /* ── Tabla metas ── */
 const metaHeaders = [
@@ -2874,6 +3701,538 @@ function applyFilters() {
   if (filters.value.tipoAsesor) cargarResumenPorAsesor()
 }
 
+/* ── Modal Liquidación RTM ── */
+// El desglose "por canal" ahora sale de facturacion_tickets.captacion_canal
+// (texto libre), que usa 'TELEMERCADEO' en vez del 'TELE' corto del enum de
+// captacion_dateos.canal — se mapean ambos por compatibilidad.
+const CANAL_LABELS_LIQUIDACION: Record<string, string> = {
+  FACHADA: 'Fachada',
+  ASESOR_COMERCIAL: 'Asesor Comercial',
+  ASESOR_CONVENIO: 'Asesor Convenio',
+  TELE: 'Telemercadeo',
+  TELEMERCADEO: 'Telemercadeo',
+  REDES: 'Redes / Marketing Digital',
+}
+
+interface LiquidacionState {
+  open: boolean
+  loading: boolean
+  error: string
+  desde: string
+  hasta: string
+  data: LiquidacionRtmResponse | null
+}
+const liquidacion = ref<LiquidacionState>({
+  open: false,
+  loading: false,
+  error: '',
+  desde: '',
+  hasta: '',
+  data: null,
+})
+
+/**
+ * Toma una "foto" del rango de fecha vigente en la vista principal
+ * (Diario/Semanal/Quincenal/Mensual o manual) al momento de abrir el modal.
+ * No se recalcula si el filtro de la vista principal cambia con el modal
+ * abierto — para ver otro período hay que cerrar, cambiar el filtro y
+ * volver a abrir.
+ */
+async function abrirLiquidacion() {
+  const hoy = toISODate(new Date())
+  const desde = filters.value.desde || hoy
+  const hasta = filters.value.hasta || hoy
+  liquidacion.value = { open: true, loading: true, error: '', desde, hasta, data: null }
+  liquidacionFiltroRapido.value = ''
+  limpiarSeleccionLiquidacion()
+  try {
+    liquidacion.value.data = await getLiquidacionRtm(desde, hasta)
+  } catch (err) {
+    liquidacion.value.error = 'Error al cargar la liquidación RTM del período'
+  } finally {
+    liquidacion.value.loading = false
+  }
+}
+
+/** Recarga los datos del modal ya abierto (mismo rango), tras un pago. */
+async function recargarLiquidacion() {
+  if (!liquidacion.value.open) return
+  try {
+    liquidacion.value.data = await getLiquidacionRtm(liquidacion.value.desde, liquidacion.value.hasta)
+  } catch {
+    // si falla el refresh, se deja el dato anterior — el usuario puede cerrar y reabrir
+  }
+}
+
+/* ── Selección y pago por sección dentro del modal de Liquidación ── */
+type SeccionLiquidacion = 'comerciales' | 'asesoresConvenio' | 'convenios'
+const liquidacionSel = ref<Record<SeccionLiquidacion, Set<number>>>({
+  comerciales: new Set(),
+  asesoresConvenio: new Set(),
+  convenios: new Set(),
+})
+function limpiarSeleccionLiquidacion() {
+  liquidacionSel.value = { comerciales: new Set(), asesoresConvenio: new Set(), convenios: new Set() }
+}
+
+function filasSeccion(seccion: SeccionLiquidacion) {
+  if (!liquidacion.value.data) return []
+  return seccion === 'comerciales'
+    ? liquidacion.value.data.comerciales
+    : seccion === 'asesoresConvenio'
+      ? liquidacion.value.data.asesores_convenio
+      : liquidacion.value.data.convenios
+}
+
+function toggleFila(seccion: SeccionLiquidacion, idx: number) {
+  const set = liquidacionSel.value[seccion]
+  if (set.has(idx)) set.delete(idx)
+  else set.add(idx)
+  // Forzar reactividad: Set mutado in-place no dispara render por sí solo en algunos casos.
+  liquidacionSel.value = { ...liquidacionSel.value }
+}
+
+function indicesPagables(seccion: SeccionLiquidacion): number[] {
+  return filasSeccion(seccion)
+    .map((r, i) => (r.comision_ids_pagables.length ? i : -1))
+    .filter((i) => i >= 0)
+}
+
+function seccionTodosSeleccionados(seccion: SeccionLiquidacion): boolean {
+  const pagables = indicesPagables(seccion)
+  if (!pagables.length) return false
+  return pagables.every((i) => liquidacionSel.value[seccion].has(i))
+}
+
+function toggleSeleccionarTodos(seccion: SeccionLiquidacion) {
+  const pagables = indicesPagables(seccion)
+  const set = liquidacionSel.value[seccion]
+  if (seccionTodosSeleccionados(seccion)) pagables.forEach((i) => set.delete(i))
+  else pagables.forEach((i) => set.add(i))
+  liquidacionSel.value = { ...liquidacionSel.value }
+}
+
+const SECCION_LIQUIDACION_LABEL: Record<SeccionLiquidacion, { singular: string; plural: string }> = {
+  comerciales: { singular: 'asesor comercial', plural: 'asesores comerciales' },
+  asesoresConvenio: { singular: 'asesor convenio', plural: 'asesores convenio' },
+  convenios: { singular: 'convenio', plural: 'convenios' },
+}
+
+function resumenSeleccionSeccion(seccion: SeccionLiquidacion): { ids: number[]; total: number; nombre: string } {
+  const rows = filasSeccion(seccion)
+  const seleccionadas = [...liquidacionSel.value[seccion]].map((i) => rows[i]).filter(Boolean)
+  const ids = seleccionadas.flatMap((r) => r.comision_ids_pagables)
+  const total = seleccionadas.reduce((acc, r) => acc + (r.monto_pagable || 0), 0)
+  const n = seleccionadas.length
+  const label = SECCION_LIQUIDACION_LABEL[seccion]
+  const nombre = n === 1 ? `1 ${label.singular}` : `${n} ${label.plural}`
+  return { ids, total, nombre }
+}
+
+function pagarSeleccionSeccion(seccion: SeccionLiquidacion) {
+  const { ids, total, nombre } = resumenSeleccionSeccion(seccion)
+  if (!ids.length) return
+  liquidacionPagoPendiente.value = seccion
+  abrirDialogAccionMasiva('PAGAR', ids, total, nombre, 'MODAL_LIQUIDAR')
+}
+/** Marca si el diálogo de pago compartido fue abierto desde el modal de
+ * Liquidación (y desde qué sección), para saber qué refrescar/limpiar al
+ * confirmar — el resto de callers de abrirDialogAccionMasiva lo dejan null. */
+const liquidacionPagoPendiente = ref<SeccionLiquidacion | null>(null)
+
+/* ── Filtro rápido de fecha (Diario/Semanal/Quincenal/Mensual) ── */
+type FiltroRapidoFecha = '' | 'DIARIO' | 'SEMANAL' | 'QUINCENAL' | 'MENSUAL'
+const filtroRapidoFecha = ref<FiltroRapidoFecha>('')
+const menuSemanal = ref(false)
+const menuQuincenal = ref(false)
+
+interface RangoRapido { desde: string; hasta: string; label: string }
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+function toISODate(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+const MESES_ABREV = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+function labelRango(desde: Date, hasta: Date): string {
+  const mismoMes = desde.getMonth() === hasta.getMonth() && desde.getFullYear() === hasta.getFullYear()
+  if (mismoMes) return `${desde.getDate()} - ${hasta.getDate()} ${MESES_ABREV[desde.getMonth()]}`
+  return `${desde.getDate()} ${MESES_ABREV[desde.getMonth()]} - ${hasta.getDate()} ${MESES_ABREV[hasta.getMonth()]}`
+}
+
+/**
+ * Semanal = semana calendario lunes-domingo (no ventana rodante de 7 días).
+ * Quincenal = quincena calendario: 1-15 o 16-último día del mes, según en
+ * qué mitad caiga hoy (alineado a los ciclos reales de pago de comisiones).
+ * Mensual = mes calendario completo (día 1 al último día del mes).
+ */
+function calcularRangoRapido(tipo: 'DIARIO' | 'MENSUAL'): { desde: string; hasta: string } {
+  const hoy = new Date()
+  if (tipo === 'DIARIO') {
+    const s = toISODate(hoy)
+    return { desde: s, hasta: s }
+  }
+  const anio = hoy.getFullYear()
+  const mes = hoy.getMonth()
+  return { desde: toISODate(new Date(anio, mes, 1)), hasta: toISODate(new Date(anio, mes + 1, 0)) }
+}
+
+function aplicarFiltroRapido(tipo: 'DIARIO' | 'MENSUAL') {
+  const { desde, hasta } = calcularRangoRapido(tipo)
+  filtroRapidoFecha.value = tipo
+  filters.value.desde = desde
+  filters.value.hasta = hasta
+  applyFilters()
+}
+
+/**
+ * Mes de referencia para las listas de Semanal/Quincenal: el mes de
+ * filters.desde si ya hay un rango cargado (manual o de un filtro rápido
+ * previo), o el mes actual si no hay nada seleccionado todavía. Así, si el
+ * usuario navega a otro mes con el selector manual y luego abre Semanal o
+ * Quincenal, ve las semanas/quincenas de ESE mes, no siempre las de hoy.
+ */
+const mesObjetivo = computed(() => {
+  if (filters.value.desde) {
+    const [y, m] = filters.value.desde.split('-').map(Number)
+    return { anio: y, mes: m - 1 }
+  }
+  const hoy = new Date()
+  return { anio: hoy.getFullYear(), mes: hoy.getMonth() }
+})
+
+function calcularSemanasDelMes(anio: number, mes: number): RangoRapido[] {
+  const ultimoDia = new Date(anio, mes + 1, 0)
+  const primerDia = new Date(anio, mes, 1)
+  const diaSemana = primerDia.getDay() // 0=domingo … 6=sábado
+  const offsetLunes = diaSemana === 0 ? -6 : 1 - diaSemana
+  let inicioSemana = new Date(anio, mes, 1 + offsetLunes)
+
+  const semanas: RangoRapido[] = []
+  while (inicioSemana <= ultimoDia) {
+    const finSemana = new Date(inicioSemana)
+    finSemana.setDate(inicioSemana.getDate() + 6)
+    semanas.push({ desde: toISODate(inicioSemana), hasta: toISODate(finSemana), label: labelRango(inicioSemana, finSemana) })
+    inicioSemana = new Date(inicioSemana)
+    inicioSemana.setDate(inicioSemana.getDate() + 7)
+  }
+  return semanas
+}
+
+function calcularQuincenasDelMes(anio: number, mes: number): RangoRapido[] {
+  const primera: [Date, Date] = [new Date(anio, mes, 1), new Date(anio, mes, 15)]
+  const segunda: [Date, Date] = [new Date(anio, mes, 16), new Date(anio, mes + 1, 0)]
+  return [primera, segunda].map(([d, h]) => ({ desde: toISODate(d), hasta: toISODate(h), label: labelRango(d, h) }))
+}
+
+const MESES_NOMBRE = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
+/** Los 12 meses calendario del año dado (día 1 al último día de cada mes). */
+function calcularMesesDelAnio(anio: number): RangoRapido[] {
+  return MESES_NOMBRE.map((nombre, mes) => {
+    const inicio = new Date(anio, mes, 1)
+    const fin = new Date(anio, mes + 1, 0)
+    return { desde: toISODate(inicio), hasta: toISODate(fin), label: nombre }
+  })
+}
+
+const opcionesSemanales = computed<RangoRapido[]>(() => calcularSemanasDelMes(mesObjetivo.value.anio, mesObjetivo.value.mes))
+const opcionesQuincenales = computed<RangoRapido[]>(() => calcularQuincenasDelMes(mesObjetivo.value.anio, mesObjetivo.value.mes))
+
+function seleccionarRangoRapido(tipo: 'SEMANAL' | 'QUINCENAL', op: RangoRapido) {
+  filtroRapidoFecha.value = tipo
+  filters.value.desde = op.desde
+  filters.value.hasta = op.hasta
+  applyFilters()
+}
+
+// Click en el BOTÓN "Semanal"/"Quincenal" (no en una opción del dropdown ya
+// abierto): SIEMPRE reinicia a la semana/quincena que contiene el día de HOY
+// (mes real del sistema), sin importar qué mes hubiera quedado seleccionado
+// en una interacción previa. Elegir una opción de otro mes desde el
+// dropdown sigue funcionando y aplica ese filtro, pero no queda "pegada"
+// como referencia para el próximo click del botón — cada click vuelve a hoy.
+function onClickBotonConMenu(tipo: 'SEMANAL' | 'QUINCENAL') {
+  const hoy = new Date()
+  const opcionesDeHoy = tipo === 'SEMANAL'
+    ? calcularSemanasDelMes(hoy.getFullYear(), hoy.getMonth())
+    : calcularQuincenasDelMes(hoy.getFullYear(), hoy.getMonth())
+  const hoyISO = toISODate(hoy)
+  const actual = opcionesDeHoy.find((op) => hoyISO >= op.desde && hoyISO <= op.hasta)
+  if (actual) seleccionarRangoRapido(tipo, actual)
+}
+
+// Si el usuario edita el rango manualmente y ya no coincide con ninguna
+// opción vigente del filtro rápido activo, se desactiva visualmente.
+watch([() => filters.value.desde, () => filters.value.hasta], ([desde, hasta]) => {
+  const tipo = filtroRapidoFecha.value
+  if (!tipo) return
+  if (tipo === 'DIARIO' || tipo === 'MENSUAL') {
+    const esperado = calcularRangoRapido(tipo)
+    if (desde !== esperado.desde || hasta !== esperado.hasta) filtroRapidoFecha.value = ''
+    return
+  }
+  const opciones = tipo === 'SEMANAL' ? opcionesSemanales.value : opcionesQuincenales.value
+  const coincide = opciones.some((op) => op.desde === desde && op.hasta === hasta)
+  if (!coincide) filtroRapidoFecha.value = ''
+})
+
+/**
+ * Filtro rápido de fecha DENTRO del modal de Liquidación RTM. Reutiliza las
+ * mismas funciones puras de cálculo de rangos (calcularRangoRapido,
+ * calcularSemanasDelMes, calcularQuincenasDelMes, toISODate) pero con estado
+ * propio (liquidacionFiltroRapido / liquidacionMenuSemanal / …), totalmente
+ * aislado de filtroRapidoFecha / filters de la vista principal: cambiar el
+ * período aquí NO toca ni recarga la tabla de atrás.
+ */
+const liquidacionFiltroRapido = ref<FiltroRapidoFecha>('')
+const liquidacionMenuSemanal = ref(false)
+const liquidacionMenuQuincenal = ref(false)
+const menuMensualLiquidacion = ref(false)
+
+const liquidacionMesObjetivo = computed(() => {
+  if (liquidacion.value.desde) {
+    const [y, m] = liquidacion.value.desde.split('-').map(Number)
+    return { anio: y, mes: m - 1 }
+  }
+  const hoy = new Date()
+  return { anio: hoy.getFullYear(), mes: hoy.getMonth() }
+})
+const liquidacionOpcionesSemanales = computed<RangoRapido[]>(() =>
+  calcularSemanasDelMes(liquidacionMesObjetivo.value.anio, liquidacionMesObjetivo.value.mes)
+)
+const liquidacionOpcionesQuincenales = computed<RangoRapido[]>(() =>
+  calcularQuincenasDelMes(liquidacionMesObjetivo.value.anio, liquidacionMesObjetivo.value.mes)
+)
+/** Los 12 meses del año EN CURSO (sin selector de año). */
+const liquidacionOpcionesMensuales = computed<RangoRapido[]>(() =>
+  calcularMesesDelAnio(new Date().getFullYear())
+)
+
+/** Recarga el reporte del modal con un nuevo rango; limpia selección previa. */
+async function cambiarPeriodoLiquidacion(desde: string, hasta: string) {
+  liquidacion.value.desde = desde
+  liquidacion.value.hasta = hasta
+  liquidacion.value.loading = true
+  liquidacion.value.error = ''
+  limpiarSeleccionLiquidacion()
+  try {
+    liquidacion.value.data = await getLiquidacionRtm(desde, hasta)
+  } catch {
+    liquidacion.value.error = 'Error al cargar la liquidación RTM del período'
+  } finally {
+    liquidacion.value.loading = false
+  }
+}
+
+function aplicarFiltroRapidoLiquidacion(tipo: 'DIARIO') {
+  const { desde, hasta } = calcularRangoRapido(tipo)
+  liquidacionFiltroRapido.value = tipo
+  cambiarPeriodoLiquidacion(desde, hasta)
+}
+
+function seleccionarRangoRapidoLiquidacion(tipo: 'SEMANAL' | 'QUINCENAL' | 'MENSUAL', op: RangoRapido) {
+  liquidacionFiltroRapido.value = tipo
+  cambiarPeriodoLiquidacion(op.desde, op.hasta)
+}
+
+// Mismo comportamiento que onClickBotonConMenu: el click en el botón
+// "Semanal"/"Quincenal" (no en una opción del dropdown) siempre reinicia a
+// la semana/quincena que contiene HOY, sin importar el mes que hubiera
+// quedado seleccionado en una interacción previa dentro del modal.
+function onClickBotonConMenuLiquidacion(tipo: 'SEMANAL' | 'QUINCENAL') {
+  const hoy = new Date()
+  const opcionesDeHoy = tipo === 'SEMANAL'
+    ? calcularSemanasDelMes(hoy.getFullYear(), hoy.getMonth())
+    : calcularQuincenasDelMes(hoy.getFullYear(), hoy.getMonth())
+  const hoyISO = toISODate(hoy)
+  const actual = opcionesDeHoy.find((op) => hoyISO >= op.desde && hoyISO <= op.hasta)
+  if (actual) seleccionarRangoRapidoLiquidacion(tipo, actual)
+}
+
+// Mismo patrón para "Mensual": el click en el BOTON (no en una opción del
+// dropdown) siempre reinicia al mes en curso, sin quedarse "pegado" a un
+// mes elegido antes en la misma sesión.
+function onClickBotonMensualLiquidacion() {
+  const hoy = new Date()
+  const meses = calcularMesesDelAnio(hoy.getFullYear())
+  const actual = meses[hoy.getMonth()]
+  seleccionarRangoRapidoLiquidacion('MENSUAL', actual)
+}
+
+/* ── TAB Historial de Liquidaciones ── */
+const ORIGEN_LABELS: Record<string, string> = {
+  MODAL_LIQUIDAR: 'Modal Liquidar',
+  TABLA_GENERAL: 'Tabla general',
+  PANEL_ASESOR: 'Panel por asesor',
+}
+const ORIGEN_COLORS: Record<string, string> = {
+  MODAL_LIQUIDAR: 'deep-purple',
+  TABLA_GENERAL: 'primary',
+  PANEL_ASESOR: 'teal',
+}
+
+interface HistorialState {
+  items: HistorialLiquidacionItem[]
+  total: number
+  page: number
+  perPage: number
+  loading: boolean
+}
+const historial = ref<HistorialState>({ items: [], total: 0, page: 1, perPage: 15, loading: false })
+const historialExpandido = ref<number | null>(null)
+const historialDetalle = ref<HistorialLiquidacionDetalleFila[]>([])
+const historialDetalleLoading = ref(false)
+const historialCache = new Map<number, HistorialLiquidacionDetalleFila[]>()
+
+async function cargarHistorial() {
+  historial.value.loading = true
+  try {
+    const res = await getHistorialLiquidaciones({
+      page: historial.value.page,
+      perPage: historial.value.perPage,
+    })
+    historial.value.items = res.data
+    historial.value.total = res.total
+  } catch {
+    historial.value.items = []
+  } finally {
+    historial.value.loading = false
+  }
+}
+
+function cambiarPaginaHistorial(delta: number) {
+  const nuevaPagina = historial.value.page + delta
+  if (nuevaPagina < 1) return
+  historial.value.page = nuevaPagina
+  historialExpandido.value = null
+  cargarHistorial()
+}
+
+async function toggleHistorialExpand(id: number) {
+  if (historialExpandido.value === id) {
+    historialExpandido.value = null
+    return
+  }
+  historialExpandido.value = id
+  const cached = historialCache.get(id)
+  if (cached) {
+    historialDetalle.value = cached
+    return
+  }
+  historialDetalleLoading.value = true
+  try {
+    const res = await getHistorialLiquidacionDetalle(id)
+    historialDetalle.value = res.detalle
+    historialCache.set(id, res.detalle)
+  } catch {
+    historialDetalle.value = []
+  } finally {
+    historialDetalleLoading.value = false
+  }
+}
+
+/**
+ * Filtro rápido de fecha de la Trazabilidad histórica (dentro de la misma
+ * tab): mismos 4 botones y misma lógica pura de cálculo de rangos que ya
+ * usan la vista principal y el modal de Liquidación RTM
+ * (calcularRangoRapido/calcularSemanasDelMes/calcularQuincenasDelMes/
+ * calcularMesesDelAnio), con estado propio y totalmente independiente —
+ * cambiar el período aquí no afecta ni al filtro principal ni al del modal.
+ */
+const trazabilidadFiltroRapido = ref<FiltroRapidoFecha>('')
+const trazabilidadMenuSemanal = ref(false)
+const trazabilidadMenuQuincenal = ref(false)
+const trazabilidadMenuMensual = ref(false)
+const trazabilidadDesde = ref('')
+const trazabilidadHasta = ref('')
+
+interface TrazabilidadState {
+  loading: boolean
+  error: string
+  data: TrazabilidadRtmResponse | null
+}
+const trazabilidad = ref<TrazabilidadState>({ loading: false, error: '', data: null })
+
+const trazabilidadMesObjetivo = computed(() => {
+  if (trazabilidadDesde.value) {
+    const [y, m] = trazabilidadDesde.value.split('-').map(Number)
+    return { anio: y, mes: m - 1 }
+  }
+  const hoy = new Date()
+  return { anio: hoy.getFullYear(), mes: hoy.getMonth() }
+})
+const trazabilidadOpcionesSemanales = computed<RangoRapido[]>(() =>
+  calcularSemanasDelMes(trazabilidadMesObjetivo.value.anio, trazabilidadMesObjetivo.value.mes)
+)
+const trazabilidadOpcionesQuincenales = computed<RangoRapido[]>(() =>
+  calcularQuincenasDelMes(trazabilidadMesObjetivo.value.anio, trazabilidadMesObjetivo.value.mes)
+)
+/** Los 12 meses del año EN CURSO (sin selector de año). */
+const trazabilidadOpcionesMensuales = computed<RangoRapido[]>(() =>
+  calcularMesesDelAnio(new Date().getFullYear())
+)
+
+async function cargarTrazabilidad(desde: string, hasta: string) {
+  trazabilidadDesde.value = desde
+  trazabilidadHasta.value = hasta
+  trazabilidad.value.loading = true
+  trazabilidad.value.error = ''
+  try {
+    trazabilidad.value.data = await getTrazabilidadRtm(desde, hasta)
+  } catch {
+    trazabilidad.value.error = 'Error al cargar la trazabilidad histórica RTM'
+  } finally {
+    trazabilidad.value.loading = false
+  }
+}
+
+function aplicarFiltroRapidoTrazabilidad(tipo: 'DIARIO') {
+  const { desde, hasta } = calcularRangoRapido(tipo)
+  trazabilidadFiltroRapido.value = tipo
+  cargarTrazabilidad(desde, hasta)
+}
+
+function seleccionarRangoRapidoTrazabilidad(tipo: 'SEMANAL' | 'QUINCENAL' | 'MENSUAL', op: RangoRapido) {
+  trazabilidadFiltroRapido.value = tipo
+  cargarTrazabilidad(op.desde, op.hasta)
+}
+
+// Click en el BOTÓN "Semanal"/"Quincenal" (no en una opción del dropdown):
+// siempre reinicia a la semana/quincena que contiene HOY.
+function onClickBotonConMenuTrazabilidad(tipo: 'SEMANAL' | 'QUINCENAL') {
+  const hoy = new Date()
+  const opcionesDeHoy = tipo === 'SEMANAL'
+    ? calcularSemanasDelMes(hoy.getFullYear(), hoy.getMonth())
+    : calcularQuincenasDelMes(hoy.getFullYear(), hoy.getMonth())
+  const hoyISO = toISODate(hoy)
+  const actual = opcionesDeHoy.find((op) => hoyISO >= op.desde && hoyISO <= op.hasta)
+  if (actual) seleccionarRangoRapidoTrazabilidad(tipo, actual)
+}
+
+// Click en el BOTÓN "Mensual" (no en una opción del dropdown): siempre
+// reinicia al mes en curso, sin quedarse "pegado" a un mes elegido antes.
+function onClickBotonMensualTrazabilidad() {
+  const hoy = new Date()
+  const meses = calcularMesesDelAnio(hoy.getFullYear())
+  const actual = meses[hoy.getMonth()]
+  seleccionarRangoRapidoTrazabilidad('MENSUAL', actual)
+}
+
+let historialTabCargada = false
+watch(activeTab, (tab) => {
+  if (tab === 'historial' && !historialTabCargada) {
+    historialTabCargada = true
+    cargarHistorial()
+    onClickBotonMensualTrazabilidad()
+  }
+})
+
 async function loadMetas() {
   metaLoading.value = true
   try {
@@ -2913,6 +4272,7 @@ function reload() {
 
 function resetFilters() {
   filters.value = { desde: '', hasta: '', asesorId: null, convenioId: null, estado: '', tipoVehiculo: '', descuentoCodigo: '', tipoAsesor: '', tipoCaptacion: '', placa: '' }
+  filtroRapidoFecha.value = ''
   conveniosFiltroComercial.value = []
   selectedIds.value = []
   reload()
@@ -3044,6 +4404,9 @@ async function cargarClientePorPlaca(placa: string) {
 /* ── Acciones Bulk (pago masivo vía /comisiones/pagar-masivo) ── */
 const snack = reactive({ show: false, text: '', color: 'success' })
 
+/** Origen del pago: de dónde se disparó, para el historial de liquidaciones. */
+type OrigenPago = 'MODAL_LIQUIDAR' | 'TABLA_GENERAL' | 'PANEL_ASESOR'
+
 interface BulkAccionDialogState {
   visible: boolean
   accion: 'APROBAR' | 'PAGAR'
@@ -3052,6 +4415,7 @@ interface BulkAccionDialogState {
   nombre: string
   fechaPago: string
   loading: boolean
+  origen: OrigenPago
 }
 const bulkAccionDialog = ref<BulkAccionDialogState>({
   visible: false,
@@ -3061,9 +4425,16 @@ const bulkAccionDialog = ref<BulkAccionDialogState>({
   nombre: '',
   fechaPago: '',
   loading: false,
+  origen: 'TABLA_GENERAL',
 })
 
-function abrirDialogAccionMasiva(accion: 'APROBAR' | 'PAGAR', ids: number[], total: number, nombre: string) {
+function abrirDialogAccionMasiva(
+  accion: 'APROBAR' | 'PAGAR',
+  ids: number[],
+  total: number,
+  nombre: string,
+  origen: OrigenPago
+) {
   if (ids.length === 0) return
   bulkAccionDialog.value = {
     visible: true,
@@ -3073,6 +4444,7 @@ function abrirDialogAccionMasiva(accion: 'APROBAR' | 'PAGAR', ids: number[], tot
     nombre,
     fechaPago: new Date().toISOString().slice(0, 10),
     loading: false,
+    origen,
   }
 }
 
@@ -3087,7 +4459,8 @@ function confirmBulkAprobar() {
     'APROBAR',
     elegibles.map((i) => i.id),
     elegibles.reduce((acc, i) => acc + calcTotalItem(i), 0),
-    nombreSeleccion.value
+    nombreSeleccion.value,
+    'TABLA_GENERAL'
   )
 }
 
@@ -3097,18 +4470,28 @@ function confirmBulkPagar() {
     'PAGAR',
     elegibles.map((i) => i.id),
     elegibles.reduce((acc, i) => acc + calcTotalItem(i), 0),
-    nombreSeleccion.value
+    nombreSeleccion.value,
+    'TABLA_GENERAL'
   )
 }
 
 async function ejecutarAccionMasiva() {
-  const { accion, ids, fechaPago, nombre } = bulkAccionDialog.value
+  const { accion, ids, fechaPago, nombre, origen } = bulkAccionDialog.value
   bulkAccionDialog.value.loading = true
   try {
+    const esDelModalLiquidacion = origen === 'MODAL_LIQUIDAR'
     const resp = await pagarMasivoComisiones({
       ids,
       accion,
       fecha_pago: accion === 'PAGAR' ? fechaPago : undefined,
+      origen,
+      // El período y el rango de fechas del evento solo se conocen cuando
+      // el pago sale del modal Liquidar (que ya tiene un rango activo).
+      // Para tabla general/panel, el backend calcula fecha_inicio/fecha_fin
+      // a partir del min/max de fecha_calculo de las comisiones incluidas.
+      tipo_periodo: esDelModalLiquidacion && liquidacionFiltroRapido.value ? liquidacionFiltroRapido.value : undefined,
+      fecha_inicio: esDelModalLiquidacion ? liquidacion.value.desde : undefined,
+      fecha_fin: esDelModalLiquidacion ? liquidacion.value.hasta : undefined,
     })
     const verbo = accion === 'APROBAR' ? 'aprobadas' : 'pagadas'
     snack.text = `${resp.actualizadas} comisiones ${verbo} a ${nombre}`
@@ -3121,6 +4504,15 @@ async function ejecutarAccionMasiva() {
     await loadItems()
     await cargarResumenPorAsesor()
     await loadResumen()
+    // Si el pago se disparó desde una sección del modal de Liquidación RTM,
+    // refresca sus datos (estados/montos actualizados) y limpia esa
+    // selección puntual — las otras 2 secciones no se tocan.
+    if (liquidacionPagoPendiente.value) {
+      liquidacionSel.value[liquidacionPagoPendiente.value] = new Set()
+      liquidacionSel.value = { ...liquidacionSel.value }
+      liquidacionPagoPendiente.value = null
+      await recargarLiquidacion()
+    }
   } catch (err) {
     snack.text = err instanceof Error ? err.message : 'Error al procesar la acción masiva'
     snack.color = 'error'
@@ -3849,33 +5241,57 @@ loadResumen()
 .scroll-wrapper {
   position: relative;
 }
+/*
+ * Nota: se intentó un breakout con margin-right negativo para ganar el
+ * padding de v-main (pa-15), pero el v-card que envuelve TODA la vista
+ * (rounded-xl) tiene overflow:hidden (para recortar las esquinas
+ * redondeadas) y recorta cualquier contenido que intente salir de su
+ * propio borde ANTES de llegar al padding de v-main — verificado con
+ * Playwright (el borde real del card queda ~60px adentro del borde de
+ * v-container). Cualquier breakout real requeriría sacar la tabla fuera
+ * del v-card (cambio estructural mayor, no incluido aquí). Por eso todo
+ * el ahorro de espacio viene de compactar la tabla misma (ver abajo).
+ */
 
 /*
- * Rompe SOLO el ancho del v-container padre (tope de 1250px fijado en
- * App.vue) para esta tabla puntual, sin tocar el resto de la vista
- * (título, filtros, tarjetas KPI, tabla de descuentos) ni el padding
- * global de MainLayout.vue (pa-15, se queda fijo para toda la app).
- *
- * El borde IZQUIERDO se queda fijo (mismo margin-left que sus hermanos,
- * el checkbox/ID no se mueven de su posición actual): todo el espacio
- * extra se gana solo hacia la derecha, vía margin-right negativo + un
- * width mayor al 100%.
- *
- * --espacio-extra es el espacio "sobrante" (a un solo lado, por eso sin
- * dividir entre 2) entre el borde del v-container (tope 1250px) y el
- * borde del padding del v-main (pa-15 = 60px por lado + sidebar rail
- * 64px): 1250 (cap del v-container) + 120 (pa-15 x2) + 64 (sidebar rail)
- * = 1434. Por debajo de ese ancho de viewport el v-container ya no llega
- * a tocar su tope de 1250px (está limitado por el padre, no por el cap),
- * así que clamp() devuelve 0 y la tabla no se mueve — sin riesgo de
- * desbordar el padding de v-main en pantallas más angostas. El tope de
- * 440px es el mismo ancho total ganado que la versión repartida a 2
- * lados (2 x 220px), solo que ahora va entero hacia la derecha.
+ * El scroll horizontal no era por falta de espacio de sobra: era
+ * min-width:1400px fijo + padding por defecto de Vuetify en 14 columnas
+ * + una columna "Placa" duplicada (el dato ya vive en "Turno"). Se quitó
+ * esa columna, se compacta el padding/tipografía, se permite wrap en
+ * columnas de texto largo (Asesor/Convenio) en vez de forzar una sola
+ * línea, se redujeron los botones de Acciones, y se recupera el padding
+ * fijo de v-main con el margin-right de arriba.
  */
-.tabla-ancha-breakout {
-  --espacio-extra: clamp(0px, calc(100vw - 1434px), 440px);
-  margin-right: calc(-1 * var(--espacio-extra));
-  width: calc(100% + var(--espacio-extra));
+.scroll-content :deep(table td),
+.scroll-content :deep(table th) {
+  padding: 0 4px !important;
+}
+.scroll-content :deep(table) {
+  font-size: 0.8125rem;
+}
+.cell-wrap {
+  display: inline-block;
+  white-space: normal;
+  max-width: 130px;
+  line-height: 1.25;
+  word-break: break-word;
+}
+.acciones-cell {
+  gap: 0;
+}
+.acciones-cell :deep(.v-btn) {
+  min-width: 26px;
+}
+.descuento-chip.v-chip {
+  height: auto;
+  min-height: 20px;
+  white-space: normal;
+  max-width: 105px;
+}
+.descuento-chip :deep(.v-chip__content) {
+  white-space: normal;
+  line-height: 1.2;
+  padding: 2px 0;
 }
 .scroll-top {
   overflow-x: auto;

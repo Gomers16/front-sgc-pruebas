@@ -739,6 +739,10 @@ export async function pagarMasivoComisiones(payload: {
   ids: number[]
   accion: 'APROBAR' | 'PAGAR'
   fecha_pago?: string
+  origen?: 'MODAL_LIQUIDAR' | 'TABLA_GENERAL' | 'PANEL_ASESOR'
+  tipo_periodo?: 'DIARIO' | 'SEMANAL' | 'QUINCENAL' | 'MENSUAL'
+  fecha_inicio?: string
+  fecha_fin?: string
 }): Promise<{ actualizadas: number; ids_actualizadas: number[]; mensaje: string }> {
   return apiFetch('/comisiones/pagar-masivo', {
     method: 'POST',

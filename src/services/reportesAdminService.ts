@@ -533,6 +533,135 @@ export async function getDetalleComisionesPorConvenio(
   })
 }
 
+/* ======================= Liquidación RTM ======================= */
+
+export interface LiquidacionPorCanal {
+  canal: string
+  cantidad: number
+  monto: number
+  porcentaje: number
+}
+
+export interface LiquidacionComercial extends ComisionComercial {
+  comision_ids: number[]
+  comision_ids_pagables: number[]
+  monto_pagable: number
+}
+
+export interface LiquidacionAsesorConvenio extends ComisionAsesorConvenio {
+  asesor_id: number
+  comision_ids: number[]
+  comision_ids_pagables: number[]
+  monto_pagable: number
+}
+
+export interface LiquidacionConvenio extends ComisionConvenio {
+  comision_ids: number[]
+  comision_ids_pagables: number[]
+  monto_pagable: number
+}
+
+export interface LiquidacionRtmResponse {
+  fecha_inicio: string
+  fecha_fin: string
+  resumen: { total_comisiones: number; total_monto: number }
+  por_canal: LiquidacionPorCanal[]
+  comerciales: LiquidacionComercial[]
+  asesores_convenio: LiquidacionAsesorConvenio[]
+  convenios: LiquidacionConvenio[]
+}
+
+export async function getLiquidacionRtm(
+  fechaInicio: string,
+  fechaFin: string
+): Promise<LiquidacionRtmResponse> {
+  return apiFetch<LiquidacionRtmResponse>('/reportes-admin/liquidacion-rtm', {
+    query: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+  })
+}
+
+/* ======================= Historial de Liquidaciones ======================= */
+
+export type HistorialLiquidacionOrigen = 'MODAL_LIQUIDAR' | 'TABLA_GENERAL' | 'PANEL_ASESOR'
+export type HistorialLiquidacionPeriodo = 'DIARIO' | 'SEMANAL' | 'QUINCENAL' | 'MENSUAL' | null
+
+export interface HistorialLiquidacionItem {
+  id: number
+  fecha_evento: string
+  fecha_inicio: string
+  fecha_fin: string
+  tipo_origen: HistorialLiquidacionOrigen
+  tipo_periodo: HistorialLiquidacionPeriodo
+  monto_total: number
+  cantidad_comisiones: number
+  usuario: string | null
+}
+
+export interface HistorialLiquidacionesResponse {
+  data: HistorialLiquidacionItem[]
+  total: number
+  page: number
+  perPage: number
+}
+
+export async function getHistorialLiquidaciones(params: {
+  page?: number
+  perPage?: number
+  fechaInicio?: string
+  fechaFin?: string
+}): Promise<HistorialLiquidacionesResponse> {
+  return apiFetch<HistorialLiquidacionesResponse>('/reportes-admin/historial-liquidaciones', {
+    query: {
+      page: params.page,
+      per_page: params.perPage,
+      fecha_inicio: params.fechaInicio,
+      fecha_fin: params.fechaFin,
+    },
+  })
+}
+
+export interface HistorialLiquidacionDetalleFila {
+  comision_id: number
+  tipo_vehiculo: string | null
+  fecha_calculo: string
+  estado: string
+  asesor_nombre: string | null
+  convenio_nombre: string | null
+  monto: number
+}
+
+export interface HistorialLiquidacionDetalleResponse {
+  liquidacion: HistorialLiquidacionItem
+  detalle: HistorialLiquidacionDetalleFila[]
+}
+
+export async function getHistorialLiquidacionDetalle(
+  id: number
+): Promise<HistorialLiquidacionDetalleResponse> {
+  return apiFetch<HistorialLiquidacionDetalleResponse>(`/reportes-admin/historial-liquidaciones/${id}`)
+}
+
+/* ======================= Trazabilidad RTM (histórica, PAGADA) ======================= */
+
+export interface TrazabilidadRtmResponse {
+  fecha_inicio: string
+  fecha_fin: string
+  resumen: { total_comisiones: number; total_monto: number }
+  por_canal: LiquidacionPorCanal[]
+  comerciales: ComisionComercial[]
+  asesores_convenio: ComisionAsesorConvenio[]
+  convenios: ComisionConvenio[]
+}
+
+export async function getTrazabilidadRtm(
+  fechaInicio: string,
+  fechaFin: string
+): Promise<TrazabilidadRtmResponse> {
+  return apiFetch<TrazabilidadRtmResponse>('/reportes-admin/trazabilidad-rtm', {
+    query: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+  })
+}
+
 /* ======================= Reporte Meta Mensual ======================= */
 
 export type FuenteMetaMensual = 'real' | 'historico' | 'sin_datos'

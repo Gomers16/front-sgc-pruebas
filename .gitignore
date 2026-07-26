@@ -39,3 +39,6 @@ Thumbs.db
 *.sln
 *.sw?
 *.tsbuildinfo
+
+# Config local de MCP (Playwright, etc.) — no compartir entre entornos
+.mcp.json
