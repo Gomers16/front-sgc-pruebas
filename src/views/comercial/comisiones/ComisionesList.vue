@@ -48,7 +48,20 @@
         <v-card>
           <v-card-title class="d-flex align-center justify-space-between">
             <span>Liquidación RTM — {{ liquidacion.desde }} a {{ liquidacion.hasta }}</span>
-            <v-btn icon="mdi-close" variant="text" size="small" @click="liquidacion.open = false" />
+            <div class="d-flex align-center gap-1">
+              <v-btn
+                v-if="liquidacion.data"
+                size="small"
+                variant="tonal"
+                color="success"
+                prepend-icon="mdi-file-excel"
+                :loading="modalExcelLoading"
+                @click="descargarExcelModal"
+              >
+                Descargar Excel
+              </v-btn>
+              <v-btn icon="mdi-close" variant="text" size="small" @click="liquidacion.open = false" />
+            </div>
           </v-card-title>
           <v-divider />
           <v-card-text style="max-height: 75vh">
@@ -939,6 +952,13 @@
                         <div class="d-flex acciones-cell">
                           <v-btn size="x-small" density="compact" variant="text" icon="mdi-eye" @click="verDetalle(item)" />
                           <v-btn
+                            v-if="item.turno?.servicio?.codigo === 'RTM'"
+                            size="x-small" density="compact" variant="text" color="info"
+                            icon="mdi-clipboard-text-clock"
+                            title="Ver detalle turno"
+                            @click="abrirDetalleTurno(item.turno.id)"
+                          />
+                          <v-btn
                             v-if="item.estado === 'PENDIENTE'"
                             size="x-small" density="compact" variant="text" color="primary"
                             icon="mdi-pencil"
@@ -1170,6 +1190,13 @@
     <div class="d-flex acciones-cell">
       <v-btn size="x-small" density="compact" variant="text" icon="mdi-eye" @click="verDetalle(item)" />
       <v-btn
+        v-if="item.turno?.servicio?.codigo === 'RTM'"
+        size="x-small" density="compact" variant="text" color="info"
+        icon="mdi-clipboard-text-clock"
+        title="Ver detalle turno"
+        @click="abrirDetalleTurno(item.turno.id)"
+      />
+      <v-btn
         v-if="item.estado === 'PENDIENTE'"
         size="x-small" density="compact" variant="text" color="primary"
         icon="mdi-pencil"
@@ -1265,8 +1292,21 @@
       <!-- ====== TAB HISTORIAL DE LIQUIDACIONES ==================== -->
       <template v-else-if="activeTab === 'historial'">
         <v-card-text class="pt-5">
-          <div class="mb-4 text-subtitle-1 font-weight-medium">
-            Eventos de liquidación (pagos ejecutados)
+          <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-4">
+            <div class="text-subtitle-1 font-weight-medium">
+              Eventos de liquidación (pagos ejecutados)
+            </div>
+            <v-btn
+              size="small"
+              variant="tonal"
+              color="success"
+              prepend-icon="mdi-file-excel"
+              :loading="historialExportLoading"
+              :disabled="!historial.total"
+              @click="descargarExcelHistorial"
+            >
+              Descargar Excel
+            </v-btn>
           </div>
 
           <v-table density="compact" class="mb-2">
@@ -1353,8 +1393,21 @@
 
           <v-divider class="mb-6" />
 
-          <div class="mb-4 text-subtitle-1 font-weight-medium">
-            Trazabilidad histórica RTM (solo comisiones PAGADAS)
+          <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-4">
+            <div class="text-subtitle-1 font-weight-medium">
+              Trazabilidad histórica RTM (solo comisiones PAGADAS)
+            </div>
+            <v-btn
+              v-if="trazabilidad.data"
+              size="small"
+              variant="tonal"
+              color="success"
+              prepend-icon="mdi-file-excel"
+              :loading="trazabilidadExcelLoading"
+              @click="descargarExcelTrazabilidad"
+            >
+              Descargar Excel
+            </v-btn>
           </div>
           <div class="d-flex align-center gap-1 mb-4" style="flex-wrap:wrap">
             <v-btn
@@ -1633,6 +1686,13 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- ══════════════════════════════════════════════════════════
+     DIÁLOGO: Detalle de turno (mismo modal "Turno #X" que Estado de
+     Turnos), disparado desde el botón "Ver detalle turno" en la tabla
+     general y el panel por asesor
+══════════════════════════════════════════════════════════ -->
+    <TurnoDetalleDialog v-model="turnoDetalleDialogOpen" :turno="turnoDetalleSeleccionado" />
 
     <!-- ══════════════════════════════════════════════════════════
      DIÁLOGO: Detalle comisión
@@ -2827,10 +2887,15 @@ import {
   getHistorialLiquidaciones,
   getHistorialLiquidacionDetalle,
   getTrazabilidadRtm,
+  descargarLiquidacionRtmExcel,
+  descargarTrazabilidadRtmExcel,
+  descargarHistorialLiquidacionesExcel,
   type HistorialLiquidacionItem,
   type HistorialLiquidacionDetalleFila,
   type TrazabilidadRtmResponse,
 } from '@/services/reportesAdminService'
+import TurnosDelDiaService from '@/services/turnosdeldiaService'
+import TurnoDetalleDialog, { type Turno as TurnoDetalle } from '@/components/rtm/TurnoDetalleDialog.vue'
 
 /* ── Extended types ── */
 interface ComisionListItemExtended extends ComisionListItem {
@@ -4233,6 +4298,76 @@ watch(activeTab, (tab) => {
   }
 })
 
+/* ── Exportar a Excel: el .xlsx se genera en el BACKEND con exceljs (ya
+   instalado y usado en turnos_rtms_controller.ts), no con la librería
+   'xlsx' del frontend — esa sí está instalada y se usa en varios reportes,
+   pero su versión community no escribe negrita real al archivo (limitación
+   confirmada inspeccionando el .xlsx generado: styles.xml queda sin ninguna
+   fuente en negrita pese a asignar `.s = {font:{bold:true}}`). El frontend
+   solo dispara la descarga del blob que devuelve el backend. ── */
+function descargarBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
+
+const modalExcelLoading = ref(false)
+async function descargarExcelModal() {
+  if (!liquidacion.value.data) return
+  modalExcelLoading.value = true
+  try {
+    const { desde, hasta } = liquidacion.value
+    const blob = await descargarLiquidacionRtmExcel(desde, hasta)
+    descargarBlob(blob, `Liquidacion_RTM_${desde}_${hasta}.xlsx`)
+  } catch {
+    snack.text = 'Error al generar el Excel de Liquidación RTM'
+    snack.color = 'error'
+    snack.show = true
+  } finally {
+    modalExcelLoading.value = false
+  }
+}
+
+const trazabilidadExcelLoading = ref(false)
+async function descargarExcelTrazabilidad() {
+  if (!trazabilidad.value.data) return
+  trazabilidadExcelLoading.value = true
+  try {
+    const { desde, hasta } = { desde: trazabilidadDesde.value, hasta: trazabilidadHasta.value }
+    const blob = await descargarTrazabilidadRtmExcel(desde, hasta)
+    descargarBlob(blob, `Trazabilidad_RTM_${desde}_${hasta}.xlsx`)
+  } catch {
+    snack.text = 'Error al generar el Excel de Trazabilidad'
+    snack.color = 'error'
+    snack.show = true
+  } finally {
+    trazabilidadExcelLoading.value = false
+  }
+}
+
+/** Excel del listado de eventos de liquidación (Historial): el backend trae
+ * TODOS los eventos que cumplan el filtro, sin paginar. */
+const historialExportLoading = ref(false)
+async function descargarExcelHistorial() {
+  historialExportLoading.value = true
+  try {
+    const blob = await descargarHistorialLiquidacionesExcel()
+    const hoy = toISODate(new Date())
+    descargarBlob(blob, `Historial_Liquidaciones_${hoy}.xlsx`)
+  } catch {
+    snack.text = 'Error al generar el Excel del historial'
+    snack.color = 'error'
+    snack.show = true
+  } finally {
+    historialExportLoading.value = false
+  }
+}
+
 async function loadMetas() {
   metaLoading.value = true
   try {
@@ -4398,6 +4533,26 @@ async function cargarClientePorPlaca(placa: string) {
     detailDialog.value.clienteData = null
   } finally {
     detailDialog.value.clienteLoading = false
+  }
+}
+
+/* ── Modal de detalle de turno (mismo componente que EstadoDeTurnos.vue) ── */
+const turnoDetalleDialogOpen = ref(false)
+const turnoDetalleSeleccionado = ref<TurnoDetalle | null>(null)
+
+async function abrirDetalleTurno(turnoId: number) {
+  try {
+    // GET /turnos-rtm/:id ya devuelve el turno completo con todos los
+    // preloads/campos derivados que necesita el modal (mismo shape que usa
+    // EstadoDeTurnos.vue) — el tipo liviano declarado en
+    // TurnosDelDiaService no lo expresa completo, de ahí el cast.
+    const data = await TurnosDelDiaService.fetchTurnoById(turnoId)
+    turnoDetalleSeleccionado.value = data as unknown as TurnoDetalle
+    turnoDetalleDialogOpen.value = true
+  } catch {
+    snack.text = 'Error al cargar el detalle del turno'
+    snack.color = 'error'
+    snack.show = true
   }
 }
 

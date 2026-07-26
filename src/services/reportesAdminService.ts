@@ -44,6 +44,25 @@ async function apiFetch<T>(
   return (await res.json()) as T
 }
 
+/** Igual que apiFetch pero para respuestas binarias (ej. .xlsx generado en el backend). */
+async function apiFetchBlob(endpoint: string, query?: Record<string, unknown>): Promise<Blob> {
+  const url = `${BASE}${endpoint}${buildQuery(query)}`
+  const token = sessionStorage.getItem('token') || localStorage.getItem('token')
+  const headers: HeadersInit = {}
+  if (token) (headers as Record<string, string>).Authorization = `Bearer ${token}`
+
+  const res = await fetch(url, { method: 'GET', headers })
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`
+    try {
+      const err = await res.json()
+      msg = (err as Record<string, unknown>)?.message as string || JSON.stringify(err)
+    } catch {}
+    throw new Error(msg)
+  }
+  return await res.blob()
+}
+
 /* ============================ Tipos ============================ */
 
 export interface IngresoCanal {
@@ -659,6 +678,32 @@ export async function getTrazabilidadRtm(
 ): Promise<TrazabilidadRtmResponse> {
   return apiFetch<TrazabilidadRtmResponse>('/reportes-admin/trazabilidad-rtm', {
     query: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+  })
+}
+
+/* ======================= Descargas Excel (.xlsx generado en backend con exceljs) ======================= */
+
+export async function descargarLiquidacionRtmExcel(fechaInicio: string, fechaFin: string): Promise<Blob> {
+  return apiFetchBlob('/reportes-admin/liquidacion-rtm/excel', {
+    fecha_inicio: fechaInicio,
+    fecha_fin: fechaFin,
+  })
+}
+
+export async function descargarTrazabilidadRtmExcel(fechaInicio: string, fechaFin: string): Promise<Blob> {
+  return apiFetchBlob('/reportes-admin/trazabilidad-rtm/excel', {
+    fecha_inicio: fechaInicio,
+    fecha_fin: fechaFin,
+  })
+}
+
+export async function descargarHistorialLiquidacionesExcel(params?: {
+  fechaInicio?: string
+  fechaFin?: string
+}): Promise<Blob> {
+  return apiFetchBlob('/reportes-admin/historial-liquidaciones/excel', {
+    fecha_inicio: params?.fechaInicio,
+    fecha_fin: params?.fechaFin,
   })
 }
 
