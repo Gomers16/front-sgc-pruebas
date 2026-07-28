@@ -319,6 +319,14 @@
           <v-list-item v-bind="props" title="Reportes Administrativos" />
         </template>
 
+        <v-list-item
+          prepend-icon="mdi-file-pdf-box"
+          title="Súper Informe"
+          :to="{ name: 'SuperInforme' }"
+          link
+          class="nav-item-child"
+        />
+
         <!-- Financieros -->
         <v-list-group value="reportes-financieros">
           <template #activator="{ props }">

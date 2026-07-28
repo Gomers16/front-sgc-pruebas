@@ -414,6 +414,17 @@ const routes: RouteRecordRaw[] = [
       roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
     },
   },
+  {
+    path: '/reportes-admin/super-informe',
+    name: 'SuperInforme',
+    component: () => import('@/views/reportes/SuperInforme.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Súper Informe',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
 ]
 
 const router = createRouter({

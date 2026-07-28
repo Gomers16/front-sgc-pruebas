@@ -200,6 +200,9 @@
               <template #item.total_bruto="{ item }">
                 {{ formatCOP(item.total_bruto) }}
               </template>
+              <template #item.porcentaje="{ item }">
+                {{ formatPercent(item.porcentaje) }}
+              </template>
 
               <template #body.append v-if="porCanalRows.length">
                 <tr class="fila-totales">
@@ -209,6 +212,7 @@
                   <td class="font-weight-bold">{{ totalesPorCanal.recuperaciones }}</td>
                   <td class="font-weight-bold">{{ totalesPorCanal.total }}</td>
                   <td class="font-weight-bold">{{ formatCOP(totalesPorCanal.total_bruto) }}</td>
+                  <td class="font-weight-bold">100%</td>
                 </tr>
               </template>
             </v-data-table>
@@ -450,6 +454,7 @@ const headersPorCanal = [
   { title: 'Recuperaciones', key: 'recuperaciones' },
   { title: 'Total', key: 'total' },
   { title: 'Total Bruto', key: 'total_bruto' },
+  { title: '% del Total', key: 'porcentaje' },
 ]
 
 const headersPorMes = [

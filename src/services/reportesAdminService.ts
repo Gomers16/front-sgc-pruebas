@@ -167,6 +167,7 @@ export interface RetencionPorCanal {
   recuperaciones: number
   total: number
   total_bruto: number
+  porcentaje: number
 }
 
 export interface RetencionPorMes {
@@ -362,6 +363,7 @@ export interface DescuentoPorCanal {
   cantidad: number
   total_descuentos: number
   tipos_usados: number
+  porcentaje: number
 }
 export interface DescuentosPorCanalResponse {
   fecha_inicio: string
@@ -707,6 +709,15 @@ export async function descargarHistorialLiquidacionesExcel(params?: {
   })
 }
 
+/* ======================= Súper Informe (PDF generado en backend con pdfkit) ======================= */
+
+export async function descargarSuperInformePdf(fechaInicio: string, fechaFin: string): Promise<Blob> {
+  return apiFetchBlob('/reportes-admin/super-informe/pdf', {
+    fecha_inicio: fechaInicio,
+    fecha_fin: fechaFin,
+  })
+}
+
 /* ======================= Reporte Meta Mensual ======================= */
 
 export type FuenteMetaMensual = 'real' | 'historico' | 'sin_datos'
@@ -822,6 +833,21 @@ export interface MetaMensualProyectadoResponse {
   dias: MetaMensualProyectadoDia[]
 }
 
+export interface MetaMensualRangoResponse {
+  mes: number
+  anio: number
+  fecha_inicio: string
+  fecha_fin: string
+  dias_del_rango: number
+  dias_del_rango_transcurridos: number
+  fuente_datos: FuenteMetaMensual
+  real: { livianos: number; motos: number; total: number }
+  meta_mes: { livianos: number; motos: number; total: number }
+  pct_real_sobre_meta_mes: number | null
+  proyeccion: { livianos: number; motos: number; total: number }
+  pct_proyeccion_sobre_meta_mes: number | null
+}
+
 export async function getMetaMensualConfig(
   mes: number,
   anio: number
@@ -877,6 +903,15 @@ export async function getMetaMensualProyectado(
 ): Promise<MetaMensualProyectadoResponse> {
   return apiFetch<MetaMensualProyectadoResponse>('/reportes-admin/meta-mensual/proyectado', {
     query: { mes, anio },
+  })
+}
+
+export async function getMetaMensualRango(
+  fechaInicio: string,
+  fechaFin: string
+): Promise<MetaMensualRangoResponse> {
+  return apiFetch<MetaMensualRangoResponse>('/reportes-admin/meta-mensual/rango', {
+    query: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
   })
 }
 

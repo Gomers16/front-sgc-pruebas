@@ -74,6 +74,110 @@
       </v-card-text>
     </v-card>
 
+    <!-- RANGO ESPECÍFICO -->
+    <v-card elevation="10" class="rounded-2xl mb-6">
+      <v-card-title class="d-flex align-center py-4">
+        <v-avatar size="36" class="mr-3" color="indigo-darken-2">
+          <v-icon size="20">mdi-calendar-range</v-icon>
+        </v-avatar>
+        <div>
+          <div class="text-h6 font-weight-bold">Rango específico</div>
+          <div class="text-caption text-medium-emphasis">
+            Real generado en un rango de fechas, vs. la meta del mes completo, y proyección de cierre basada en el ritmo de ese rango
+          </div>
+        </div>
+      </v-card-title>
+
+      <v-divider />
+
+      <v-card-text>
+        <v-row align="center" dense>
+          <v-col cols="6" sm="3" md="2">
+            <v-text-field
+              v-model="rangoDesde"
+              label="Desde"
+              type="date"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </v-col>
+          <v-col cols="6" sm="3" md="2">
+            <v-text-field
+              v-model="rangoHasta"
+              label="Hasta"
+              type="date"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </v-col>
+          <v-col cols="12" sm="4" md="2">
+            <v-btn color="primary" :loading="loadingRango" block @click="aplicarRango">
+              Aplicar
+            </v-btn>
+          </v-col>
+        </v-row>
+
+        <v-alert v-if="rangoError" type="error" variant="tonal" density="compact" class="mt-4">
+          {{ rangoError }}
+        </v-alert>
+
+        <template v-if="rango && !rangoError">
+          <v-row class="mt-4" dense>
+            <v-col cols="12" sm="6" md="3">
+              <div class="text-caption text-medium-emphasis">Real del rango</div>
+              <div class="text-h6 font-weight-bold">{{ formatNum(rango.real.total) }}</div>
+              <div class="text-caption">{{ formatPct(rango.pct_real_sobre_meta_mes) }} de la meta del mes</div>
+            </v-col>
+            <v-col cols="12" sm="6" md="3">
+              <div class="text-caption text-medium-emphasis">Meta del mes completo</div>
+              <div class="text-h6 font-weight-bold">{{ formatNum(rango.meta_mes.total) }}</div>
+              <div class="text-caption">{{ etiquetaMes(rango.mes) }} {{ rango.anio }}</div>
+            </v-col>
+            <v-col cols="12" sm="6" md="3">
+              <div class="text-caption text-medium-emphasis">Proyección de cierre del mes</div>
+              <div class="text-h6 font-weight-bold">{{ formatNum(rango.proyeccion.total) }}</div>
+              <div class="text-caption">{{ formatPct(rango.pct_proyeccion_sobre_meta_mes) }} de la meta proyectado</div>
+            </v-col>
+            <v-col cols="12" sm="6" md="3">
+              <div class="text-caption text-medium-emphasis">Días considerados para el ritmo</div>
+              <div class="text-h6 font-weight-bold">
+                {{ rango.dias_del_rango_transcurridos }} de {{ rango.dias_del_rango }}
+              </div>
+              <div class="text-caption">de los {{ diasDelMesRango }} días de {{ etiquetaMes(rango.mes) }}</div>
+            </v-col>
+          </v-row>
+
+          <v-alert
+            v-if="rango.dias_del_rango_transcurridos > 0 && rango.dias_del_rango_transcurridos <= 2"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-4"
+          >
+            Proyección basada en solo {{ rango.dias_del_rango_transcurridos }} día{{ rango.dias_del_rango_transcurridos === 1 ? '' : 's' }} — puede ser volátil, interpreta el resultado con cautela.
+          </v-alert>
+
+          <v-alert
+            v-else-if="rango.dias_del_rango_transcurridos === 0"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-4"
+          >
+            El rango elegido todavía no tiene días transcurridos, así que no se puede calcular un ritmo diario.
+          </v-alert>
+
+          <div class="text-caption text-medium-emphasis mt-3">
+            Ritmo diario calculado con {{ formatFechaCorta(rango.fecha_inicio) }} al
+            {{ formatFechaCorta(rango.fecha_fin) }}, proyectado a los {{ diasDelMesRango }} días de
+            {{ etiquetaMes(rango.mes) }} {{ rango.anio }}. Fuente de datos: {{ etiquetaFuente(rango.fuente_datos) }}.
+          </div>
+        </template>
+      </v-card-text>
+    </v-card>
+
     <!-- KPIs -->
     <v-row class="mb-2" dense>
       <v-col cols="12" sm="6" md="3">
@@ -779,10 +883,12 @@ import {
   getMetaMensualDiario,
   getMetaMensualSemanal,
   getMetaMensualProyectado,
+  getMetaMensualRango,
   type MetaMensualResumenResponse,
   type MetaMensualDiarioResponse,
   type MetaMensualSemanalResponse,
   type MetaMensualProyectadoResponse,
+  type MetaMensualRangoResponse,
   type MetaMensualSemana,
   type MetaMensualDiarioDia,
   type FuenteMetaMensual,
@@ -863,6 +969,44 @@ const configForm = reactive({
   meta_motos: 0,
   pct_crecimiento_referencia: 0,
 })
+
+/* ===== Rango específico (Desde/Hasta) ===== */
+function fechaISO(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function primerDiaMesActualISO() {
+  const d = new Date()
+  return fechaISO(new Date(d.getFullYear(), d.getMonth(), 1))
+}
+
+const rangoDesde = ref(primerDiaMesActualISO())
+const rangoHasta = ref(fechaISO(new Date()))
+const rango = ref<MetaMensualRangoResponse | null>(null)
+const rangoError = ref('')
+const loadingRango = ref(false)
+
+const diasDelMesRango = computed(() => {
+  if (!rango.value) return 0
+  return new Date(rango.value.anio, rango.value.mes, 0).getDate()
+})
+
+async function aplicarRango() {
+  if (!rangoDesde.value || !rangoHasta.value) {
+    rangoError.value = 'Selecciona ambas fechas.'
+    rango.value = null
+    return
+  }
+  loadingRango.value = true
+  rangoError.value = ''
+  try {
+    rango.value = await getMetaMensualRango(rangoDesde.value, rangoHasta.value)
+  } catch (e) {
+    rango.value = null
+    rangoError.value = e instanceof Error ? e.message : 'No se pudo calcular el rango.'
+  } finally {
+    loadingRango.value = false
+  }
+}
 
 /* ===== Formato ===== */
 function formatNum(n: number | undefined | null) {

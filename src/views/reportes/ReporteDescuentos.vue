@@ -161,6 +161,7 @@
             >
               <template #item.canal="{ item }">{{ nombreCanal(item.canal) }}</template>
               <template #item.total_descuentos="{ item }">{{ formatCOP(item.total_descuentos) }}</template>
+              <template #item.porcentaje="{ item }">{{ formatPercent(item.porcentaje) }}</template>
 
               <template #body.append v-if="totalesCanal">
                 <tr class="fila-totales">
@@ -168,6 +169,7 @@
                   <td class="font-weight-bold">{{ totalesCanal.cantidad }}</td>
                   <td class="font-weight-bold">{{ formatCOP(totalesCanal.total_descuentos) }}</td>
                   <td class="font-weight-bold">—</td>
+                  <td class="font-weight-bold">100%</td>
                 </tr>
               </template>
             </v-data-table>
@@ -349,6 +351,11 @@ function formatCOP(value: number | string) {
   }).format(n)
 }
 
+function formatPercent(value: number | undefined | null) {
+  if (value === undefined || value === null || Number.isNaN(value)) return '—'
+  return `${value.toFixed(1)}%`
+}
+
 function soloFecha(fecha: string | null | undefined) {
   if (!fecha) return '—'
   return String(fecha).slice(0, 10)
@@ -382,6 +389,7 @@ const headersPorCanal = [
   { title: 'Cantidad', key: 'cantidad' },
   { title: 'Total descuento', key: 'total_descuentos' },
   { title: 'Tipos usados', key: 'tipos_usados' },
+  { title: '% del Total', key: 'porcentaje' },
 ]
 
 const headersPorAutorizador = [
