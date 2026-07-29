@@ -63,6 +63,12 @@ export interface Dateo extends DateoImagenMeta {
   aprobado_excepcion_por?: number | null
   aprobado_excepcion_at?: string | null
   aprobado_excepcion_por_nombre?: string | null
+
+  /** Comisión ya calculada/unida por el backend (endpoint dateos-comisiones) */
+  monto_comision?: number
+  estado_comision?: 'PENDIENTE' | 'APROBADA' | 'PAGADA' | 'ANULADA' | null
+  desglose_comision?: { label: string; monto: number }[]
+  comisiones?: { id: number; estado: string; generado_at: string | null; monto: number }[]
 }
 
 export interface ListResponse<T> { data: T[]; total: number; page: number; perPage: number; lastPage: number }
@@ -145,6 +151,58 @@ export async function listDateos(params: ListParams) {
     meta?.per_page ??
     params.perPage ??
     10
+  )
+
+  const lastPage = Number(
+    ('lastPage' in r && (r as { lastPage?: number }).lastPage) ??
+    meta?.last_page ??
+    (total && perPage ? Math.ceil(total / perPage) : 1)
+  ) || 1
+
+  return { data, total, page, perPage, lastPage } as ListResponse<Dateo>
+}
+
+/**
+ * Dateos del asesor con su comisión YA calculada/unida por el backend
+ * (une captacion_dateos + comisiones vía JOIN paginado, sin cruce en el navegador).
+ */
+export async function listDateosConComision(
+  asesorId: number,
+  params: { page?: number; perPage?: number; desde?: string; hasta?: string }
+) {
+  const r = await get<BackendListEnvelope<Dateo>>(
+    `/api/agentes-captacion/${asesorId}/dateos-comisiones`,
+    { params }
+  )
+
+  const data =
+    ('data' in r && Array.isArray(r.data) && r.data) ||
+    ('items' in r && Array.isArray(r.items) && r.items) ||
+    ('rows' in r && Array.isArray((r as { rows?: Dateo[] }).rows) && (r as { rows: Dateo[] }).rows) ||
+    []
+
+  const meta = ('meta' in r && r.meta) || undefined
+  const total =
+    Number(
+      ('total' in r && r.total) ??
+      (meta?.total) ??
+      (('totalItems' in r && (r as { totalItems?: number }).totalItems)) ??
+      (('count' in r && (r as { count?: number }).count)) ??
+      data.length
+    ) || 0
+
+  const page = Number(
+    ('page' in r && r.page) ??
+    meta?.current_page ??
+    params.page ??
+    1
+  )
+
+  const perPage = Number(
+    ('perPage' in r && r.perPage) ??
+    meta?.per_page ??
+    params.perPage ??
+    100
   )
 
   const lastPage = Number(

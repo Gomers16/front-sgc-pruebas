@@ -633,29 +633,29 @@
                 <span v-else class="text-medium-emphasis d-flex justify-center">—</span>
               </template>
 
-              <!-- 🆕 ACTUALIZADO: Comisión con tooltip de desglose -->
+              <!-- Comisión ya calculada por el backend, con tooltip de desglose -->
               <template #item.comisionAsesor="{ item }">
                 <v-tooltip location="top" max-width="300">
                   <template #activator="{ props }">
                     <span
                       v-bind="props"
                       class="comision-valor"
-                      :class="getComisionPorRolParaDateo(item.id) > 0 ? 'text-success' : 'text-medium-emphasis'"
+                      :class="(item.monto_comision ?? 0) > 0 ? 'text-success' : 'text-medium-emphasis'"
                     >
-                      {{ money(getComisionPorRolParaDateo(item.id)) }}
+                      {{ money(item.monto_comision ?? 0) }}
                     </span>
                   </template>
                   <template #default>
                     <div class="desglose-tooltip">
                       <div class="font-weight-bold mb-1">Desglose comisión</div>
                       <div
-                        v-for="(linea, idx) in getDesgloseComision(item.id)"
+                        v-for="(linea, idx) in (item.desglose_comision || [])"
                         :key="idx"
                       >
-                        {{ linea }}
+                        {{ linea.label }}: {{ money(linea.monto) }}
                       </div>
                       <div
-                        v-if="!getDesgloseComision(item.id).length"
+                        v-if="!(item.desglose_comision || []).length"
                         class="text-medium-emphasis"
                       >
                         Sin comisión registrada
@@ -668,12 +668,12 @@
               <!-- 💰 Estado Comisión -->
               <template #item.estadoComision="{ item }">
                 <v-chip
-                  :color="getEstadoComisionColor(getEstadoComisionParaDateo(item.id))"
+                  :color="getEstadoComisionColor(item.estado_comision ?? null)"
                   size="small"
                   variant="flat"
-                  :prepend-icon="getEstadoComisionIcon(getEstadoComisionParaDateo(item.id))"
+                  :prepend-icon="getEstadoComisionIcon(item.estado_comision ?? null)"
                 >
-                  {{ getEstadoComisionLabel(getEstadoComisionParaDateo(item.id)) }}
+                  {{ getEstadoComisionLabel(item.estado_comision ?? null) }}
                 </v-chip>
               </template>
 
@@ -906,11 +906,9 @@ import { useDisplay } from 'vuetify'
 import { get } from '@/services/http'
 import { getMiFicha, getAsesorById } from '@/services/asesoresService'
 import { useAuthStore } from '@/stores/AuthStore'
-import { listDateos, getExclusividadConfig, type Dateo, formatDateTime } from '@/services/dateosService'
+import { listDateosConComision, getExclusividadConfig, type Dateo, formatDateTime } from '@/services/dateosService'
 import { calcularReservaCountdown } from '@/composables/useReservaCountdown'
 import {
-  listComisiones,
-  type ComisionListItem,
   listMetasMensuales,
   type MetaMensualRow,
 } from '@/services/comisionesService'
@@ -941,15 +939,6 @@ type Convenio = {
   nombre: string
   vigencia_desde?: string | null
   vigencia_hasta?: string | null
-}
-
-type ComisionConExtras = ComisionListItem & {
-  convenio?: { id: number; nombre: string } | null
-  asesor?: { id: number; nombre?: string } | null
-  valor_unitario?: number
-  valor_cliente?: number
-  estado?: string
-  generado_at?: string
 }
 
 type DateoConExtras = Dateo & {
@@ -1019,7 +1008,6 @@ const asesor = ref<Asesor | null>(null)
 const prospectos = ref<ProspectoConExtras[]>([])
 const convenios = ref<Convenio[]>([])
 const dateos = ref<DateoConExtras[]>([])
-const comisiones = ref<ComisionConExtras[]>([])
 const pagos = ref<{ id: number; valor: number; fecha?: string }[]>([])
 
 const loading = ref(false)
@@ -1293,109 +1281,6 @@ function openViewer(url: string) {
   viewer.value = { visible: true, url }
 }
 
-/* ===== Guardar el convenio del asesor (para asesores convenio) ===== */
-const convenioDelAsesor = ref<{ id: number; nombre: string } | null>(null)
-
-/* ===== Mapear comisiones a dateo ===== */
-const comisionesPorDateo = computed(() => {
-  const map = new Map<number, ComisionConExtras[]>()
-  for (const c of comisiones.value) {
-    const dateoId =
-      (c as Record<string, unknown>).dateo_id ??
-      (c as Record<string, unknown>).captacionDateoId ??
-      (c as Record<string, unknown>).captacion_dateo_id ?? null
-    if (!dateoId) continue
-    const key = Number(dateoId)
-    if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push(c)
-  }
-  return map
-})
-
-function getComisionPorRolParaDateo(dateoId: number): number {
-  const arr = comisionesPorDateo.value.get(Number(dateoId)) || []
-
-  console.log('🔍 getComisionPorRolParaDateo - Dateo ID:', dateoId)
-  console.log('   - Comisiones encontradas:', arr.length)
-  console.log('   - esAsesorConvenio:', esAsesorConvenio.value)
-  console.log('   - asesorId actual:', asesorId.value)
-  console.log('   - convenioDelAsesor:', convenioDelAsesor.value)
-
-  if (esAsesorConvenio.value) {
-    return arr.reduce((sum, c, index) => {
-      const montoAsesor = Number(c.valor_unitario || 0)
-      const montoConvenio = Number(c.valor_cliente || 0)
-
-      console.log(`   📊 Comisión #${index + 1}:`)
-      console.log('      - ID comisión:', c.id)
-      console.log('      - montoAsesor (dateo):', montoAsesor)
-      console.log('      - montoConvenio (placa):', montoConvenio)
-      console.log('      - c.asesor:', c.asesor)
-      console.log('      - c.convenio:', c.convenio)
-
-      const esConvenioDelAsesor =
-        c.convenio &&
-        convenioDelAsesor.value &&
-        c.convenio.id === convenioDelAsesor.value.id
-
-      const esAsesorQueDateo = c.asesor?.id === asesorId.value
-
-      console.log('      - esConvenioDelAsesor:', esConvenioDelAsesor)
-      console.log('      - esAsesorQueDateo:', esAsesorQueDateo)
-
-      let total = 0
-      if (esConvenioDelAsesor) {
-        total += montoConvenio
-        console.log('      ✅ Suma montoConvenio:', montoConvenio)
-      }
-      if (esAsesorQueDateo) {
-        total += montoAsesor
-        console.log('      ✅ Suma montoAsesor:', montoAsesor)
-      }
-      console.log('      💰 Total parcial:', total)
-      return sum + total
-    }, 0)
-  }
-
-  return arr.reduce((sum, c) => {
-    const montoAsesor = Number(c.valor_unitario || 0)
-    const montoConvenio = Number(c.valor_cliente || 0)
-    const hayConvenio = !!c.convenio
-    if (hayConvenio) return sum + montoAsesor
-    return sum + montoAsesor + montoConvenio
-  }, 0)
-}
-
-function getEstadoComisionParaDateo(dateoId: number): string | null {
-  const arr = comisionesPorDateo.value.get(Number(dateoId)) || []
-  if (!arr.length) return null
-
-  const comisionesRelevantes = arr.filter((c) => {
-    if (esAsesorConvenio.value) {
-      const esConvenioDelAsesor =
-        c.convenio &&
-        convenioDelAsesor.value &&
-        c.convenio.id === convenioDelAsesor.value.id
-      const esAsesorQueDateo = c.asesor?.id === asesorId.value
-      return esConvenioDelAsesor || esAsesorQueDateo
-    }
-    return c.asesor?.id === asesorId.value
-  })
-
-  if (!comisionesRelevantes.length) return null
-
-  const prioridad: Record<string, number> = { PAGADA: 4, APROBADA: 3, PENDIENTE: 2, ANULADA: 1 }
-  const estadoMasRelevante = comisionesRelevantes.reduce(
-    (mejor: ComisionConExtras | null, actual) => {
-      const prioActual = prioridad[actual.estado || ''] || 0
-      const prioMejor = mejor ? prioridad[mejor.estado || ''] || 0 : 0
-      return prioActual > prioMejor ? actual : mejor
-    },
-    null,
-  )
-  return estadoMasRelevante?.estado || null
-}
-
 function getEstadoComisionColor(estado: string | null): string {
   if (estado === 'PAGADA') return 'success'
   if (estado === 'APROBADA') return 'info'
@@ -1427,29 +1312,12 @@ function calcularComisionesPorEstado(dateosExitosos: DateoConExtras[]) {
   let comisionesPagadas = 0
 
   for (const dateo of dateosExitosos) {
-    const dateoId = Number(dateo.id)
-    const arr = comisionesPorDateo.value.get(dateoId) || []
-
-    const comisionesRelevantes = arr.filter((c) => {
-      if (esAsesorConvenio.value) {
-        const esConvenioDelAsesor =
-          c.convenio &&
-          convenioDelAsesor.value &&
-          c.convenio.id === convenioDelAsesor.value.id
-        const esAsesorQueDateo = c.asesor?.id === asesorId.value
-        return esConvenioDelAsesor || esAsesorQueDateo
-      }
-      return c.asesor?.id === asesorId.value
-    })
-
-    for (const c of comisionesRelevantes) {
-      const monto = getComisionPorRolParaDateo(dateoId)
-      totalGenerado += monto
-      if (c.estado === 'PAGADA') comisionesPagadas += monto
-      else if (c.estado === 'APROBADA') comisionesAprobadas += monto
-      else if (c.estado === 'PENDIENTE') comisionesPendientes += monto
-      break
-    }
+    const monto = Number(dateo.monto_comision || 0)
+    if (!monto) continue
+    totalGenerado += monto
+    if (dateo.estado_comision === 'PAGADA') comisionesPagadas += monto
+    else if (dateo.estado_comision === 'APROBADA') comisionesAprobadas += monto
+    else if (dateo.estado_comision === 'PENDIENTE') comisionesPendientes += monto
   }
 
   return { totalGenerado, comisionesPendientes, comisionesAprobadas, comisionesPagadas }
@@ -1512,37 +1380,6 @@ function getTipoClienteParaDateo(item: DateoConExtras): {
   }
 }
 
-/* ===== 🆕 NUEVA: Desglose de comisión para tooltip ===== */
-function getDesgloseComision(dateoId: number): string[] {
-  const arr = comisionesPorDateo.value.get(Number(dateoId)) || []
-  if (!arr.length) return []
-
-  const lineas: string[] = []
-
-  for (const c of arr) {
-    const monto     = Number(c.valor_unitario || 0)
-    const incentivo = Number(c.valor_cliente  || 0)
-    const nombreConvenio = c.convenio?.nombre || null
-    const nombreAsesor   = c.asesor?.nombre   || 'Asesor'
-
-    if (nombreConvenio && incentivo > 0 && monto > 0) {
-      // Comercial datea cliente nuevo CON convenio → reparten
-      lineas.push(`📋 ${nombreAsesor} (dateo): ${money(monto)}`)
-      lineas.push(`💼 ${nombreConvenio} (incentivo): ${money(incentivo)}`)
-    } else if (nombreConvenio && incentivo > 0 && monto === 0) {
-      // Asesor convenio → solo incentivo de placa
-      lineas.push(`💼 ${nombreConvenio} (incentivo placa): ${money(incentivo)}`)
-    } else if (!nombreConvenio) {
-      // Sin convenio: nuevo directo, recurrente o recuperación → todo para el asesor
-      lineas.push(`🌟 ${nombreAsesor} (comisión): ${money(monto)}`)
-    } else {
-      // Recurrente/recuperación con convenio → solo dateo, incentivo no aplica
-      lineas.push(`📋 ${nombreAsesor} (dateo): ${money(monto)}`)
-    }
-  }
-
-  return lineas
-}
 /* ===== Prospectos: ver todos / solo en rango ===== */
 const verTodosProspectos = ref(false)
 
@@ -1590,7 +1427,7 @@ const totalExitosos = computed(() => dateosFiltrados.value.filter((d) => isExito
 const totalComisionAsesor = computed(() =>
   dateosFiltrados.value
     .filter((d) => isExitoso(d))
-    .reduce((acc, d) => acc + getComisionPorRolParaDateo(d.id), 0),
+    .reduce((acc, d) => acc + Number(d.monto_comision || 0), 0),
 )
 
 /* ===== KPIs ===== */
@@ -1657,40 +1494,24 @@ const historialPagos = computed(() => {
 
   for (const dateo of dateos.value.filter((d) => isExitoso(d))) {
     const dateoId = Number(dateo.id)
-    const arr = comisionesPorDateo.value.get(dateoId) || []
+    const comisionPagada = (dateo.comisiones || []).find((c) => c.estado === 'PAGADA')
+    if (!comisionPagada) continue
 
-    const comisionesRelevantes = arr.filter((c) => {
-      if (c.estado !== 'PAGADA') return false
-      if (esAsesorConvenio.value) {
-        const esConvenioDelAsesor =
-          c.convenio &&
-          convenioDelAsesor.value &&
-          c.convenio.id === convenioDelAsesor.value.id
-        const esAsesorQueDateo = c.asesor?.id === asesorId.value
-        return esConvenioDelAsesor || esAsesorQueDateo
-      }
-      return c.asesor?.id === asesorId.value
+    const fechaPago = comisionPagada.generado_at || dateo.created_at || ''
+    const fechaPagoDate = fechaPago ? new Date(fechaPago) : null
+    if (fechaPagoDate && (fechaPagoDate < desde || fechaPagoDate > hasta)) continue
+
+    const tipoInfo = getTipoClienteParaDateo(dateo)
+    pagos.push({
+      id: comisionPagada.id,
+      fecha: fechaPago,
+      placa: dateo.placa || '—',
+      convenio: dateo.convenio?.nombre || 'Sin convenio',
+      tipoClienteLabel: tipoInfo.label,
+      tipoClienteColor: tipoInfo.color,
+      monto: comisionPagada.monto,
+      dateoId,
     })
-
-    for (const c of comisionesRelevantes) {
-      const fechaPago = c.generado_at || dateo.created_at || ''
-      const fechaPagoDate = fechaPago ? new Date(fechaPago) : null
-
-      if (fechaPagoDate && (fechaPagoDate < desde || fechaPagoDate > hasta)) continue
-
-      const tipoInfo = getTipoClienteParaDateo(dateo)
-      pagos.push({
-        id: c.id,
-        fecha: fechaPago,
-        placa: dateo.placa || '—',
-        convenio: dateo.convenio?.nombre || 'Sin convenio',
-        tipoClienteLabel: tipoInfo.label,
-        tipoClienteColor: tipoInfo.color,
-        monto: getComisionPorRolParaDateo(dateoId),
-        dateoId,
-      })
-      break
-    }
   }
 
   return pagos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
@@ -1910,8 +1731,15 @@ async function fetchConvenios(id: number) {
   return []
 }
 
-async function fetchDateosPorFiltro(filtro: { agenteId?: number; convenioId?: number }) {
-  const PAGE_SIZE = 1000
+/**
+ * Dateos del asesor con su comisión ya calculada/unida por el backend
+ * (GET /agentes-captacion/:id/dateos-comisiones). El backend resuelve
+ * internamente la unión asesor + convenio del asesor (rol ASESOR_CONVENIO),
+ * así que aquí solo hace falta paginar hasta agotar resultados — igual que
+ * antes, pero sin el tope artificial que perdía comisiones viejas.
+ */
+async function fetchDateosConComision(id: number) {
+  const PAGE_SIZE = 200
   let page = 1
   let all: DateoConExtras[] = []
   const rango = verTodosDateos.value
@@ -1919,15 +1747,7 @@ async function fetchDateosPorFiltro(filtro: { agenteId?: number; convenioId?: nu
     : { desde: filtros.value.desde, hasta: filtros.value.hasta }
 
   while (true) {
-    const r = await listDateos({
-      page,
-      perPage: PAGE_SIZE,
-      canal: 'ASESOR',
-      sortBy: 'id',
-      order: 'desc',
-      ...filtro,
-      ...rango,
-    })
+    const r = await listDateosConComision(id, { page, perPage: PAGE_SIZE, ...rango })
     const chunk = (r.data as DateoConExtras[]) || []
     all = all.concat(chunk)
     if (page >= (r.lastPage || 1) || chunk.length === 0) break
@@ -1935,71 +1755,6 @@ async function fetchDateosPorFiltro(filtro: { agenteId?: number; convenioId?: nu
   }
 
   return all
-}
-
-async function fetchDateosUnionAsesorYConvenio(opts: { asesor: Asesor | null; convenios: Convenio[] }) {
-  const a = opts.asesor
-  if (!a) return [] as DateoConExtras[]
-
-  const fetchByAgente = () => fetchDateosPorFiltro({ agenteId: a.id })
-  const fetchByConvenio = (convenioId: number) => fetchDateosPorFiltro({ convenioId })
-
-  const esConvenioLocal = normalizeTipoAgente(a.tipo).includes('CONVENIO')
-  if (!esConvenioLocal) return await fetchByAgente()
-
-  const calls: Promise<DateoConExtras[]>[] = [fetchByAgente()]
-
-  try {
-    const resConvenio = await get<{ id?: number; nombre?: string }>(
-      `${API}/convenios/buscar-por-nombre?nombre=${encodeURIComponent(a.nombre)}`,
-    )
-    if (resConvenio && resConvenio.id) calls.push(fetchByConvenio(Number(resConvenio.id)))
-  } catch (e: unknown) {
-    const error = e as { response?: { status?: number } }
-    if (error?.response?.status !== 404) console.error('❌ Error buscando convenio por nombre:', e)
-  }
-
-  const results = await Promise.all(calls)
-  const map = new Map<number, DateoConExtras>()
-  for (const arr of results) {
-    if (!Array.isArray(arr)) continue
-    for (const it of arr) map.set(it.id, it)
-  }
-  return Array.from(map.values()).sort((a, b) => Number(b.id) - Number(a.id))
-}
-
-async function fetchComisiones(id: number) {
-  const esConvenioLocal = asesor.value && normalizeTipoAgente(asesor.value.tipo).includes('CONVENIO')
-
-  if (!esConvenioLocal) {
-    const res = await listComisiones({ asesorId: id, perPage: 500 })
-    return res.data as ComisionConExtras[]
-  }
-
-  const porAsesor = await listComisiones({ asesorId: id, perPage: 500 })
-    .then((r) => r.data as ComisionConExtras[])
-
-  let porConvenio: ComisionConExtras[] = []
-  try {
-    const resConvenio = await get<{ id?: number; nombre?: string }>(
-      `${API}/convenios/buscar-por-nombre?nombre=${encodeURIComponent(asesor.value!.nombre)}`,
-    )
-    if (resConvenio && resConvenio.id) {
-      convenioDelAsesor.value = { id: resConvenio.id, nombre: resConvenio.nombre || '' }
-      const resComisiones = await listComisiones({ convenioId: Number(resConvenio.id), perPage: 500 })
-      porConvenio = resComisiones.data as ComisionConExtras[]
-    }
-  } catch (e: unknown) {
-    const error = e as { response?: { status?: number } }
-    if (error?.response?.status !== 404) console.error('❌ Error buscando comisiones por convenio:', e)
-  }
-
-  const map = new Map<number, ComisionConExtras>()
-  for (const c of [...porAsesor, ...porConvenio]) {
-    if (!c || c.id == null) continue
-    map.set(Number(c.id), c)
-  }
-  return Array.from(map.values())
 }
 
 async function fetchPagos() {
@@ -2019,17 +1774,15 @@ async function loadAll() {
     }
     convenios.value = Array.isArray(c) ? c : []
 
-    const d = await fetchDateosUnionAsesorYConvenio({ asesor: asesor.value, convenios: convenios.value })
+    const d = await fetchDateosConComision(asesorId.value)
     dateos.value = Array.isArray(d) ? d : []
 
-    const [p, pg, cm] = await Promise.all([
+    const [p, pg] = await Promise.all([
       fetchProspectos(asesorId.value),
       fetchPagos(),
-      fetchComisiones(asesorId.value),
     ])
     prospectos.value = Array.isArray(p) ? p : []
     pagos.value = Array.isArray(pg) ? pg : []
-    comisiones.value = Array.isArray(cm) ? cm : []
 
     if (asesor.value && esAsesorComercial.value) {
       await loadMetasAsesor()
@@ -2069,35 +1822,9 @@ function reload() {
   loadAll()
 }
 
-watch(
-  () => convenios.value.map((c) => c.id).join(','),
-  async () => {
-    if (asesor.value && esAsesorConvenio.value) {
-      const d = await fetchDateosUnionAsesorYConvenio({ asesor: asesor.value, convenios: convenios.value })
-      dateos.value = Array.isArray(d) ? d : []
-
-      const desdeD = new Date(filtros.value.desde + 'T00:00:00')
-      const hastaD = new Date(filtros.value.hasta + 'T23:59:59')
-      const dEnRango = dateos.value.filter((x) => {
-        const tRaw = normalizeCreatedAt(x)
-        const t = tRaw ? new Date(tRaw) : null
-        return t ? t >= desdeD && t <= hastaD : true
-      })
-      const exitosos = dEnRango.filter((x) => isExitoso(x))
-      const comisionesPorEstado = calcularComisionesPorEstado(exitosos)
-
-      kpi.value.montoGenerado = comisionesPorEstado.totalGenerado
-      kpi.value.comisionesPendientes = comisionesPorEstado.comisionesPendientes
-      kpi.value.comisionesAprobadas = comisionesPorEstado.comisionesAprobadas
-      kpi.value.comisionesPagadas = comisionesPorEstado.comisionesPagadas
-      kpi.value.pagosRegistrados = comisionesPorEstado.comisionesPagadas
-    }
-  },
-)
-
 watch(verTodosDateos, async () => {
   if (asesor.value) {
-    const d = await fetchDateosUnionAsesorYConvenio({ asesor: asesor.value, convenios: convenios.value })
+    const d = await fetchDateosConComision(asesorId.value)
     dateos.value = Array.isArray(d) ? d : []
   }
 })
@@ -2174,8 +1901,8 @@ function exportCsv(soloExitosos: boolean) {
     descuento: d.descuento?.nombre || (d.es_avance ? 'AVANCE' : ''),
     convenio: d.convenio?.nombre || 'Sin convenio',
     estado: isExitoso(d) ? 'EXITOSO' : textoResultado(d.resultado),
-    monto_comision: getComisionPorRolParaDateo(d.id),
-    estado_comision: getEstadoComisionLabel(getEstadoComisionParaDateo(d.id)),
+    monto_comision: d.monto_comision ?? 0,
+    estado_comision: getEstadoComisionLabel(d.estado_comision ?? null),
     fecha_creacion: formatFechaCSV(d.created_at),
   }))
 
