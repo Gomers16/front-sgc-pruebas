@@ -1259,6 +1259,78 @@ export async function createComision(payload: {
   })
   return mapComisionToDetail(raw)
 }
+/* ============================ Continuidad ============================ */
+
+export type ContinuidadEstado = 'CONTINUA' | 'ROTA' | 'SIN_EVIDENCIA'
+export type ContinuidadOverrideEstado = 'AUTOMATICO' | 'FORZAR_SI' | 'FORZAR_NO'
+
+export interface ContinuidadVisita {
+  turnoId: number
+  fecha: string
+  estado: string
+  canal: string | null
+  esRecurrente: boolean
+  esRecuperacion: boolean
+  estadoContinuidad: ContinuidadEstado | null
+  dateoId: number | null
+  convenioId: number | null
+  asesorConvenioId: number | null
+  asesorConvenioNombre: string | null
+  agenteNombre: string | null
+  convenioNombre: string | null
+}
+
+export interface ContinuidadOverrideItem {
+  id: number
+  placa: string
+  asesorConvenioId: number | null
+  convenioId: number | null
+  estado: ContinuidadOverrideEstado
+  motivo: string | null
+  creadoPorId: number
+  createdAt: string
+  updatedAt: string
+  asesorConvenio?: { id: number; nombre: string } | null
+  convenio?: { id: number; nombre: string } | null
+  creadoPor?: { id: number; nombres: string; apellidos: string } | null
+}
+
+export interface ContinuidadBusqueda {
+  placa?: string
+  cliente?: { id: number; nombre: string | null }
+  placas?: string[]
+  visitas?: ContinuidadVisita[]
+  overrides?: ContinuidadOverrideItem[]
+}
+
+/**
+ * GET /api/continuidad/buscar?placa=XXX  ó  ?cedula=XXX
+ */
+export async function buscarContinuidad(params: {
+  placa?: string
+  cedula?: string
+}): Promise<ContinuidadBusqueda> {
+  return apiFetch<ContinuidadBusqueda>('/continuidad/buscar', {
+    query: params as Record<string, unknown>,
+  })
+}
+
+/**
+ * POST /api/continuidad/overrides
+ */
+export async function guardarContinuidadOverride(payload: {
+  placa: string
+  asesorConvenioId?: number | null
+  convenioId?: number | null
+  estado: ContinuidadOverrideEstado
+  motivo?: string | null
+}): Promise<ContinuidadOverrideItem> {
+  return apiFetch<ContinuidadOverrideItem>('/continuidad/overrides', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
 export function formatCOP(value: number | string) {
   const n = typeof value === 'string' ? Number(value) : value
   if (Number.isNaN(n)) return '—'

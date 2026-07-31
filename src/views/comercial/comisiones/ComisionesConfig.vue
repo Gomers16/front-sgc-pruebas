@@ -40,6 +40,10 @@
                 <span class="d-none d-sm-inline">🔄 Recurrencia</span>
                 <span class="d-sm-none">🔄</span>
               </v-btn>
+              <v-btn value="CONTINUIDAD" size="small" style="flex: 1">
+                <span class="d-none d-sm-inline">🔗 Continuidad</span>
+                <span class="d-sm-none">🔗</span>
+              </v-btn>
             </v-btn-toggle>
           </v-col>
         </v-row>
@@ -842,6 +846,200 @@ hint="Comercial datea CON convenio — aplica siempre sin importar tipo de clien
           </v-data-table>
         </div>
       </v-card-text>
+
+      <!-- ===================== SECCIÓN CONTINUIDAD ===================== -->
+      <v-card-text v-else-if="activeSection === 'CONTINUIDAD'" class="pt-4">
+        <v-alert type="info" variant="tonal" density="compact" class="mb-4 text-caption">
+          Úsala cuando haya una discusión puntual con un asesor convenio sobre si se le
+          respetó o no la continuidad. Busca por placa o cédula, revisa el historial que ve
+          el sistema y, si hace falta, fuerza el resultado manualmente.
+        </v-alert>
+
+        <v-row dense class="mb-2">
+          <v-col cols="12" sm="4" md="3">
+            <v-btn-toggle v-model="continuidadTipoBusqueda" mandatory rounded="xl" divided style="width: 100%">
+              <v-btn value="placa" size="small" style="flex: 1">Placa</v-btn>
+              <v-btn value="cedula" size="small" style="flex: 1">Cédula</v-btn>
+            </v-btn-toggle>
+          </v-col>
+          <v-col cols="12" sm="6" md="4">
+            <v-text-field
+              v-model="continuidadQuery"
+              :label="continuidadTipoBusqueda === 'placa' ? 'Placa' : 'Cédula del cliente'"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              clearable
+              @keyup.enter="buscarContinuidadUI"
+            />
+          </v-col>
+          <v-col cols="12" sm="2" md="2">
+            <v-btn
+              color="primary"
+              block
+              :loading="continuidadLoading"
+              :disabled="!continuidadQuery"
+              @click="buscarContinuidadUI"
+            >
+              Buscar
+            </v-btn>
+          </v-col>
+        </v-row>
+
+        <v-alert v-if="continuidadError" type="error" variant="tonal" density="compact" class="mb-4">
+          {{ continuidadError }}
+        </v-alert>
+
+        <!-- Cédula con varias placas: hay que elegir una -->
+        <div v-if="continuidadPlacasParaElegir.length > 0" class="mb-4">
+          <div class="text-subtitle-2 mb-2">
+            Esta cédula tiene {{ continuidadPlacasParaElegir.length }} placas asociadas — elige una:
+          </div>
+          <v-chip
+            v-for="p in continuidadPlacasParaElegir"
+            :key="p"
+            class="mr-2 mb-2"
+            color="primary"
+            variant="outlined"
+            @click="buscarPorPlacaDirecta(p)"
+          >
+            {{ p }}
+          </v-chip>
+        </div>
+
+        <!-- Resultado: historial + override -->
+        <div v-if="continuidadResultado?.placa">
+          <div class="text-subtitle-1 font-weight-bold mb-2">
+            Historial de {{ continuidadResultado.placa }}
+          </div>
+
+          <div class="mb-4" style="overflow-x: auto">
+            <v-table density="comfortable">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Canal</th>
+                  <th>Asesor / Convenio</th>
+                  <th>Continuidad del turno</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!continuidadResultado.visitas?.length">
+                  <td colspan="4" class="text-center text-medium-emphasis py-4">
+                    Sin turnos registrados para esta placa.
+                  </td>
+                </tr>
+                <tr v-for="v in continuidadResultado.visitas" :key="v.turnoId">
+                  <td>{{ v.fecha }}</td>
+                  <td>{{ v.canal || '— (fachada / walk-in)' }}</td>
+                  <td>{{ v.asesorConvenioNombre || v.agenteNombre || v.convenioNombre || '—' }}</td>
+                  <td>
+                    <v-chip
+                      v-if="v.estadoContinuidad"
+                      size="small"
+                      :color="continuidadChipColor(v.estadoContinuidad)"
+                      variant="flat"
+                    >
+                      {{ continuidadChipLabel(v.estadoContinuidad) }}
+                    </v-chip>
+                    <span v-else class="text-medium-emphasis">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </div>
+
+          <v-divider class="mb-4" />
+
+          <div class="text-subtitle-1 font-weight-bold mb-2">Overrides activos en esta placa</div>
+          <div class="mb-4" style="overflow-x: auto">
+            <v-table density="comfortable">
+              <thead>
+                <tr>
+                  <th>Asesor / Convenio</th>
+                  <th>Estado</th>
+                  <th>Motivo</th>
+                  <th>Actualizado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!continuidadResultado.overrides?.length">
+                  <td colspan="4" class="text-center text-medium-emphasis py-4">
+                    Sin overrides — la continuidad se calcula automáticamente.
+                  </td>
+                </tr>
+                <tr v-for="o in continuidadResultado.overrides" :key="o.id">
+                  <td>{{ o.asesorConvenio?.nombre || o.convenio?.nombre || '—' }}</td>
+                  <td>
+                    <v-chip size="small" :color="overrideChipColor(o.estado)" variant="flat">
+                      {{ o.estado }}
+                    </v-chip>
+                  </td>
+                  <td>{{ o.motivo || '—' }}</td>
+                  <td>{{ formatFechaCorta(o.updatedAt) }}</td>
+                </tr>
+              </tbody>
+            </v-table>
+          </div>
+
+          <v-divider class="mb-4" />
+
+          <div class="text-subtitle-1 font-weight-bold mb-3">Fijar override manual</div>
+          <v-row dense>
+            <v-col cols="12" sm="6" md="4">
+              <v-select
+                v-model="overrideForm.asesorConvenioId"
+                :items="continuidadAsesoresDisponibles"
+                item-title="nombre"
+                item-value="id"
+                label="Asesor convenio"
+                variant="outlined"
+                density="comfortable"
+                clearable
+                hint="A cuál asesor convenio le aplica el override"
+                persistent-hint
+              />
+            </v-col>
+            <v-col cols="12" sm="6" md="3">
+              <v-select
+                v-model="overrideForm.estado"
+                :items="[
+                  { title: 'Automático (decide el sistema)', value: 'AUTOMATICO' },
+                  { title: 'Forzar continuidad SÍ', value: 'FORZAR_SI' },
+                  { title: 'Forzar continuidad NO', value: 'FORZAR_NO' },
+                ]"
+                item-title="title"
+                item-value="value"
+                label="Estado"
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+            <v-col cols="12" md="5">
+              <v-text-field
+                v-model="overrideForm.motivo"
+                label="Motivo"
+                :hint="overrideForm.estado !== 'AUTOMATICO' ? 'Obligatorio si no es Automático' : ''"
+                persistent-hint
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+          </v-row>
+          <v-row dense class="mt-1">
+            <v-col cols="12" class="d-flex justify-end">
+              <v-btn
+                color="primary"
+                :loading="overrideSaving"
+                :disabled="!overrideForm.asesorConvenioId"
+                @click="guardarOverrideUI"
+              >
+                Guardar override
+              </v-btn>
+            </v-col>
+          </v-row>
+        </div>
+      </v-card-text>
     </v-card>
 
     <!-- Diálogo eliminar regla comisión -->
@@ -1008,16 +1206,20 @@ import {
   listConfigRecurrenciaAsesores,
   upsertConfigRecurrenciaAsesor,
   deleteConfigRecurrenciaAsesor,
+  buscarContinuidad,
+  guardarContinuidadOverride,
   type ComisionConfig,
   type ComisionConfigPayload,
   type TipoVehiculoComision,
   type AgenteLight,
   type ConfigRecurrenciaGlobal,
   type ConfigRecurrenciaAsesor,
+  type ContinuidadBusqueda,
+  type ContinuidadOverrideEstado,
 } from '@/services/comisionesService'
 
 type Scope = 'GLOBAL' | 'ASESOR'
-type Section = 'REGLAS' | 'METAS' | 'RECURRENCIA'
+type Section = 'REGLAS' | 'METAS' | 'RECURRENCIA' | 'CONTINUIDAD'
 
 /** Metas mensuales (por asesor, opción global o por tipo de vehículo) */
 type MetaMensualConfig = {
@@ -1071,6 +1273,39 @@ const recurrenciaGlobal = ref<ConfigRecurrenciaGlobal>({
 const recurrenciasAsesores = ref<ConfigRecurrenciaAsesor[]>([])
 const loadingRecurrencia = ref(false)
 const savingRecurrencia = ref(false)
+
+/* ===== Continuidad ===== */
+const continuidadTipoBusqueda = ref<'placa' | 'cedula'>('placa')
+const continuidadQuery = ref('')
+const continuidadLoading = ref(false)
+const continuidadError = ref('')
+const continuidadResultado = ref<ContinuidadBusqueda | null>(null)
+const continuidadPlacasParaElegir = ref<string[]>([])
+const overrideSaving = ref(false)
+const overrideForm = ref<{
+  asesorConvenioId: number | null
+  estado: ContinuidadOverrideEstado
+  motivo: string
+}>({
+  asesorConvenioId: null,
+  estado: 'AUTOMATICO',
+  motivo: '',
+})
+
+const continuidadAsesoresDisponibles = computed(() => {
+  const mapa = new Map<number, string>()
+  for (const v of continuidadResultado.value?.visitas ?? []) {
+    if (v.asesorConvenioId && v.asesorConvenioNombre) {
+      mapa.set(v.asesorConvenioId, v.asesorConvenioNombre)
+    }
+  }
+  for (const o of continuidadResultado.value?.overrides ?? []) {
+    if (o.asesorConvenioId && o.asesorConvenio?.nombre) {
+      mapa.set(o.asesorConvenioId, o.asesorConvenio.nombre)
+    }
+  }
+  return Array.from(mapa.entries()).map(([id, nombre]) => ({ id, nombre }))
+})
 
 /* ===== Formulario reglas ===== */
 const scope = ref<Scope>('GLOBAL')
@@ -1625,6 +1860,90 @@ async function doDeleteRecurrencia() {
   } finally {
     deleting.value = false
   }
+}
+
+/* ===== Continuidad ===== */
+function resetOverrideForm() {
+  overrideForm.value = { asesorConvenioId: null, estado: 'AUTOMATICO', motivo: '' }
+}
+
+async function ejecutarBusquedaContinuidad(params: { placa?: string; cedula?: string }) {
+  continuidadLoading.value = true
+  continuidadError.value = ''
+  continuidadPlacasParaElegir.value = []
+  continuidadResultado.value = null
+  try {
+    const data = await buscarContinuidad(params)
+    if (data.placas && data.placas.length > 0) {
+      continuidadPlacasParaElegir.value = data.placas
+    } else if (data.placa) {
+      continuidadResultado.value = data
+      resetOverrideForm()
+    } else {
+      continuidadError.value = 'No se encontraron turnos para esta búsqueda.'
+    }
+  } catch (e) {
+    continuidadError.value = e instanceof Error ? e.message : 'Error al buscar continuidad'
+  } finally {
+    continuidadLoading.value = false
+  }
+}
+
+function buscarContinuidadUI() {
+  const q = continuidadQuery.value.trim()
+  if (!q) return
+  if (continuidadTipoBusqueda.value === 'placa') {
+    ejecutarBusquedaContinuidad({ placa: q })
+  } else {
+    ejecutarBusquedaContinuidad({ cedula: q })
+  }
+}
+
+function buscarPorPlacaDirecta(placa: string) {
+  continuidadPlacasParaElegir.value = []
+  ejecutarBusquedaContinuidad({ placa })
+}
+
+async function guardarOverrideUI() {
+  if (!continuidadResultado.value?.placa || !overrideForm.value.asesorConvenioId) return
+  if (overrideForm.value.estado !== 'AUTOMATICO' && !overrideForm.value.motivo.trim()) {
+    continuidadError.value = 'El motivo es obligatorio cuando el estado no es Automático.'
+    return
+  }
+  overrideSaving.value = true
+  continuidadError.value = ''
+  try {
+    await guardarContinuidadOverride({
+      placa: continuidadResultado.value.placa,
+      asesorConvenioId: overrideForm.value.asesorConvenioId,
+      estado: overrideForm.value.estado,
+      motivo: overrideForm.value.motivo.trim() || null,
+    })
+    await ejecutarBusquedaContinuidad({ placa: continuidadResultado.value.placa })
+  } catch (e) {
+    continuidadError.value = e instanceof Error ? e.message : 'Error al guardar el override'
+  } finally {
+    overrideSaving.value = false
+  }
+}
+
+function continuidadChipColor(estado: string) {
+  if (estado === 'CONTINUA') return 'success'
+  if (estado === 'ROTA') return 'error'
+  return 'warning'
+}
+function continuidadChipLabel(estado: string) {
+  if (estado === 'CONTINUA') return 'Continua'
+  if (estado === 'ROTA') return 'Rota'
+  return 'Sin evidencia'
+}
+function overrideChipColor(estado: string) {
+  if (estado === 'FORZAR_SI') return 'success'
+  if (estado === 'FORZAR_NO') return 'error'
+  return 'grey'
+}
+function formatFechaCorta(value?: string | null) {
+  return formatDateTime(value)
 }
 
 /* Watch para cargar datos cuando cambias de pestaña */
