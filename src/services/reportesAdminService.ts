@@ -90,22 +90,10 @@ export interface ProduccionLider {
   turnos_prev: number
   turnos_peri: number
 }
-export interface ProduccionFuncionario {
-  funcionario_id: number
-  funcionario_nombre: string
-  vehiculos: number
-  total_bruto: number
-  total_neto: number
-  turnos_rtm: number
-  turnos_soat: number
-  turnos_prev: number
-  turnos_peri: number
-}
 export interface ProduccionLiderResponse {
   fecha_inicio: string
   fecha_fin: string
   por_sede: ProduccionLider[]
-  por_funcionario: ProduccionFuncionario[]
 }
 
 export interface ReporteAsesor {
@@ -190,16 +178,6 @@ export interface RetencionPorMes {
   total: number
 }
 
-export interface TopClienteRetencion {
-  placa: string
-  fecha: string
-  tipo_vehiculo: string | null
-  captacion_canal: string
-  total: number
-  cliente_nombre: string | null
-  cliente_documento: string | null
-}
-
 export interface RetencionResponse {
   fecha_inicio: string
   fecha_fin: string
@@ -212,12 +190,6 @@ export interface RetencionResponse {
   }
   por_canal: RetencionPorCanal[]
   por_mes: RetencionPorMes[]
-  top_clientes: {
-    nuevos: TopClienteRetencion[]
-    recurrentes: TopClienteRetencion[]
-    recuperaciones: TopClienteRetencion[]
-  }
-  top_clientes_limite: number
 }
 
 /**
@@ -793,12 +765,6 @@ export interface SuperInformeMetaMensualResponse {
   detalle_por_mes: SuperInformeMetaMensualDetalleMes[]
 }
 
-export interface SuperInformeDescuentoAsesor {
-  codigo: string
-  nombre: string
-  cantidad: number
-  total_descuentos: number
-}
 export interface SuperInformeMetaComercialAsesor {
   asesor_id: number
   asesor_nombre: string
@@ -815,8 +781,15 @@ export interface SuperInformeMetaComercialAsesor {
   meta_vehiculos: number | null
   logrado_vehiculos: number
   faltante_vehiculos: number | null
-  descuentos: SuperInformeDescuentoAsesor[]
-  descuentos_total: number
+}
+/** Fila plana para la tabla "Descuentos dados por asesor" — universo AMPLIADO (Comercial + Convenio), distinto de `asesores` arriba (solo Comercial). */
+export interface SuperInformeDescuentoAsesorFila {
+  asesor_id: number
+  asesor_nombre: string
+  codigo: string
+  nombre: string
+  cantidad: number
+  total_descuentos: number
 }
 export interface SuperInformeMetaComercialResponse {
   caso: 'un_mes_actual' | 'cruce_con_mes_actual' | 'solo_cerrados'
@@ -835,6 +808,7 @@ export interface SuperInformeMetaComercialResponse {
     pct_proyeccion: number | null
   }
   asesores: SuperInformeMetaComercialAsesor[]
+  descuentosPorAsesor: SuperInformeDescuentoAsesorFila[]
 }
 
 export async function getSuperInformeMetaMensual(

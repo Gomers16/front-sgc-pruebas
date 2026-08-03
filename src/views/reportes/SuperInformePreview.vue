@@ -157,15 +157,15 @@
           Logrado (vehículos) = vehículos facturados atribuidos al asesor (facturacion_tickets), no filas de comisiones.
         </div>
 
-        <template v-if="asesoresConDescuentos.length">
-          <div class="text-caption font-weight-bold mb-1 mt-4">Descuentos dados por asesor</div>
-          <div v-for="a in asesoresConDescuentos" :key="a.asesor_id" class="mb-2">
-            <div class="text-body-2 font-weight-bold">{{ a.asesor_nombre }}</div>
-            <div class="text-caption text-medium-emphasis">
-              {{ a.detalle }} (Total: {{ formatPeso(a.total) }})
-            </div>
-          </div>
-        </template>
+        <div class="text-caption font-weight-bold mb-1 mt-4">Descuentos dados por asesor (Comercial y Convenio)</div>
+        <v-data-table
+          v-if="datos.metaComercial.descuentosPorAsesor.length"
+          density="compact"
+          :headers="headersDescuentosPorAsesor"
+          :items="filasDescuentosPorAsesor"
+          hide-default-footer
+        />
+        <v-alert v-else type="info" variant="tonal" density="compact">Sin descuentos en este rango.</v-alert>
       </v-card-text>
     </v-card>
 
@@ -222,8 +222,7 @@
         <div>
           <div class="text-subtitle-1 font-weight-bold">5. Retención de Clientes</div>
           <div class="text-caption text-medium-emphasis">
-            Clientes Nuevos, Recurrentes y Recuperados, con el detalle de los más recientes de cada categoría
-            (top {{ datos.retencion.top_clientes_limite }}).
+            Clientes Nuevos, Recurrentes y Recuperados en el rango, por canal y por mes.
           </div>
         </div>
       </v-card-title>
@@ -255,18 +254,6 @@
           <template #item.total_bruto="{ item }">{{ formatPeso(item.total_bruto) }}</template>
           <template #item.porcentaje="{ item }">{{ formatPct(item.porcentaje) }}</template>
         </v-data-table>
-
-        <div v-for="cat in categoriasRetencion" :key="cat.key" class="mb-3">
-          <div class="text-caption font-weight-bold mb-1">Top clientes — {{ cat.titulo }}</div>
-          <v-data-table
-            v-if="cat.filas.length"
-            density="compact"
-            :headers="headersTopClientes"
-            :items="cat.filas"
-            hide-default-footer
-          />
-          <v-alert v-else type="info" variant="tonal" density="compact">Sin registros en este rango.</v-alert>
-        </div>
       </v-card-text>
     </v-card>
 
@@ -311,30 +298,16 @@
         <div>
           <div class="text-subtitle-1 font-weight-bold">7. Producción por Líder</div>
           <div class="text-caption text-medium-emphasis">
-            Producción agregada por sede/líder, más el detalle individual por funcionario.
+            Producción agregada por sede y líder comercial.
           </div>
         </div>
       </v-card-title>
       <v-divider />
       <v-card-text>
-        <div class="text-caption font-weight-bold mb-1">Por Sede</div>
-        <v-data-table density="compact" :headers="headersProduccionLider" :items="datos.produccionLider.por_sede" hide-default-footer class="mb-4">
+        <v-data-table density="compact" :headers="headersProduccionLider" :items="datos.produccionLider.por_sede" hide-default-footer>
           <template #item.total_bruto="{ item }">{{ formatPeso(item.total_bruto) }}</template>
           <template #item.total_neto="{ item }">{{ formatPeso(item.total_neto) }}</template>
         </v-data-table>
-
-        <div class="text-caption font-weight-bold mb-1">Por Funcionario (detalle individual)</div>
-        <v-data-table
-          v-if="datos.produccionLider.por_funcionario.length"
-          density="compact"
-          :headers="headersProduccionFuncionario"
-          :items="datos.produccionLider.por_funcionario"
-          hide-default-footer
-        >
-          <template #item.total_bruto="{ item }">{{ formatPeso(item.total_bruto) }}</template>
-          <template #item.total_neto="{ item }">{{ formatPeso(item.total_neto) }}</template>
-        </v-data-table>
-        <v-alert v-else type="info" variant="tonal" density="compact">Sin registros en este rango.</v-alert>
       </v-card-text>
     </v-card>
   </div>
@@ -474,15 +447,19 @@ const filasMetaComercialVehiculos = computed(() =>
   }))
 )
 
-const asesoresConDescuentos = computed(() =>
-  props.datos.metaComercial.asesores
-    .filter((a) => a.descuentos_total > 0)
-    .map((a) => ({
-      asesor_id: a.asesor_id,
-      asesor_nombre: a.asesor_nombre,
-      detalle: a.descuentos.map((d) => `${d.nombre} x${d.cantidad} = ${formatPeso(d.total_descuentos)}`).join('; '),
-      total: a.descuentos_total,
-    }))
+const headersDescuentosPorAsesor = [
+  { title: 'Asesor', key: 'asesor' },
+  { title: 'Tipo', key: 'tipo' },
+  { title: 'Cantidad', key: 'cantidad' },
+  { title: 'Total', key: 'total' },
+]
+const filasDescuentosPorAsesor = computed(() =>
+  props.datos.metaComercial.descuentosPorAsesor.map((d) => ({
+    asesor: d.asesor_nombre,
+    tipo: d.nombre,
+    cantidad: formatNum(d.cantidad),
+    total: formatPeso(d.total_descuentos),
+  }))
 )
 
 /* ===== 3. Ingresos por Canal ===== */
@@ -493,14 +470,17 @@ const headersIngresosCanal = [
   { title: 'Total Neto', key: 'totalNeto' },
   { title: 'Prom. Ticket', key: 'promedio' },
   { title: 'Var. vs. Anterior', key: 'variacion' },
+  { title: '% del Total', key: 'pctTotal' },
 ]
 const filasIngresosCanal = computed(() => {
   const anteriorMap = new Map(props.datos.ingresosCanalAnterior.por_canal.map((c) => [c.canal, c]))
+  const totalBrutoGeneral = props.datos.ingresosCanal.totales.total_bruto
   const filas = props.datos.ingresosCanal.por_canal.map((c) => {
     const anterior = anteriorMap.get(c.canal)
     const base = anterior?.total_bruto ?? 0
     const variacionAbs = c.total_bruto - base
     const variacionPct = base > 0 ? Math.round((variacionAbs / base) * 1000) / 10 : null
+    const pctTotal = totalBrutoGeneral > 0 ? Math.round((c.total_bruto / totalBrutoGeneral) * 10000) / 100 : 0
     return {
       canal: nombreCanal(c.canal),
       vehiculos: formatNum(c.cantidad),
@@ -509,6 +489,7 @@ const filasIngresosCanal = computed(() => {
       promedio: formatPeso(c.promedio_ticket),
       variacion: `${variacionAbs >= 0 ? '+' : ''}${formatPct(variacionPct)}`,
       variacionAbs,
+      pctTotal: formatPct(pctTotal),
     }
   })
   const baseTotal = props.datos.ingresosCanalAnterior.totales.total_bruto
@@ -522,6 +503,7 @@ const filasIngresosCanal = computed(() => {
     promedio: formatPeso(props.datos.ingresosCanal.totales.promedio_ticket),
     variacion: `${variacionAbsTotal >= 0 ? '+' : ''}${formatPct(variacionPctTotal)}`,
     variacionAbs: variacionAbsTotal,
+    pctTotal: formatPct(100),
   })
   return filas
 })
@@ -558,53 +540,6 @@ const headersRetencionCanal = [
   { title: 'Total Bruto', key: 'total_bruto' },
   { title: '% del Total', key: 'porcentaje' },
 ]
-const headersTopClientes = [
-  { title: 'Placa', key: 'placa' },
-  { title: 'Fecha', key: 'fecha' },
-  { title: 'Cliente', key: 'cliente_nombre' },
-  { title: 'Documento', key: 'cliente_documento' },
-  { title: 'Canal', key: 'canal' },
-  { title: 'Valor', key: 'valor' },
-]
-const categoriasRetencion = computed(() => [
-  {
-    key: 'nuevos',
-    titulo: 'Nuevos',
-    filas: props.datos.retencion.top_clientes.nuevos.map((f) => ({
-      placa: f.placa,
-      fecha: f.fecha,
-      cliente_nombre: f.cliente_nombre ?? '—',
-      cliente_documento: f.cliente_documento ?? '—',
-      canal: nombreCanal(f.captacion_canal),
-      valor: formatPeso(f.total),
-    })),
-  },
-  {
-    key: 'recurrentes',
-    titulo: 'Recurrentes',
-    filas: props.datos.retencion.top_clientes.recurrentes.map((f) => ({
-      placa: f.placa,
-      fecha: f.fecha,
-      cliente_nombre: f.cliente_nombre ?? '—',
-      cliente_documento: f.cliente_documento ?? '—',
-      canal: nombreCanal(f.captacion_canal),
-      valor: formatPeso(f.total),
-    })),
-  },
-  {
-    key: 'recuperaciones',
-    titulo: 'Recuperados',
-    filas: props.datos.retencion.top_clientes.recuperaciones.map((f) => ({
-      placa: f.placa,
-      fecha: f.fecha,
-      cliente_nombre: f.cliente_nombre ?? '—',
-      cliente_documento: f.cliente_documento ?? '—',
-      canal: nombreCanal(f.captacion_canal),
-      valor: formatPeso(f.total),
-    })),
-  },
-])
-
 /* ===== 6. Descuentos ===== */
 const headersDescuentosTipo = [
   { title: 'Código', key: 'codigo' },
@@ -647,16 +582,6 @@ const filasAutorizadorTop = computed(() => {
 const headersProduccionLider = [
   { title: 'Sede', key: 'sede_nombre' },
   { title: 'Líder', key: 'lider_nombre' },
-  { title: 'RTM', key: 'turnos_rtm' },
-  { title: 'SOAT', key: 'turnos_soat' },
-  { title: 'PREV', key: 'turnos_prev' },
-  { title: 'PERI', key: 'turnos_peri' },
-  { title: 'Vehículos', key: 'vehiculos' },
-  { title: 'Total Bruto', key: 'total_bruto' },
-  { title: 'Total Neto', key: 'total_neto' },
-]
-const headersProduccionFuncionario = [
-  { title: 'Funcionario', key: 'funcionario_nombre' },
   { title: 'RTM', key: 'turnos_rtm' },
   { title: 'SOAT', key: 'turnos_soat' },
   { title: 'PREV', key: 'turnos_prev' },
