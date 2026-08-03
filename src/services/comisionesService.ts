@@ -238,7 +238,8 @@ export interface ComisionConfig {
  */
 export interface ComisionConfigPayload {
   asesor_id?: number | null
-  tipo_vehiculo: TipoVehiculoComision
+  // null = sin distinción de tipo (Asesor Comercial: sus campos no varían por tipo de vehículo)
+  tipo_vehiculo: TipoVehiculoComision | null
   valor_placa: number
   // incentivos específicos por tipo de vehículo (null = sin configurar, usa valor_placa)
   valor_placa_vehiculo?: number | null
@@ -856,6 +857,51 @@ export async function updateConfigComision(
 export async function deleteConfigComision(id: number) {
   await apiFetch<unknown>(`/comisiones/config/${id}`, {
     method: 'DELETE',
+  })
+}
+
+/* ===== Simulador de comisiones (dry-run, Fase 6) ===== */
+
+export type ActorSimulador = 'COMERCIAL' | 'CONVENIO'
+export type EscenarioSimulador = 'NUEVO' | 'RECURRENTE' | 'RECUPERACION'
+export type OrigenDescuentoSimulador = 'DATEO' | 'CAJA'
+
+export interface SimularComisionPayload {
+  actor: ActorSimulador
+  asesorId: number
+  tipoVehiculo: TipoVehiculoComision
+  conConvenio: boolean
+  escenario: EscenarioSimulador
+  tuvoContinuidad?: boolean
+  esAvance?: boolean
+  codigoDescuento?: string | null
+  origenDescuento?: OrigenDescuentoSimulador | null
+}
+
+export interface SimularComisionResultado {
+  caso: string
+  escenario: string
+  actor: string
+  asesor: { id: number; nombre: string; tipo: string }
+  continuidadUsada: boolean | null
+  reglaGanadora: { alcance: 'INDIVIDUAL' | 'GLOBAL'; asesorId: number | null; asesorNombre: string | null }
+  reglaAplicada: string
+  resultado: {
+    base: number
+    monto: number
+    montoAsesor: number
+    montoConvenio: number
+    valorNuevoDirectoFinal: number
+  }
+}
+
+/** POST /api/comisiones/simular — dry-run, no crea nada */
+export async function simularComision(
+  payload: SimularComisionPayload
+): Promise<SimularComisionResultado> {
+  return apiFetch<SimularComisionResultado>('/comisiones/simular', {
+    method: 'POST',
+    body: payload,
   })
 }
 

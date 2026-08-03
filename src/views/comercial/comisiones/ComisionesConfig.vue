@@ -44,6 +44,10 @@
                 <span class="d-none d-sm-inline">🔗 Continuidad</span>
                 <span class="d-sm-none">🔗</span>
               </v-btn>
+              <v-btn value="SIMULADOR" size="small" style="flex: 1">
+                <span class="d-none d-sm-inline">🧪 Simulador</span>
+                <span class="d-sm-none">🧪</span>
+              </v-btn>
             </v-btn-toggle>
           </v-col>
         </v-row>
@@ -106,97 +110,109 @@
             />
           </v-col>
 
-          <!-- Tipo de vehículo -->
-          <v-col cols="12" md="3">
-            <v-select
-              v-model="form.tipoVehiculo"
-              :items="tipoVehiculoItems"
-              item-title="label"
-              item-value="value"
-              label="Tipo de vehículo"
-              density="comfortable"
-              variant="outlined"
-              hide-details="auto"
-            />
+          <!-- Sin selector de tipo de vehículo: Comercial, Convenio y Global son siempre 1 sola fila -->
+          <v-col cols="12" md="3" class="d-flex align-center text-caption text-medium-emphasis">
+            <span v-if="actorSeleccionado === 'COMERCIAL'">
+              Sin tipo de vehículo — una sola regla cubre moto y vehículo para Comercial.
+            </span>
+            <span v-else>
+              Sin tipo de vehículo — Incentivo vehículo e Incentivo moto ya diferencian dentro de esta única fila.
+            </span>
           </v-col>
         </v-row>
 
-        <!-- Fila 1: incentivo base + específicos por tipo 🆕 -->
-        <v-row dense>
-          <!-- Incentivo base -->
-<v-col cols="12" md="4">
-  <v-text-field
-    v-model="form.valorPlaca"
-    label="💼 Incentivo base (fallback)"
-    hint="Se usa si no hay valor específico"
-    persistent-hint
-    type="number"
-    min="0"
-    density="comfortable"
-    variant="outlined"
-    prefix="$"
-  />
-</v-col>
+        <!-- Fila 1: incentivo base + específicos por tipo (solo aplica a Asesor Convenio / Convenio) -->
+        <div v-if="actorSeleccionado !== 'COMERCIAL'">
+          <div v-if="actorSeleccionado === 'CONVENIO'" class="text-caption text-medium-emphasis mb-1">
+            🤝 Campos de <strong>Asesor Convenio / Convenio</strong>
+          </div>
+          <v-row dense>
+            <!-- Incentivo base -->
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model="form.valorPlaca"
+                label="💼 Incentivo base (fallback)"
+                hint="Se usa si no hay valor específico"
+                persistent-hint
+                type="number"
+                min="0"
+                density="comfortable"
+                variant="outlined"
+                prefix="$"
+              />
+            </v-col>
 
-<!-- SOLO VEHÍCULO -->
-<v-col cols="12" md="4" v-if="form.tipoVehiculo === 'VEHICULO' || form.tipoVehiculo === 'AMBOS'">
-  <v-text-field
-    v-model="form.valorPlacaVehiculo"
-    label="💼 Incentivo específico vehículo"
-    type="number"
-    min="0"
-    density="comfortable"
-    variant="outlined"
-    prefix="$"
-    clearable
-  />
-</v-col>
+            <!-- Incentivo vehículo: siempre visible para Convenio y Global (1 sola fila cada uno) -->
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model="form.valorPlacaVehiculo"
+                label="💼 Incentivo específico vehículo"
+                type="number"
+                min="0"
+                density="comfortable"
+                variant="outlined"
+                prefix="$"
+                clearable
+              />
+            </v-col>
 
-<!-- SOLO MOTO -->
-<v-col cols="12" md="4" v-if="form.tipoVehiculo === 'MOTO' || form.tipoVehiculo === 'AMBOS'">
-  <v-text-field
-    v-model="form.valorPlacaMoto"
-    label="💼 Incentivo específico moto"
-    type="number"
-    min="0"
-    density="comfortable"
-    variant="outlined"
-    prefix="$"
-    clearable
-  />
-</v-col>
-        </v-row>
+            <!-- Incentivo moto: siempre visible para Convenio y Global (1 sola fila cada uno) -->
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model="form.valorPlacaMoto"
+                label="💼 Incentivo específico moto"
+                type="number"
+                min="0"
+                density="comfortable"
+                variant="outlined"
+                prefix="$"
+                clearable
+              />
+            </v-col>
+          </v-row>
+        </div>
+        <div v-else class="mb-2 text-caption text-medium-emphasis">
+          Incentivo base / vehículo / moto no aplican a Asesor Comercial — se omiten para esta regla.
+        </div>
 
-        <!-- Fila 2: dateo nuevo + nuevo directo -->
-        <v-row dense class="mt-2">
-          <v-col cols="12" md="6">
-            <v-text-field
-              v-model="form.valorDateo"
-              label="📋 Comisión dateo (via convenio)"
-hint="Comercial datea CON convenio — aplica siempre sin importar tipo de cliente"
-              persistent-hint
-              type="number"
-              min="0"
-              density="comfortable"
-              variant="outlined"
-              prefix="$"
-            />
-          </v-col>
+        <!-- Fila 2: dateo nuevo + nuevo directo (solo aplica a Asesor Comercial) -->
+        <div v-if="actorSeleccionado !== 'CONVENIO'" class="mt-2">
+          <div v-if="actorSeleccionado === 'COMERCIAL'" class="text-caption text-medium-emphasis mb-1">
+            🧑‍💼 Campos de <strong>Asesor Comercial</strong>
+          </div>
+          <v-row dense>
+            <v-col cols="12" md="6">
+              <v-text-field
+                v-model="form.valorDateo"
+                label="📋 Comisión dateo (via convenio)"
+                hint="Comercial datea CON convenio — aplica siempre sin importar tipo de cliente"
+                persistent-hint
+                type="number"
+                min="0"
+                density="comfortable"
+                variant="outlined"
+                prefix="$"
+              />
+            </v-col>
 
-          <v-col cols="12" md="6">
-            <v-text-field
-              v-model="form.valorNuevoDirecto"
-              label="🌟 Comisión cliente nuevo directo"
-              hint="Comercial datea cliente nuevo SIN convenio"
-              persistent-hint
-              type="number"
-              min="0"
-              density="comfortable"
-              variant="outlined"
-              prefix="$"
-            />
-          </v-col>
-        </v-row>
+            <v-col cols="12" md="6">
+              <v-text-field
+                v-model="form.valorNuevoDirecto"
+                label="🌟 Comisión cliente nuevo directo"
+                hint="Comercial datea cliente nuevo SIN convenio"
+                persistent-hint
+                type="number"
+                min="0"
+                density="comfortable"
+                variant="outlined"
+                prefix="$"
+              />
+            </v-col>
+          </v-row>
+        </div>
+        <div v-else class="mt-2 mb-2 text-caption text-medium-emphasis">
+          Dateo vía convenio / Nuevo directo no aplican a Asesor Convenio — se omiten para esta regla.
+        </div>
 
         <v-row dense class="mt-2">
           <v-col cols="12" class="d-flex align-end justify-end gap-2">
@@ -261,88 +277,260 @@ hint="Comercial datea CON convenio — aplica siempre sin importar tipo de clien
           </div>
         </div>
 
-        <v-data-table
-          :headers="headers"
-          :items="configs"
-          :loading="loading"
-          item-key="id"
-          density="comfortable"
-        >
-          <template #item.alcance="{ item }">
-            <v-chip
-              size="small"
-              :color="item.asesor_id ? 'info' : 'primary'"
-              variant="tonal"
+        <!-- Cascada de prioridad -->
+        <v-alert type="info" variant="tonal" density="comfortable" class="mb-4 text-caption">
+          <strong>¿Qué regla gana cuando hay varias?</strong> Manda la más específica, en este orden:
+          <strong>1º</strong> asesor + tipo de vehículo exacto ·
+          <strong>2º</strong> asesor (sin importar tipo) ·
+          <strong>3º</strong> global + tipo de vehículo ·
+          <strong>4º</strong> global (fallback de todos).
+          Ojo: una regla del <strong>mismo asesor sin tipo de vehículo</strong> le gana a una
+          <strong>global con el tipo correcto</strong> — el asesor pesa más que el tipo de vehículo.
+        </v-alert>
+
+        <!-- ============ ASESOR COMERCIAL ============ -->
+        <v-card variant="outlined" class="mb-4 rounded-lg">
+          <v-card-item>
+            <template #prepend>
+              <span class="text-h5">🧑‍💼</span>
+            </template>
+            <v-card-title class="text-subtitle-1">
+              Asesor Comercial
+            </v-card-title>
+            <v-card-subtitle class="text-caption">
+              Datea directamente al cliente, con o sin convenio de por medio
+            </v-card-subtitle>
+          </v-card-item>
+          <v-card-text class="pt-0">
+            <div class="text-caption text-medium-emphasis mb-3">
+              <div class="mb-1">
+                <strong>Caso 1 — Cliente nuevo directo:</strong> datea sin convenio → cobra
+                🌟 Comisión cliente nuevo directo.
+              </div>
+              <div class="mb-1">
+                <strong>Caso 3 — Datea junto con un convenio:</strong> el cliente llega vía convenio →
+                cobra 📋 Comisión dateo (vía convenio).
+              </div>
+              <div class="mb-1">
+                <strong>Avance:</strong> si el dateo quedó marcado como Avance, cambia el resultado del
+                Caso 3 automáticamente. No es un campo configurable aquí — depende del dateo mismo.
+              </div>
+              <div>
+                <strong>🔄 Recurrente / 💛 Recuperación:</strong> si el cliente ya había venido antes,
+                estos valores reemplazan los de arriba — se configuran en la
+                <a class="text-decoration-underline" style="cursor: pointer" @click="irARecurrencia">
+                  pestaña Recurrencia
+                </a>.
+              </div>
+            </div>
+
+            <v-data-table
+              :headers="headersComercial"
+              :items="configsAsesorComercial"
+              :loading="loading"
+              item-key="id"
+              density="comfortable"
             >
-              {{ item.asesor_id ? 'Por asesor / convenio' : 'Global' }}
-            </v-chip>
-          </template>
+              <template #item.alcance="{ item }">
+                <v-chip size="small" color="info" variant="tonal">
+                  {{ prioridadConfig(item).label }}
+                </v-chip>
+              </template>
 
-          <template #item.asesor="{ item }">
-            <span v-if="item.asesor_id">
-              {{ findAsesorNombre(item.asesor_id) || `#${item.asesor_id}` }}
-            </span>
-            <span v-else class="text-medium-emphasis">— Todos —</span>
-          </template>
+              <template #item.asesor="{ item }">
+                {{ findAsesorNombre(item.asesor_id) || `#${item.asesor_id}` }}
+              </template>
 
-          <template #item.tipo_vehiculo="{ item }">
-            {{ tipoVehiculoLabel(item.tipo_vehiculo) }}
-          </template>
+              <template #item.valor_dateo="{ item }">
+                <span class="text-caption">📋 {{ formatCOP(item.valor_dateo) }}</span>
+              </template>
 
-          <template #item.valor_placa="{ item }">
-            <span class="text-caption">💼 {{ formatCOP(item.valor_placa) }}</span>
-          </template>
+              <template #item.valor_nuevo_directo="{ item }">
+                <span class="text-caption">🌟 {{ formatCOP(item.valor_nuevo_directo) }}</span>
+              </template>
 
-          <!-- 🆕 -->
-          <template #item.valor_placa_vehiculo="{ item }">
-            <span class="text-caption">
-              {{ item.valor_placa_vehiculo != null ? '🚗 ' + formatCOP(item.valor_placa_vehiculo) : '—' }}
-            </span>
-          </template>
+              <template #item.recurrencia_ref="{ item }">
+                <v-chip size="small" variant="tonal" :color="recurrenciaReferenciaPara(item.asesor_id).esGlobal ? 'default' : 'success'">
+                  🔄 {{ formatCOP(recurrenciaReferenciaPara(item.asesor_id).recurrencia) }} ·
+                  💛 {{ formatCOP(recurrenciaReferenciaPara(item.asesor_id).recuperacion) }}
+                  <span v-if="recurrenciaReferenciaPara(item.asesor_id).esGlobal" class="ml-1">(global)</span>
+                </v-chip>
+              </template>
 
-          <!-- 🆕 -->
-          <template #item.valor_placa_moto="{ item }">
-            <span class="text-caption">
-              {{ item.valor_placa_moto != null ? '🏍️ ' + formatCOP(item.valor_placa_moto) : '—' }}
-            </span>
-          </template>
+              <template #item.acciones="{ item }">
+                <div class="d-flex gap-1">
+                  <v-btn size="small" variant="text" icon="mdi-pencil" @click="editConfig(item)" />
+                  <v-btn size="small" variant="text" color="error" icon="mdi-delete" @click="confirmDelete(item)" />
+                </div>
+              </template>
 
-          <template #item.valor_dateo="{ item }">
-            <span class="text-caption">📋 {{ formatCOP(item.valor_dateo) }}</span>
-          </template>
+              <template #no-data>
+                <div class="text-center py-6 text-medium-emphasis">
+                  No hay reglas configuradas para Asesor Comercial.
+                </div>
+              </template>
+            </v-data-table>
+          </v-card-text>
+        </v-card>
 
-          <template #item.valor_nuevo_directo="{ item }">
-            <span class="text-caption">🌟 {{ formatCOP(item.valor_nuevo_directo) }}</span>
-          </template>
-
-          <template #item.fecha_calculo="{ item }">
-            {{ formatDateTime(item.fecha_calculo) }}
-          </template>
-
-          <template #item.acciones="{ item }">
-            <div class="d-flex gap-1">
-              <v-btn
-                size="small"
-                variant="text"
-                icon="mdi-pencil"
-                @click="editConfig(item)"
-              />
-              <v-btn
-                size="small"
-                variant="text"
-                color="error"
-                icon="mdi-delete"
-                @click="confirmDelete(item)"
-              />
+        <!-- ============ ASESOR CONVENIO / CONVENIO ============ -->
+        <v-card variant="outlined" class="mb-4 rounded-lg">
+          <v-card-item>
+            <template #prepend>
+              <span class="text-h5">🤝</span>
+            </template>
+            <v-card-title class="text-subtitle-1">
+              Asesor Convenio / Convenio
+            </v-card-title>
+            <v-card-subtitle class="text-caption">
+              Misma configuración: recibe el dateo del comercial o datea directo como convenio
+            </v-card-subtitle>
+          </v-card-item>
+          <v-card-text class="pt-0">
+            <div class="text-caption text-medium-emphasis mb-3">
+              <div class="mb-1">
+                <strong>Incentivo base:</strong> valor de respaldo si no hay valor específico por tipo de vehículo.
+              </div>
+              <div class="mb-1">
+                <strong>Caso 2 / 3 — Dateo de carro o moto:</strong> usa 🚗 Incentivo vehículo o
+                🏍️ Incentivo moto según corresponda.
+              </div>
+              <div class="mb-1">
+                <strong>Avance:</strong> cambia el resultado de los Casos 2 y 3 — no es un campo aquí,
+                depende del dateo mismo.
+              </div>
+              <div class="mb-1">
+                <strong>🔄 Recurrente / 💛 Recuperación:</strong> se configura en la
+                <a class="text-decoration-underline" style="cursor: pointer" @click="irARecurrencia">
+                  pestaña Recurrencia
+                </a>.
+              </div>
+              <div>
+                <strong>🔗 Continuidad:</strong> ¿discusión puntual sobre si este asesor convenio
+                mantiene la continuidad del turno? Revísalo y gestiónalo en la
+                <a class="text-decoration-underline" style="cursor: pointer" @click="irAContinuidad">
+                  pestaña Continuidad
+                </a>.
+              </div>
             </div>
-          </template>
 
-          <template #no-data>
-            <div class="text-center py-6 text-medium-emphasis">
-              No hay reglas configuradas todavía.
-            </div>
-          </template>
-        </v-data-table>
+            <v-data-table
+              :headers="headersConvenio"
+              :items="configsAsesorConvenio"
+              :loading="loading"
+              item-key="id"
+              density="comfortable"
+            >
+              <template #item.alcance="{ item }">
+                <v-chip size="small" color="info" variant="tonal">
+                  {{ prioridadConfig(item).label }}
+                </v-chip>
+              </template>
+
+              <template #item.asesor="{ item }">
+                {{ findAsesorNombre(item.asesor_id) || `#${item.asesor_id}` }}
+              </template>
+
+              <template #item.valor_placa="{ item }">
+                <span class="text-caption">💼 {{ formatCOP(item.valor_placa) }}</span>
+              </template>
+
+              <template #item.valor_placa_vehiculo="{ item }">
+                <span class="text-caption">
+                  {{ item.valor_placa_vehiculo != null ? '🚗 ' + formatCOP(item.valor_placa_vehiculo) : '—' }}
+                </span>
+              </template>
+
+              <template #item.valor_placa_moto="{ item }">
+                <span class="text-caption">
+                  {{ item.valor_placa_moto != null ? '🏍️ ' + formatCOP(item.valor_placa_moto) : '—' }}
+                </span>
+              </template>
+
+              <template #item.recurrencia_ref="{ item }">
+                <v-chip size="small" variant="tonal" :color="recurrenciaReferenciaPara(item.asesor_id).esGlobal ? 'default' : 'success'">
+                  🔄 {{ formatCOP(recurrenciaReferenciaPara(item.asesor_id).recurrencia) }} ·
+                  💛 {{ formatCOP(recurrenciaReferenciaPara(item.asesor_id).recuperacion) }}
+                  <span v-if="recurrenciaReferenciaPara(item.asesor_id).esGlobal" class="ml-1">(global)</span>
+                </v-chip>
+              </template>
+
+              <template #item.acciones="{ item }">
+                <div class="d-flex gap-1">
+                  <v-btn size="small" variant="text" icon="mdi-pencil" @click="editConfig(item)" />
+                  <v-btn size="small" variant="text" color="error" icon="mdi-delete" @click="confirmDelete(item)" />
+                </div>
+              </template>
+
+              <template #no-data>
+                <div class="text-center py-6 text-medium-emphasis">
+                  No hay reglas configuradas para Asesor Convenio / Convenio.
+                </div>
+              </template>
+            </v-data-table>
+          </v-card-text>
+        </v-card>
+
+        <!-- ============ GLOBAL (fallback compartido) ============ -->
+        <v-card variant="outlined" class="rounded-lg">
+          <v-card-item>
+            <template #prepend>
+              <span class="text-h5">🌐</span>
+            </template>
+            <v-card-title class="text-subtitle-1">
+              Global (fallback)
+            </v-card-title>
+            <v-card-subtitle class="text-caption">
+              Se usa cuando ningún asesor tiene una regla propia — alimenta a ambos actores
+            </v-card-subtitle>
+          </v-card-item>
+          <v-card-text class="pt-0">
+            <v-data-table
+              :headers="headersGlobalFallback"
+              :items="configsGlobal"
+              :loading="loading"
+              item-key="id"
+              density="comfortable"
+            >
+              <template #item.valor_placa="{ item }">
+                <span class="text-caption">💼 {{ formatCOP(item.valor_placa) }}</span>
+              </template>
+
+              <template #item.valor_placa_vehiculo="{ item }">
+                <span class="text-caption">
+                  {{ item.valor_placa_vehiculo != null ? '🚗 ' + formatCOP(item.valor_placa_vehiculo) : '—' }}
+                </span>
+              </template>
+
+              <template #item.valor_placa_moto="{ item }">
+                <span class="text-caption">
+                  {{ item.valor_placa_moto != null ? '🏍️ ' + formatCOP(item.valor_placa_moto) : '—' }}
+                </span>
+              </template>
+
+              <template #item.valor_dateo="{ item }">
+                <span class="text-caption">📋 {{ formatCOP(item.valor_dateo) }}</span>
+              </template>
+
+              <template #item.valor_nuevo_directo="{ item }">
+                <span class="text-caption">🌟 {{ formatCOP(item.valor_nuevo_directo) }}</span>
+              </template>
+
+              <template #item.acciones="{ item }">
+                <div class="d-flex gap-1">
+                  <v-btn size="small" variant="text" icon="mdi-pencil" @click="editConfig(item)" />
+                  <v-btn size="small" variant="text" color="error" icon="mdi-delete" @click="confirmDelete(item)" />
+                </div>
+              </template>
+
+              <template #no-data>
+                <div class="text-center py-6 text-medium-emphasis">
+                  No hay reglas globales configuradas todavía.
+                </div>
+              </template>
+            </v-data-table>
+          </v-card-text>
+        </v-card>
       </v-card-text>
 
       <!-- ===================== SECCIÓN METAS MENSUALES ===================== -->
@@ -1040,6 +1228,183 @@ hint="Comercial datea CON convenio — aplica siempre sin importar tipo de clien
           </v-row>
         </div>
       </v-card-text>
+
+      <!-- ===================== SECCIÓN SIMULADOR (DRY-RUN) ===================== -->
+      <v-card-text v-else-if="activeSection === 'SIMULADOR'" class="pt-4">
+        <v-alert type="info" variant="tonal" density="compact" class="mb-4 text-caption">
+          Ejecuta la misma función real de cálculo del backend con parámetros simulados —
+          <strong>no crea ninguna comisión</strong>, solo muestra el monto que se generaría.
+        </v-alert>
+
+        <v-row dense>
+          <!-- Actor -->
+          <v-col cols="12" sm="6" md="3">
+            <div class="mb-1 text-subtitle-2 text-medium-emphasis">Actor</div>
+            <v-btn-toggle v-model="simActor" mandatory rounded="xl" divided style="width: 100%">
+              <v-btn value="COMERCIAL" size="small" style="flex: 1">Comercial</v-btn>
+              <v-btn value="CONVENIO" size="small" style="flex: 1">Convenio</v-btn>
+            </v-btn-toggle>
+          </v-col>
+
+          <!-- Asesor -->
+          <v-col cols="12" sm="6" md="3">
+            <v-autocomplete
+              v-model="simAsesorId"
+              :items="simAsesoresFiltrados"
+              item-title="nombre"
+              item-value="id"
+              label="Asesor"
+              density="comfortable"
+              variant="outlined"
+              :loading="asesoresLoading"
+              hide-details
+              clearable
+            />
+          </v-col>
+
+          <!-- Tipo de vehículo -->
+          <v-col cols="12" sm="6" md="3">
+            <div class="mb-1 text-subtitle-2 text-medium-emphasis">Tipo de vehículo</div>
+            <v-btn-toggle v-model="simTipoVehiculo" mandatory rounded="xl" divided style="width: 100%">
+              <v-btn value="MOTO" size="small" style="flex: 1">🏍️ Moto</v-btn>
+              <v-btn value="VEHICULO" size="small" style="flex: 1">🚗 Vehículo</v-btn>
+            </v-btn-toggle>
+          </v-col>
+
+          <!-- ¿Con convenio? -->
+          <v-col cols="12" sm="6" md="3">
+            <v-switch
+              v-model="simConConvenio"
+              color="primary"
+              density="comfortable"
+              hide-details
+              :label="simActor === 'COMERCIAL'
+                ? (simConConvenio ? 'Con convenio (Caso 3)' : 'Sin convenio (Caso 1)')
+                : (simConConvenio ? 'Recibe de comercial (Caso 3)' : 'Self-dateo (Caso 2)')"
+            />
+          </v-col>
+        </v-row>
+
+        <v-row dense class="mt-2">
+          <!-- Escenario -->
+          <v-col cols="12" sm="6" md="3">
+            <v-select
+              v-model="simEscenario"
+              :items="[
+                { label: '🆕 Nuevo', value: 'NUEVO' },
+                { label: '🔄 Recurrente', value: 'RECURRENTE' },
+                { label: '💛 Recuperación', value: 'RECUPERACION' },
+              ]"
+              item-title="label"
+              item-value="value"
+              label="Escenario del cliente"
+              density="comfortable"
+              variant="outlined"
+              hide-details
+            />
+          </v-col>
+
+          <!-- Continuidad: solo Convenio self-dateo + recurrente/recuperación -->
+          <v-col cols="12" sm="6" md="3" v-if="simActor === 'CONVENIO' && !simConConvenio && simEscenario !== 'NUEVO'">
+            <v-switch
+              v-model="simTuvoContinuidad"
+              color="success"
+              density="comfortable"
+              hide-details
+              :label="simTuvoContinuidad ? '✅ Con continuidad' : '❌ Sin continuidad (ROTA)'"
+            />
+          </v-col>
+
+          <!-- Avance: no aplica a Comercial sin convenio (Caso 1) -->
+          <v-col cols="12" sm="6" md="3" v-if="!(simActor === 'COMERCIAL' && !simConConvenio)">
+            <v-switch
+              v-model="simEsAvance"
+              color="warning"
+              density="comfortable"
+              hide-details
+              label="🆕 Avance"
+            />
+          </v-col>
+
+          <!-- Descuento informativo -->
+          <v-col cols="12" sm="6" md="3">
+            <v-select
+              v-model="simCodigoDescuento"
+              :items="[{ codigo: null, nombre: '— Ninguno —' }, ...simDescuentos]"
+              item-title="nombre"
+              item-value="codigo"
+              label="Descuento / informativo"
+              density="comfortable"
+              variant="outlined"
+              :loading="simDescuentosLoading"
+              hide-details
+            />
+          </v-col>
+
+          <!-- Origen del descuento: solo si hay descuento elegido -->
+          <v-col cols="12" sm="6" md="3" v-if="simCodigoDescuento">
+            <v-btn-toggle v-model="simOrigenDescuento" mandatory rounded="xl" divided style="width: 100%">
+              <v-btn value="DATEO" size="small" style="flex: 1">Comercial (dateo)</v-btn>
+              <v-btn value="CAJA" size="small" style="flex: 1">Cajera (ticket)</v-btn>
+            </v-btn-toggle>
+          </v-col>
+        </v-row>
+
+        <v-row dense class="mt-3">
+          <v-col cols="12" class="d-flex justify-end">
+            <v-btn color="primary" :loading="simLoading" :disabled="!simAsesorId" @click="ejecutarSimulacion">
+              🧪 Simular
+            </v-btn>
+          </v-col>
+        </v-row>
+
+        <v-alert v-if="simError" type="error" variant="tonal" density="compact" class="mt-3 text-caption">
+          {{ simError }}
+        </v-alert>
+
+        <!-- Resultado -->
+        <v-card v-if="simResultado" variant="outlined" class="mt-4 rounded-lg">
+          <v-card-text>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <v-chip size="small" variant="tonal" :color="simResultado.reglaGanadora.alcance === 'INDIVIDUAL' ? 'info' : 'primary'">
+                Regla ganadora:
+                <strong class="ms-1">
+                  {{ simResultado.reglaGanadora.alcance === 'INDIVIDUAL'
+                    ? `Individual (${simResultado.reglaGanadora.asesorNombre})`
+                    : 'Global' }}
+                </strong>
+              </v-chip>
+              <v-chip v-if="simResultado.continuidadUsada !== null" size="small" variant="tonal" :color="simResultado.continuidadUsada ? 'success' : 'error'">
+                Continuidad usada:
+                <strong class="ms-1">{{ simResultado.continuidadUsada ? 'Sí (paga completo)' : 'No (paga recurrencia)' }}</strong>
+              </v-chip>
+            </div>
+
+            <div class="text-caption text-medium-emphasis mb-3">
+              {{ simResultado.reglaAplicada }}
+            </div>
+
+            <v-row dense>
+              <v-col cols="6" sm="3">
+                <div class="text-caption text-medium-emphasis">Comercial recibe</div>
+                <div class="text-h6">{{ formatCOP(simResultado.resultado.montoAsesor) }}</div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="text-caption text-medium-emphasis">Convenio recibe</div>
+                <div class="text-h6">{{ formatCOP(simResultado.resultado.montoConvenio) }}</div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="text-caption text-medium-emphasis">Base</div>
+                <div class="text-body-1">{{ formatCOP(simResultado.resultado.base) }}</div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="text-caption text-medium-emphasis">Monto comisión</div>
+                <div class="text-body-1">{{ formatCOP(simResultado.resultado.monto) }}</div>
+              </v-col>
+            </v-row>
+          </v-card-text>
+        </v-card>
+      </v-card-text>
     </v-card>
 
     <!-- Diálogo eliminar regla comisión -->
@@ -1208,6 +1573,8 @@ import {
   deleteConfigRecurrenciaAsesor,
   buscarContinuidad,
   guardarContinuidadOverride,
+  simularComision,
+  listDescuentos,
   type ComisionConfig,
   type ComisionConfigPayload,
   type TipoVehiculoComision,
@@ -1216,10 +1583,15 @@ import {
   type ConfigRecurrenciaAsesor,
   type ContinuidadBusqueda,
   type ContinuidadOverrideEstado,
+  type ActorSimulador,
+  type EscenarioSimulador,
+  type OrigenDescuentoSimulador,
+  type SimularComisionResultado,
+  type DescuentoItem,
 } from '@/services/comisionesService'
 
 type Scope = 'GLOBAL' | 'ASESOR'
-type Section = 'REGLAS' | 'METAS' | 'RECURRENCIA' | 'CONTINUIDAD'
+type Section = 'REGLAS' | 'METAS' | 'RECURRENCIA' | 'CONTINUIDAD' | 'SIMULADOR'
 
 /** Metas mensuales (por asesor, opción global o por tipo de vehículo) */
 type MetaMensualConfig = {
@@ -1315,8 +1687,8 @@ const form = ref<{
   asesorId: number | null
   tipoVehiculo: TipoVehiculoComision | 'AMBOS' | ''
   valorPlaca: string
-  valorPlacaVehiculo: string   // 🆕
-  valorPlacaMoto: string       // 🆕
+  valorPlacaVehiculo: string | null   // 🆕 — clearable puede dejarlo en null (no '')
+  valorPlacaMoto: string | null       // 🆕 — idem
   valorDateo: string
   valorNuevoDirecto: string
 }>({
@@ -1339,23 +1711,6 @@ const tipoAsesorItems = [
   { label: 'Convenio', value: 'CONVENIO' },
 ]
 
-const tipoVehiculoItems = [
-  { label: 'Ambos (Moto + Vehículo)', value: 'AMBOS' },
-  { label: 'Solo Moto', value: 'MOTO' as TipoVehiculoComision },
-  { label: 'Solo Vehículo', value: 'VEHICULO' as TipoVehiculoComision },
-]
-const headers = [
-  { title: 'Alcance', key: 'alcance', sortable: false },
-  { title: 'Asesor / Convenio', key: 'asesor', sortable: false },
-  { title: 'Tipo vehículo', key: 'tipo_vehiculo', sortable: false },
-  { title: '💼 Incentivo base', key: 'valor_placa', sortable: true },
-  { title: '🚗 Incentivo vehículo', key: 'valor_placa_vehiculo', sortable: false },  // 🆕
-  { title: '🏍️ Incentivo moto', key: 'valor_placa_moto', sortable: false },          // 🆕
-  { title: '📋 Dateo convenio', key: 'valor_dateo', sortable: true },
-  { title: '🌟 Nuevo directo', key: 'valor_nuevo_directo', sortable: true },
-  { title: 'Actualizado', key: 'fecha_calculo', sortable: true },
-  { title: 'Acciones', key: 'acciones', sortable: false, align: 'end' as const },
-]
 
 /* Tabla metas mensuales */
 const metaHeaders = [
@@ -1415,6 +1770,13 @@ const recurrenciaForm = ref<{
 })
 
 /* ===== Helpers ===== */
+
+/** '' y null (VTextField clearable pone null, no '') significan "sin configurar" → usa el base */
+function toNullableNumber(v: string | null | undefined): number | null {
+  if (v === '' || v === null || v === undefined) return null
+  const n = Number(v)
+  return Number.isNaN(n) ? null : n
+}
 
 function normalizeTipo(value?: string | null) {
   return (value ?? '').toString().toUpperCase().trim()
@@ -1495,7 +1857,6 @@ const formPreview = computed(() => {
 })
 
 const canSubmit = computed(() => {
-  if (!form.value.tipoVehiculo) return false
   const placa = Number(form.value.valorPlaca || 0)
   const dateo = Number(form.value.valorDateo || 0)
   const directo = Number(form.value.valorNuevoDirecto || 0)
@@ -1505,6 +1866,185 @@ const canSubmit = computed(() => {
   if (scope.value === 'ASESOR' && !form.value.asesorId) return false
   return true
 })
+
+/* ===== Fase 5: agrupación de reglas por actor real ===== */
+type ActorReglas = 'COMERCIAL' | 'CONVENIO'
+
+/** Actor que aplica al formulario de alta/edición — deriva del asesor elegido o del filtro */
+const actorSeleccionado = computed<ActorReglas | 'GLOBAL'>(() => {
+  if (scope.value === 'GLOBAL') return 'GLOBAL'
+  if (form.value.asesorId) return actorDeAsesor(form.value.asesorId)
+  if (tipoAsesor.value === 'CONVENIO') return 'CONVENIO'
+  if (tipoAsesor.value === 'COMERCIAL') return 'COMERCIAL'
+  return 'GLOBAL'
+})
+
+/** El actor de una regla lo define el tipo del asesor vinculado, no la fila en sí */
+function actorDeAsesor(id: number | null | undefined): ActorReglas {
+  if (!id) return 'COMERCIAL'
+  const t = normalizeTipo(asesores.value.find((a) => a.id === id)?.tipo)
+  return t.includes('CONVENIO') ? 'CONVENIO' : 'COMERCIAL'
+}
+
+/** Nivel de prioridad real de la cascada (captacion_dateos_controller.ts / facturacion_tickets_controller.ts) */
+function prioridadConfig(item: ComisionConfig): { nivel: 1 | 2 | 3 | 4; label: string } {
+  if (item.asesor_id && item.tipo_vehiculo) return { nivel: 1, label: '1º · Asesor + tipo exacto' }
+  if (item.asesor_id && !item.tipo_vehiculo) return { nivel: 2, label: '2º · Asesor (todo tipo)' }
+  if (!item.asesor_id && item.tipo_vehiculo) return { nivel: 3, label: '3º · Global + tipo exacto' }
+  return { nivel: 4, label: '4º · Global (fallback)' }
+}
+
+const configsGlobal = computed(() => configs.value.filter((c) => !c.asesor_id))
+const configsAsesorComercial = computed(() =>
+  configs.value.filter((c) => c.asesor_id && actorDeAsesor(c.asesor_id) === 'COMERCIAL'),
+)
+const configsAsesorConvenio = computed(() =>
+  configs.value.filter((c) => c.asesor_id && actorDeAsesor(c.asesor_id) === 'CONVENIO'),
+)
+
+/** Valor de Recurrente/Recuperación que le aplicaría a este asesor (o el global si no tiene propio) */
+function recurrenciaReferenciaPara(asesorId: number | null | undefined) {
+  const propia = asesorId ? recurrenciasAsesores.value.find((r) => r.asesor_id === asesorId) : null
+  if (propia) {
+    return {
+      esGlobal: false,
+      habilitada: propia.recurrencia_habilitada,
+      meses: propia.meses_minimos ?? recurrenciaGlobal.value.meses_minimos,
+      recurrencia: propia.valor_dateo_recurrencia ?? recurrenciaGlobal.value.valor_dateo_recurrencia,
+      recuperacion: propia.valor_dateo_recuperacion ?? recurrenciaGlobal.value.valor_dateo_recuperacion,
+    }
+  }
+  return {
+    esGlobal: true,
+    habilitada: true,
+    meses: recurrenciaGlobal.value.meses_minimos,
+    recurrencia: recurrenciaGlobal.value.valor_dateo_recurrencia,
+    recuperacion: recurrenciaGlobal.value.valor_dateo_recuperacion,
+  }
+}
+
+function irARecurrencia() {
+  activeSection.value = 'RECURRENCIA'
+}
+function irAContinuidad() {
+  activeSection.value = 'CONTINUIDAD'
+}
+
+/* ===== Fase 6: Simulador (dry-run) ===== */
+const simActor = ref<ActorSimulador>('COMERCIAL')
+const simAsesorId = ref<number | null>(null)
+const simTipoVehiculo = ref<TipoVehiculoComision>('VEHICULO')
+const simConConvenio = ref(false)
+const simEscenario = ref<EscenarioSimulador>('NUEVO')
+const simTuvoContinuidad = ref(true)
+const simEsAvance = ref(false)
+const simCodigoDescuento = ref<string | null>(null)
+const simOrigenDescuento = ref<OrigenDescuentoSimulador>('DATEO')
+
+const simDescuentos = ref<DescuentoItem[]>([])
+const simDescuentosLoading = ref(false)
+const simLoading = ref(false)
+const simError = ref('')
+const simResultado = ref<SimularComisionResultado | null>(null)
+
+/** Asesores filtrados por el actor elegido en el simulador (Comercial o Convenio) */
+const simAsesoresFiltrados = computed(() =>
+  asesores.value.filter((a) => {
+    const t = normalizeTipo(a.tipo)
+    if (simActor.value === 'CONVENIO') return t.includes('CONVENIO')
+    return !t.includes('CONVENIO')
+  }),
+)
+
+async function cargarDescuentosSimulador() {
+  if (simDescuentos.value.length > 0) return
+  simDescuentosLoading.value = true
+  try {
+    simDescuentos.value = await listDescuentos()
+  } finally {
+    simDescuentosLoading.value = false
+  }
+}
+
+async function ejecutarSimulacion() {
+  if (!simAsesorId.value) return
+  simLoading.value = true
+  simError.value = ''
+  try {
+    simResultado.value = await simularComision({
+      actor: simActor.value,
+      asesorId: simAsesorId.value,
+      tipoVehiculo: simTipoVehiculo.value,
+      conConvenio: simConConvenio.value,
+      escenario: simEscenario.value,
+      tuvoContinuidad: simTuvoContinuidad.value,
+      esAvance: simEsAvance.value,
+      codigoDescuento: simCodigoDescuento.value,
+      origenDescuento: simCodigoDescuento.value ? simOrigenDescuento.value : null,
+    })
+  } catch (err) {
+    simResultado.value = null
+    simError.value = err instanceof Error ? err.message : 'Error al simular la comisión'
+  } finally {
+    simLoading.value = false
+  }
+}
+
+// Auto-simular en vivo cuando cambia cualquier parámetro (con asesor ya elegido)
+watch(
+  [
+    simActor,
+    simAsesorId,
+    simTipoVehiculo,
+    simConConvenio,
+    simEscenario,
+    simTuvoContinuidad,
+    simEsAvance,
+    simCodigoDescuento,
+    simOrigenDescuento,
+  ],
+  () => {
+    if (simAsesorId.value) ejecutarSimulacion()
+  },
+)
+
+// Si cambia el actor, el asesor elegido puede ya no ser válido — se limpia
+watch(simActor, () => {
+  simAsesorId.value = null
+  simResultado.value = null
+})
+
+watch(activeSection, (s) => {
+  if (s === 'SIMULADOR') cargarDescuentosSimulador()
+})
+
+const headersComercial = [
+  { title: 'Regla', key: 'alcance', sortable: false },
+  { title: 'Asesor', key: 'asesor', sortable: false },
+  { title: '📋 Dateo vía convenio (Caso 3)', key: 'valor_dateo', sortable: true },
+  { title: '🌟 Cliente nuevo directo (Caso 1)', key: 'valor_nuevo_directo', sortable: true },
+  { title: '🔄 Recurrente / 💛 Recuperación', key: 'recurrencia_ref', sortable: false },
+  { title: 'Acciones', key: 'acciones', sortable: false, align: 'end' as const },
+]
+
+const headersConvenio = [
+  { title: 'Regla', key: 'alcance', sortable: false },
+  { title: 'Asesor / Convenio', key: 'asesor', sortable: false },
+  { title: '💼 Incentivo base', key: 'valor_placa', sortable: true },
+  { title: '🚗 Incentivo vehículo', key: 'valor_placa_vehiculo', sortable: false },
+  { title: '🏍️ Incentivo moto', key: 'valor_placa_moto', sortable: false },
+  { title: '🔄 Recurrente / 💛 Recuperación', key: 'recurrencia_ref', sortable: false },
+  { title: 'Acciones', key: 'acciones', sortable: false, align: 'end' as const },
+]
+
+const headersGlobalFallback = [
+  { title: '💼 Incentivo base', key: 'valor_placa', sortable: true },
+  { title: '🚗 Incentivo vehículo', key: 'valor_placa_vehiculo', sortable: false },
+  { title: '🏍️ Incentivo moto', key: 'valor_placa_moto', sortable: false },
+  { title: '📋 Dateo vía convenio', key: 'valor_dateo', sortable: true },
+  { title: '🌟 Nuevo directo', key: 'valor_nuevo_directo', sortable: true },
+  { title: 'Acciones', key: 'acciones', sortable: false, align: 'end' as const },
+]
 
 /* ===== Formulario metas mensuales ===== */
 const metaForm = ref<{
@@ -1627,17 +2167,16 @@ async function submitForm() {
   if (!canSubmit.value) return
   saving.value = true
   try {
-    const tipos: TipoVehiculoComision[] =
-      form.value.tipoVehiculo === 'AMBOS'
-        ? ['MOTO', 'VEHICULO']
-        : [form.value.tipoVehiculo as TipoVehiculoComision]
+    // Comercial, Convenio y Global: siempre 1 sola fila sin tipo_vehiculo — Convenio y
+    // Global diferencian moto/vehículo con sus propias columnas dentro de la misma fila.
+    const tipos: (TipoVehiculoComision | null)[] = [null]
 
     for (const tipo of tipos) {
       const payload: ComisionConfigPayload = {
         tipo_vehiculo: tipo,
         valor_placa: Number(form.value.valorPlaca || 0),
-        valor_placa_vehiculo: form.value.valorPlacaVehiculo !== '' ? Number(form.value.valorPlacaVehiculo) : null,
-        valor_placa_moto: form.value.valorPlacaMoto !== '' ? Number(form.value.valorPlacaMoto) : null,
+        valor_placa_vehiculo: toNullableNumber(form.value.valorPlacaVehiculo),
+        valor_placa_moto: toNullableNumber(form.value.valorPlacaMoto),
         valor_dateo: Number(form.value.valorDateo || 0),
         valor_nuevo_directo: Number(form.value.valorNuevoDirecto || 0),
         asesor_id: scope.value === 'ASESOR' ? form.value.asesorId ?? null : null,
