@@ -90,10 +90,22 @@ export interface ProduccionLider {
   turnos_prev: number
   turnos_peri: number
 }
+export interface ProduccionFuncionario {
+  funcionario_id: number
+  funcionario_nombre: string
+  vehiculos: number
+  total_bruto: number
+  total_neto: number
+  turnos_rtm: number
+  turnos_soat: number
+  turnos_prev: number
+  turnos_peri: number
+}
 export interface ProduccionLiderResponse {
   fecha_inicio: string
   fecha_fin: string
   por_sede: ProduccionLider[]
+  por_funcionario: ProduccionFuncionario[]
 }
 
 export interface ReporteAsesor {
@@ -178,6 +190,16 @@ export interface RetencionPorMes {
   total: number
 }
 
+export interface TopClienteRetencion {
+  placa: string
+  fecha: string
+  tipo_vehiculo: string | null
+  captacion_canal: string
+  total: number
+  cliente_nombre: string | null
+  cliente_documento: string | null
+}
+
 export interface RetencionResponse {
   fecha_inicio: string
   fecha_fin: string
@@ -190,6 +212,12 @@ export interface RetencionResponse {
   }
   por_canal: RetencionPorCanal[]
   por_mes: RetencionPorMes[]
+  top_clientes: {
+    nuevos: TopClienteRetencion[]
+    recurrentes: TopClienteRetencion[]
+    recuperaciones: TopClienteRetencion[]
+  }
+  top_clientes_limite: number
 }
 
 /**
@@ -315,6 +343,14 @@ export interface ReporteServicioDetalle {
   valor_unitario: number
   total_generado: number
   total_neto: number
+  /**
+   * Valor REAL cobrado (post-descuento), directo de facturacion_tickets —
+   * puede diferir de total_generado/total_neto (estimados por tarifa
+   * configurada). Opcional porque las filas de subtotal que construye
+   * ReporteServicios.vue no lo calculan (esa vista no lo usa todavía).
+   */
+  valor_real_bruto?: number
+  valor_real_neto?: number
 }
 
 export interface ReporteServiciosResponse {
@@ -325,6 +361,8 @@ export interface ReporteServiciosResponse {
     turnos: number
     total_generado: number
     total_neto: number
+    valor_real_bruto: number
+    valor_real_neto: number
   }
 }
 
@@ -347,6 +385,7 @@ export interface TotalesDescuentos {
 export interface DescuentoPorTipo {
   codigo: string
   nombre: string
+  descripcion: string | null
   cantidad: number
   total_descuentos: number
   promedio: number
@@ -718,6 +757,104 @@ export async function descargarSuperInformePdf(fechaInicio: string, fechaFin: st
   })
 }
 
+/**
+ * Previsualización del Súper Informe — usan /super-informe/meta-mensual y
+ * /super-informe/meta-comercial (rango libre) en vez de /meta-mensual/resumen
+ * y /meta-comercial/resumen (solo mes/año calendario completo), porque son
+ * los mismos compute*() que arma el PDF y son los únicos que dan un
+ * resultado correcto para los 4 modos de filtro (Día/Semana/Mes/Personalizado).
+ */
+export interface SuperInformeTotales {
+  livianos: number
+  motos: number
+  total: number
+}
+export interface SuperInformeMetaMensualDetalleMes {
+  mes: number
+  anio: number
+  es_mes_actual: boolean
+  meta: SuperInformeTotales
+  real: SuperInformeTotales
+}
+export interface SuperInformeMetaMensualResponse {
+  caso: 'un_mes_actual' | 'cruce_con_mes_actual' | 'solo_cerrados'
+  fecha_inicio: string
+  fecha_fin: string
+  meses_tocados: { mes: number; anio: number }[]
+  meta_total: SuperInformeTotales
+  real_total: SuperInformeTotales
+  pct_real_sobre_meta: number | null
+  semaforo: SemaforoColor
+  proyeccion_total: SuperInformeTotales | null
+  pct_proyeccion_sobre_meta: number | null
+  real_anio_anterior: SuperInformeTotales
+  variacion_abs: number
+  variacion_pct: number | null
+  detalle_por_mes: SuperInformeMetaMensualDetalleMes[]
+}
+
+export interface SuperInformeDescuentoAsesor {
+  codigo: string
+  nombre: string
+  cantidad: number
+  total_descuentos: number
+}
+export interface SuperInformeMetaComercialAsesor {
+  asesor_id: number
+  asesor_nombre: string
+  pesos_convenio: number
+  pesos_comercial: number
+  pesos_total: number
+  meta_pesos: number | null
+  pct_avance: number | null
+  cumplio: boolean | null
+  faltante: number | null
+  proyeccion_cierre: number
+  comision_pagada: number
+  comision_pendiente: number
+  meta_vehiculos: number | null
+  logrado_vehiculos: number
+  faltante_vehiculos: number | null
+  descuentos: SuperInformeDescuentoAsesor[]
+  descuentos_total: number
+}
+export interface SuperInformeMetaComercialResponse {
+  caso: 'un_mes_actual' | 'cruce_con_mes_actual' | 'solo_cerrados'
+  fecha_inicio: string
+  fecha_fin: string
+  meses_tocados: { mes: number; anio: number }[]
+  nota: string | null
+  comision_estado_disponible: boolean
+  kpis: {
+    pesos_total: number
+    meta_pesos: number | null
+    pct_avance: number | null
+    pesos_convenio: number
+    pesos_comercial: number
+    proyeccion_cierre: number | null
+    pct_proyeccion: number | null
+  }
+  asesores: SuperInformeMetaComercialAsesor[]
+}
+
+export async function getSuperInformeMetaMensual(
+  fechaInicio: string,
+  fechaFin: string
+): Promise<SuperInformeMetaMensualResponse> {
+  return apiFetch<SuperInformeMetaMensualResponse>('/reportes-admin/super-informe/meta-mensual', {
+    query: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+  })
+}
+
+export async function getSuperInformeMetaComercial(
+  fechaInicio: string,
+  fechaFin: string
+): Promise<SuperInformeMetaComercialResponse> {
+  return apiFetch<SuperInformeMetaComercialResponse>('/reportes-admin/super-informe/meta-comercial', {
+    query: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+  })
+}
+
 /* ======================= Reporte Meta Mensual ======================= */
 
 export type FuenteMetaMensual = 'real' | 'historico' | 'sin_datos'
@@ -935,6 +1072,10 @@ export interface MetaComercialAsesorResumen {
   meta_pesos: number | null
   pct_avance: number | null
   semaforo: SemaforoColor
+  /** Meta en cantidad de vehículos (independiente de meta_pesos) — null si no está definida. */
+  meta_vehiculos?: number | null
+  /** Solo disponible en meses históricos (cantidad_convenio + cantidad_comercial); null en meses reales. */
+  logrado_vehiculos?: number | null
 }
 
 export interface MetaComercialResumenResponse {
