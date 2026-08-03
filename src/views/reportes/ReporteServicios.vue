@@ -207,6 +207,7 @@ const filasConSubtotal = computed<FilaServicio[]>(() => {
         valor_unitario: 0,
         total_generado: grupo.reduce((acc, r) => acc + r.total_generado, 0),
         total_neto: grupo.reduce((acc, r) => acc + r.total_neto, 0),
+        costo_base: grupo.reduce((acc, r) => acc + r.costo_base, 0),
         _rowKey: `${codigo}-subtotal`,
         _esSubtotal: true,
       })

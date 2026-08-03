@@ -323,6 +323,12 @@ export interface ReporteServicioDetalle {
    */
   valor_real_bruto?: number
   valor_real_neto?: number
+  /**
+   * Costo Base RTM = turnos × valor Global de comisiones (es_config, asesor_id
+   * IS NULL) — referencia de costo base, NO ajustada por overrides individuales
+   * de asesor. Solo aplica a filas de RTM (0 para otros servicios).
+   */
+  costo_base: number
 }
 
 export interface ReporteServiciosResponse {
@@ -335,6 +341,7 @@ export interface ReporteServiciosResponse {
     total_neto: number
     valor_real_bruto: number
     valor_real_neto: number
+    costo_base: number
   }
 }
 
@@ -779,8 +786,19 @@ export interface SuperInformeMetaComercialAsesor {
   comision_pagada: number
   comision_pendiente: number
   meta_vehiculos: number | null
+  /** Unidades logradas por tipo de vehículo (facturacion_tickets), NO sumadas entre sí. */
+  logrado_motos: number
   logrado_vehiculos: number
   faltante_vehiculos: number | null
+  /**
+   * Costo Base RTM del asesor para el último mes tocado del rango — en meses
+   * reales, config individual (con fallback a Global si no tiene override);
+   * en meses históricos, la tarifa real de ese asesor/mes.
+   */
+  costo_base_moto: number | null
+  costo_base_vehiculo: number | null
+  /** Ingreso real que el asesor trajo al negocio (unidades × Costo Base), NO su comisión. */
+  ingreso_rtm_generado: number
 }
 /** Fila plana para la tabla "Descuentos dados por asesor" — universo AMPLIADO (Comercial + Convenio), distinto de `asesores` arriba (solo Comercial). */
 export interface SuperInformeDescuentoAsesorFila {

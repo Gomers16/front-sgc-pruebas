@@ -154,7 +154,17 @@
         <div class="text-caption font-weight-bold mb-1 mt-4">Unidades (vehículos)</div>
         <v-data-table density="compact" :headers="headersMetaComercialVehiculos" :items="filasMetaComercialVehiculos" hide-default-footer />
         <div class="text-caption text-medium-emphasis mt-1">
-          Logrado (vehículos) = vehículos facturados atribuidos al asesor (facturacion_tickets), no filas de comisiones.
+          Motos/Vehículos = unidades facturadas atribuidas al asesor (facturacion_tickets), no filas de comisiones.
+          En meses históricos sin detalle por tipo de vehículo cargado, ese mes no aporta a este desglose.
+        </div>
+
+        <div class="text-caption font-weight-bold mb-1 mt-4">Ingreso RTM Generado por Asesor</div>
+        <v-data-table density="compact" :headers="headersIngresoRtmAsesor" :items="filasIngresoRtmAsesor" hide-default-footer />
+        <div class="text-caption text-medium-emphasis mt-1">
+          Ingreso RTM Generado = el ingreso real que el asesor trajo al negocio (unidades × Costo Base), NO su comisión
+          — la comisión ganada sigue en la tabla de arriba, sin cambios. Costo Base: en meses reales, config individual
+          del asesor (con fallback al valor Global si no tiene override propio); en meses históricos, la tarifa real de
+          ese asesor/mes.
         </div>
 
         <div class="text-caption font-weight-bold mb-1 mt-4">Descuentos dados por asesor (Comercial y Convenio)</div>
@@ -201,8 +211,8 @@
         <div>
           <div class="text-subtitle-1 font-weight-bold">4. Servicios (RTM)</div>
           <div class="text-caption text-medium-emphasis">
-            Turnos por servicio y tipo de vehículo: valor Estimado (tarifa configurada) vs. valor Real cobrado
-            (post-descuento, directo de la factura).
+            Turnos por servicio y tipo de vehículo: valor Estimado (tarifa configurada), Costo Base (referencia)
+            vs. valor Real cobrado (post-descuento, directo de la factura).
           </div>
         </div>
       </v-card-title>
@@ -212,6 +222,10 @@
         <v-alert v-if="!datos.servicios.detalle.length" type="info" variant="tonal" density="compact" class="mt-3">
           Sin datos en este rango.
         </v-alert>
+        <div v-else class="text-caption text-medium-emphasis mt-1">
+          Costo Base = turnos × valor Global de Costo Base RTM configurado en Comisiones — referencia general,
+          NO ajustada por overrides individuales de asesor. Solo aplica a filas de RTM.
+        </div>
       </v-card-text>
     </v-card>
 
@@ -435,15 +449,36 @@ const filasMetaComercial = computed(() =>
 const headersMetaComercialVehiculos = [
   { title: 'Asesor', key: 'asesor' },
   { title: 'Meta (Veh)', key: 'meta' },
-  { title: 'Logrado (Veh)', key: 'logrado' },
+  { title: 'Motos', key: 'motos' },
+  { title: 'Vehículos', key: 'vehiculos' },
   { title: 'Faltante (Veh)', key: 'faltante' },
 ]
 const filasMetaComercialVehiculos = computed(() =>
   props.datos.metaComercial.asesores.map((a) => ({
     asesor: a.asesor_nombre,
     meta: a.meta_vehiculos === null ? 'Sin meta' : formatNum(a.meta_vehiculos),
-    logrado: formatNum(a.logrado_vehiculos),
+    motos: formatNum(a.logrado_motos),
+    vehiculos: formatNum(a.logrado_vehiculos),
     faltante: a.faltante_vehiculos === null ? '—' : formatNum(a.faltante_vehiculos),
+  }))
+)
+
+const headersIngresoRtmAsesor = [
+  { title: 'Asesor', key: 'asesor' },
+  { title: 'Motos', key: 'motos' },
+  { title: 'Vehículos', key: 'vehiculos' },
+  { title: 'Costo Base Moto', key: 'costoBaseMoto' },
+  { title: 'Costo Base Vehículo', key: 'costoBaseVehiculo' },
+  { title: 'Ingreso RTM Generado', key: 'ingreso' },
+]
+const filasIngresoRtmAsesor = computed(() =>
+  props.datos.metaComercial.asesores.map((a) => ({
+    asesor: a.asesor_nombre,
+    motos: formatNum(a.logrado_motos),
+    vehiculos: formatNum(a.logrado_vehiculos),
+    costoBaseMoto: a.costo_base_moto === null ? '—' : formatPeso(a.costo_base_moto),
+    costoBaseVehiculo: a.costo_base_vehiculo === null ? '—' : formatPeso(a.costo_base_vehiculo),
+    ingreso: formatPeso(a.ingreso_rtm_generado),
   }))
 )
 
@@ -515,6 +550,7 @@ const headersServicios = [
   { title: 'Turnos', key: 'turnos' },
   { title: 'Est. Bruto', key: 'estBruto' },
   { title: 'Est. Neto', key: 'estNeto' },
+  { title: 'Costo Base', key: 'costoBase' },
   { title: 'Real Bruto', key: 'realBruto' },
   { title: 'Real Neto', key: 'realNeto' },
 ]
@@ -525,6 +561,7 @@ const filasServicios = computed(() =>
     turnos: formatNum(d.turnos),
     estBruto: formatPeso(d.total_generado),
     estNeto: formatPeso(d.total_neto),
+    costoBase: formatPeso(d.costo_base),
     realBruto: formatPeso(d.valor_real_bruto),
     realNeto: formatPeso(d.valor_real_neto),
   }))
