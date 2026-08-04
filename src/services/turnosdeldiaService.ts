@@ -163,7 +163,21 @@ export interface Turno {
   conductor?: ConductorLite | null
 
   reasignadoDeTurnoId?: number | null
+
+  // 👇 NUEVO: semáforo de etapas, calculado en backend (turno_etapas_service)
+  // única fuente de verdad — no recalcular esto en el frontend.
+  etapasRequeridas?: number
+  etapasCompletadas?: number
+  estadoVisual?: EstadoVisual
 }
+
+/**
+ * Estados del semáforo de turnos. Única fuente de verdad para este tipo en
+ * el frontend — se importa acá desde cualquier vista/componente que lo
+ * necesite (ej. TurnosDelDia.vue), no se redeclara localmente. El cálculo
+ * real vive en el backend: app/services/turno_etapas_service.ts.
+ */
+export type EstadoVisual = 'cancelado' | 'en_proceso' | 'incompleto' | 'finalizado'
 
 /* ========== Filtros exportación ========== */
 export interface ExportFilters {

@@ -15,6 +15,72 @@
         </span>
       </v-card-title>
 
+      <!-- Panel resumen: leyenda del semáforo + contadores del día.
+           Los contadores se calculan sobre turnosFiltrados (respeta el
+           filtro de servicio/placa activo) — a diferencia del modal
+           "Estadísticas" más abajo, que cuenta sobre todos los turnos del
+           día sin importar el filtro (comportamiento previo, sin cambios). -->
+      <v-card variant="outlined" class="pa-3 pa-sm-4 mb-4 mb-sm-6 rounded-lg">
+        <div class="d-flex flex-wrap align-center" style="gap: 8px">
+          <span class="text-caption text-sm-body-2 font-weight-bold mr-1">Leyenda:</span>
+          <v-chip size="small" color="light-blue-accent-3" variant="elevated" label>
+            🔵 En proceso
+          </v-chip>
+          <v-chip size="small" color="amber" variant="elevated" label>
+            🟡 Incompleto (falta una etapa)
+          </v-chip>
+          <v-chip size="small" color="light-green-accent-3" variant="elevated" label>
+            🟢 Finalizado
+          </v-chip>
+          <v-chip size="small" color="red-accent-2" variant="elevated" label>
+            🔴 Cancelado
+          </v-chip>
+        </div>
+
+        <v-divider class="my-3" />
+
+        <v-row dense>
+          <v-col cols="6" sm="3">
+            <div class="text-center">
+              <div class="text-h6 text-sm-h5 font-weight-bold text-light-blue-darken-2">
+                {{ resumenSemaforo.en_proceso }}
+              </div>
+              <div class="text-caption text-sm-body-2">En proceso</div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="text-center">
+              <div class="text-h6 text-sm-h5 font-weight-bold text-amber-darken-3">
+                {{ resumenSemaforo.incompleto }}
+              </div>
+              <div class="text-caption text-sm-body-2">Incompletos</div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="text-center">
+              <div class="text-h6 text-sm-h5 font-weight-bold text-green-darken-2">
+                {{ resumenSemaforo.finalizado }}
+              </div>
+              <div class="text-caption text-sm-body-2">Finalizados</div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="text-center">
+              <div class="text-h6 text-sm-h5 font-weight-bold text-red-darken-2">
+                {{ resumenSemaforo.cancelado }}
+              </div>
+              <div class="text-caption text-sm-body-2">Cancelados</div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <v-divider class="my-3" />
+
+        <div class="text-center text-subtitle-2 text-sm-subtitle-1 font-weight-bold">
+          Total visible con el filtro actual: {{ turnosFiltrados.length }}
+        </div>
+      </v-card>
+
       <!-- Filtros y acciones - Responsive -->
       <v-row class="mb-4 align-center">
         <!-- Botón Refrescar -->
@@ -141,8 +207,8 @@
         >
           <v-card
             class="turno-card pa-3 pa-sm-4 rounded-lg elevation-4"
-            :color="cardColor(turno.estado)"
-            :class="`estado-${turno.estado}`"
+            :color="cardColor(turno)"
+            :class="`estado-${getEstadoVisual(turno)}`"
           >
             <v-card-title class="text-subtitle-1 text-sm-h6 font-weight-bold pb-1 text-on-primary-text">
               🔢 Turno: {{ displayTurnoNumero(turno) }}
@@ -161,11 +227,11 @@
               <v-chip
                 class="mb-2 mb-sm-3"
                 :size="$vuetify.display.xs ? 'x-small' : 'small'"
-                :color="estadoChipColor(turno.estado)"
+                :color="estadoChipColor(turno)"
                 variant="elevated"
                 label
               >
-                {{ estadoChipLabel(turno.estado) }}
+                {{ estadoChipLabel(turno) }}
               </v-chip>
 
               <p class="text-caption text-sm-subtitle-1 text-on-primary-text mb-1">
@@ -614,11 +680,11 @@
         </v-card-title>
         <v-card-text>
           <p class="text-subtitle-1 text-sm-h6 mb-1 text-center">
-            Total de turnos visibles hoy (excepto inactivos):
-            <strong>{{ turnos.length }}</strong>
+            Total de turnos visibles con el filtro actual:
+            <strong>{{ turnosFiltrados.length }}</strong>
           </p>
           <p class="text-caption text-sm-body-2 text-center text-grey-darken-1">
-            Incluye turnos en proceso, finalizados y cancelados.
+            Incluye turnos en proceso, incompletos, finalizados y cancelados.
           </p>
 
           <v-row class="mt-4">
@@ -632,8 +698,16 @@
                   <v-list-item>
                     <v-list-item-title class="text-caption text-sm-body-2">En proceso</v-list-item-title>
                     <template #append>
-                      <v-chip color="amber" label :size="$vuetify.display.xs ? 'small' : 'default'">
+                      <v-chip color="light-blue-accent-3" label :size="$vuetify.display.xs ? 'small' : 'default'">
                         {{ conteoPorEstado.enProceso }}
+                      </v-chip>
+                    </template>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title class="text-caption text-sm-body-2">Incompletos</v-list-item-title>
+                    <template #append>
+                      <v-chip color="amber" label :size="$vuetify.display.xs ? 'small' : 'default'">
+                        {{ conteoPorEstado.incompletos }}
                       </v-chip>
                     </template>
                   </v-list-item>
@@ -749,6 +823,8 @@
             variant="outlined"
             prepend-icon="mdi-file-excel"
             @click="downloadExcelDia"
+            :loading="isDownloadingExcel"
+            :disabled="isDownloadingExcel"
             :size="$vuetify.display.xs ? 'small' : 'default'"
             :block="$vuetify.display.xs"
           >
@@ -776,7 +852,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { DateTime } from 'luxon'
-import TurnosDelDiaService from '@/services/turnosdeldiaService'
+import TurnosDelDiaService, { type EstadoVisual } from '@/services/turnosdeldiaService'
 import { authSetStore } from '@/stores/AuthStore'
 
 import {
@@ -887,6 +963,12 @@ interface Turno {
     nombres: string
     apellidos: string
   } | null
+
+  // ✅ Semáforo de etapas, calculado en backend (turno_etapas_service) —
+  // única fuente de verdad. No recalcular esta cuenta en el frontend.
+  etapasRequeridas?: number
+  etapasCompletadas?: number
+  estadoVisual?: EstadoVisual
 }
 
 interface Etapa {
@@ -942,6 +1024,28 @@ const turnosFiltrados = computed(() => {
   })
 })
 
+/**
+ * Resumen del semáforo para el panel superior. A propósito cuenta sobre
+ * `turnosFiltrados` (no sobre `turnos`) para reflejar exactamente los
+ * turnos que el asesor tiene visibles según el filtro de servicio/placa que
+ * tenga puesto — el modal "Estadísticas" histórico cuenta sobre `turnos`
+ * sin filtrar, que es un bug conocido y separado de este panel.
+ */
+const resumenSemaforo = computed(() => {
+  const res = {
+    en_proceso: 0,
+    incompleto: 0,
+    finalizado: 0,
+    cancelado: 0,
+  }
+
+  turnosFiltrados.value.forEach((t) => {
+    res[getEstadoVisual(t)]++
+  })
+
+  return res
+})
+
 /* ===== Modal observaciones del dateo ===== */
 const modalObservacionesDateo = ref({
   show: false,
@@ -995,18 +1099,28 @@ const abrirObservacionesTurno = (turno: Turno) => {
   }
 }
 
-/* ===== Conteo por estado ===== */
+/**
+ * Conteo por estado para el modal "Estadísticas". Fuente de datos alineada
+ * con el panel resumen de arriba: mismo array (turnosFiltrados, respeta el
+ * filtro de servicio/placa activo) y mismo semáforo centralizado
+ * (getEstadoVisual/estadoVisual del backend) en vez de turno.estado crudo,
+ * para no repetir el bug de contar como "Finalizados" turnos que en
+ * realidad saltaron una etapa.
+ */
 const conteoPorEstado = computed(() => {
   const res = {
     enProceso: 0,
+    incompletos: 0,
     finalizados: 0,
     cancelados: 0,
   }
 
-  turnos.value.forEach((t) => {
-    if (t.estado === 'activo') res.enProceso++
-    else if (t.estado === 'finalizado') res.finalizados++
-    else if (t.estado === 'cancelado') res.cancelados++
+  turnosFiltrados.value.forEach((t) => {
+    const ev = getEstadoVisual(t)
+    if (ev === 'en_proceso') res.enProceso++
+    else if (ev === 'incompleto') res.incompletos++
+    else if (ev === 'finalizado') res.finalizados++
+    else if (ev === 'cancelado') res.cancelados++
   })
 
   return res
@@ -1163,32 +1277,47 @@ const formatFechaModal = (fechaString: string | null): string => {
 }
 
 /* ===== Colores ===== */
-const cardColor = (estado: Turno['estado']) => {
-  if (estado === 'finalizado') return 'success'
-  if (estado === 'cancelado') return 'error'
-  if (estado === 'inactivo') return 'grey-darken-1'
+/**
+ * Estado visual (semáforo) del turno. Viene calculado desde el backend
+ * (turno_etapas_service → computeEtapasTurno) para que el conteo de etapas
+ * completas/requeridas no se desincronice entre frontend y backend. Si por
+ * algún motivo no llegara (respuesta vieja en caché, etc.) se asume
+ * 'en_proceso' como valor seguro por defecto.
+ */
+const getEstadoVisual = (turno: Turno): EstadoVisual => turno.estadoVisual ?? 'en_proceso'
+
+const cardColor = (turno: Turno) => {
+  const ev = getEstadoVisual(turno)
+  if (turno.estado === 'inactivo') return 'grey-darken-1'
+  if (ev === 'finalizado') return 'success'
+  if (ev === 'incompleto') return 'warning'
+  if (ev === 'cancelado') return 'error'
   return 'primary'
 }
 
-const estadoChipLabel = (estado: Turno['estado']) => {
-  if (estado === 'finalizado') return 'Finalizado'
-  if (estado === 'cancelado') return 'Cancelado'
-  if (estado === 'inactivo') return 'Inactivo'
+const estadoChipLabel = (turno: Turno) => {
+  const ev = getEstadoVisual(turno)
+  if (turno.estado === 'inactivo') return 'Inactivo'
+  if (ev === 'finalizado') return 'Finalizado'
+  if (ev === 'incompleto') return 'Incompleto'
+  if (ev === 'cancelado') return 'Cancelado'
   return 'En proceso'
 }
 
-const estadoChipColor = (estado: Turno['estado']) => {
-  if (estado === 'finalizado') return 'light-green-accent-3'
-  if (estado === 'cancelado') return 'red-accent-2'
-  if (estado === 'inactivo') return 'grey'
-  return 'amber'
+const estadoChipColor = (turno: Turno) => {
+  const ev = getEstadoVisual(turno)
+  if (turno.estado === 'inactivo') return 'grey'
+  if (ev === 'finalizado') return 'light-green-accent-3'
+  if (ev === 'incompleto') return 'amber'
+  if (ev === 'cancelado') return 'red-accent-2'
+  return 'light-blue-accent-3'
 }
 
 const iconColor = (etapa: Etapa, turno: Turno) => {
   if (!etapa.completed) {
     return 'on-primary-text-light'
   }
-  if (turno.estado === 'finalizado') {
+  if (getEstadoVisual(turno) === 'finalizado') {
     return 'white'
   }
   return 'success'
@@ -1237,7 +1366,10 @@ const loadTurnosHoy = async () => {
 watch(fechaSeleccionada, () => loadTurnosHoy())
 
 const getEtapas = (turno: Turno): Etapa[] => {
-  const esSOAT = getServicioCodigo(turno).toUpperCase() === 'SOAT'
+  // Fuente de verdad de cuántas etapas requiere el turno: turno.etapasRequeridas
+  // (calculado en backend por turno_etapas_service). Si no llegara, se asume
+  // 3 (Puerta+Facturación+Certificación) como caso general.
+  const esSOAT = (turno.etapasRequeridas ?? 3) < 3
 
   const etapas: Etapa[] = [
     {
@@ -1343,7 +1475,22 @@ const openStatsModal = () => {
   showStatsModal.value = true
 }
 
-const downloadExcelDia = () => {
+const isDownloadingExcel = ref(false)
+
+/** Dispara la descarga de un Blob como archivo (mismo patrón que ContadorConvenios.vue). */
+const triggerBlobDownload = (data: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(new Blob([data]))
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
+
+const downloadExcelDia = async () => {
+  isDownloadingExcel.value = true
   try {
     const today = new Date()
     const options: Intl.DateTimeFormatOptions = {
@@ -1359,11 +1506,20 @@ const downloadExcelDia = () => {
     const day = parts.find((p) => p.type === 'day')?.value
     const todayISO = `${year}-${month}-${day}`
 
-    const url = `/api/turnos-rtm/reporte/excel?fechaInicio=${todayISO}&fechaFin=${todayISO}`
-    window.open(url, '_blank')
+    // 👇 Usa TurnosDelDiaService (fetch con Bearer token), NO window.open():
+    // la API exige Authorization header y esta app no usa cookies de sesión,
+    // así que abrir la URL directo en una pestaña nueva siempre devolvía 401.
+    const { data, filename } = await TurnosDelDiaService.exportTurnosExcel({
+      fechaInicio: todayISO,
+      fechaFin: todayISO,
+    })
+    triggerBlobDownload(data, filename)
+    showSnackbar('Excel del día descargado.', 'success')
   } catch (error) {
     console.error('Error al descargar Excel del día:', error)
     showSnackbar('No se pudo descargar el Excel del día.', 'error')
+  } finally {
+    isDownloadingExcel.value = false
   }
 }
 
@@ -1519,8 +1675,11 @@ onMounted(() => {
 .estado-finalizado {
   border: 2px solid #4ade80;
 }
-.estado-activo {
+.estado-en_proceso {
   border: 2px solid #38bdf8;
+}
+.estado-incompleto {
+  border: 2px solid #fbbf24;
 }
 
 .text-on-primary-text {
