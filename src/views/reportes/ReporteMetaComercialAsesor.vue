@@ -111,9 +111,9 @@
       <v-col cols="12" sm="6" md="3">
         <v-card elevation="6" class="rounded-xl kpi-card" :class="borderSemaforo(resumenActual?.semaforo)">
           <v-card-text>
-            <div class="text-caption text-medium-emphasis">Total General</div>
+            <div class="text-caption text-medium-emphasis">Total General (Ingreso RTM Generado)</div>
             <div class="text-h6 font-weight-bold">
-              {{ formatMoney(resumenActual?.pesos_total) }} / {{ formatMoney(resumenActual?.meta_pesos) }}
+              {{ formatMoney(resumenActual?.ingreso_rtm_generado_total) }} / {{ formatMoney(resumenActual?.meta_pesos) }}
             </div>
             <div class="text-caption">{{ formatPct(resumenActual?.pct_avance) }} de la meta</div>
           </v-card-text>
@@ -122,11 +122,11 @@
       <v-col cols="12" sm="6" md="3">
         <v-card elevation="6" class="rounded-xl kpi-card">
           <v-card-text>
-            <div class="text-caption text-medium-emphasis">Convenio</div>
-            <div class="text-h6 font-weight-bold">{{ formatMoney(resumenActual?.pesos_convenio) }}</div>
+            <div class="text-caption text-medium-emphasis">Convenio (Ingreso Generado)</div>
+            <div class="text-h6 font-weight-bold">{{ formatMoney(resumenActual?.ingreso_rtm_generado_convenio) }}</div>
             <div class="text-caption">
               {{ resumenActual?.cantidad_convenio !== null && resumenActual?.cantidad_convenio !== undefined
-                ? `${resumenActual.cantidad_convenio} captaciones` : 'comisión real' }}
+                ? `${resumenActual.cantidad_convenio} captaciones` : 'facturación real' }}
             </div>
           </v-card-text>
         </v-card>
@@ -134,11 +134,22 @@
       <v-col cols="12" sm="6" md="3">
         <v-card elevation="6" class="rounded-xl kpi-card">
           <v-card-text>
-            <div class="text-caption text-medium-emphasis">Propio (Comercial)</div>
-            <div class="text-h6 font-weight-bold">{{ formatMoney(resumenActual?.pesos_comercial) }}</div>
+            <div class="text-caption text-medium-emphasis">Propio - Comercial (Ingreso Generado)</div>
+            <div class="text-h6 font-weight-bold">{{ formatMoney(resumenActual?.ingreso_rtm_generado_comercial) }}</div>
             <div class="text-caption">
               {{ resumenActual?.cantidad_comercial !== null && resumenActual?.cantidad_comercial !== undefined
-                ? `${resumenActual.cantidad_comercial} captaciones` : 'comisión real' }}
+                ? `${resumenActual.cantidad_comercial} captaciones` : 'facturación real' }}
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" md="3">
+        <v-card elevation="6" class="rounded-xl kpi-card">
+          <v-card-text>
+            <div class="text-caption text-medium-emphasis">💰 Comisión Ganada</div>
+            <div class="text-h6 font-weight-bold">{{ formatMoney(resumenActual?.pesos_total) }}</div>
+            <div class="text-caption text-medium-emphasis">
+              No se compara contra la meta — la meta mide ingreso generado
             </div>
           </v-card-text>
         </v-card>
@@ -436,8 +447,8 @@
                   </div>
                 </template>
                 <template v-else-if="tipoGraficoMeta === 'composicion'">
-                  <div v-if="(resumenActual?.pesos_total ?? 0) > 0" style="height: 220px;">
-                    <Doughnut :data="chartComposicion(resumenActual)" :options="chartOptionsBase" />
+                  <div v-if="(resumenActual?.ingreso_rtm_generado_total ?? 0) > 0" style="height: 220px;">
+                    <Doughnut :data="chartComposicion(composicionIngresoActual)" :options="chartOptionsBase" />
                   </div>
                   <v-alert v-else type="info" variant="tonal" density="compact">Aún no hay captaciones este mes.</v-alert>
                 </template>
@@ -456,15 +467,15 @@
             <v-row v-if="resumenActual">
               <v-col cols="12">
                 <v-card variant="outlined" class="rounded-xl">
-                  <v-card-title class="text-subtitle-1">Cuánto se lleva vs. cuánto falta — {{ resumenActual.asesor_nombre }}</v-card-title>
+                  <v-card-title class="text-subtitle-1">Cuánto se lleva vs. cuánto falta (Ingreso RTM Generado) — {{ resumenActual.asesor_nombre }}</v-card-title>
                   <v-card-text>
                     <div>
                       <div class="d-flex justify-space-between font-weight-bold">
                         <span>Total</span>
                         <span>
-                          {{ formatMoney(resumenActual.pesos_total) }} / {{ formatMoney(resumenActual.meta_pesos) }}
+                          {{ formatMoney(resumenActual.ingreso_rtm_generado_total) }} / {{ formatMoney(resumenActual.meta_pesos) }}
                           <template v-if="resumenActual.meta_pesos">
-                            (falta {{ formatMoney(Math.max(0, resumenActual.meta_pesos - resumenActual.pesos_total)) }})
+                            (falta {{ formatMoney(Math.max(0, resumenActual.meta_pesos - resumenActual.ingreso_rtm_generado_total)) }})
                           </template>
                         </span>
                       </div>
@@ -473,6 +484,9 @@
                         :color="colorSemaforo(resumenActual.semaforo)"
                         height="12" rounded class="mt-1"
                       />
+                      <div class="text-caption text-medium-emphasis mt-2">
+                        💰 Comisión Ganada: {{ formatMoney(resumenActual.pesos_total) }} (no forma parte del avance de meta)
+                      </div>
                     </div>
                   </v-card-text>
                 </v-card>
@@ -528,13 +542,16 @@
               hide-default-footer
               :items-per-page="-1"
             >
-              <template #item.pesos_convenio="{ item }">{{ formatMoney(item.pesos_convenio) }}</template>
-              <template #item.pesos_comercial="{ item }">{{ formatMoney(item.pesos_comercial) }}</template>
-              <template #item.pesos_total="{ item }">{{ formatMoney(item.pesos_total) }}</template>
+              <template #item.ingreso_rtm_generado_convenio="{ item }">{{ formatMoney(item.ingreso_rtm_generado_convenio) }}</template>
+              <template #item.ingreso_rtm_generado_comercial="{ item }">{{ formatMoney(item.ingreso_rtm_generado_comercial) }}</template>
+              <template #item.ingreso_rtm_generado_total="{ item }">{{ formatMoney(item.ingreso_rtm_generado_total) }}</template>
               <template #item.meta_pesos="{ item }">{{ formatMoney(item.meta_pesos) }}</template>
               <template #item.pct_avance="{ item }">
                 <span v-if="item.pct_avance === null" class="text-caption text-medium-emphasis">Sin meta</span>
                 <v-chip v-else size="small" :color="colorSemaforo(item.semaforo)" variant="tonal">{{ formatPct(item.pct_avance) }}</v-chip>
+              </template>
+              <template #item.pesos_total="{ item }">
+                <span class="text-medium-emphasis">{{ formatMoney(item.pesos_total) }}</span>
               </template>
               <template #item.acciones="{ item }">
                 <v-btn
@@ -617,8 +634,8 @@
                   </div>
                 </template>
                 <template v-else-if="tipoGraficoProyectado === 'composicion'">
-                  <div v-if="(resumenActual?.pesos_total ?? 0) > 0" style="height: 220px;">
-                    <Doughnut :data="chartComposicion(resumenActual)" :options="chartOptionsBase" />
+                  <div v-if="(resumenActual?.ingreso_rtm_generado_total ?? 0) > 0" style="height: 220px;">
+                    <Doughnut :data="chartComposicion(composicionIngresoActual)" :options="chartOptionsBase" />
                   </div>
                   <v-alert v-else type="info" variant="tonal" density="compact">Aún no hay captaciones este mes.</v-alert>
                 </template>
@@ -1058,15 +1075,26 @@ const resumenActual = computed<MetaComercialAsesorResumen | null>(() => {
     (acc, a) => {
       acc.pesos_convenio += a.pesos_convenio
       acc.pesos_comercial += a.pesos_comercial
+      acc.ingreso_rtm_generado_convenio += a.ingreso_rtm_generado_convenio
+      acc.ingreso_rtm_generado_comercial += a.ingreso_rtm_generado_comercial
       acc.cantidad_convenio = a.cantidad_convenio === null ? null : (acc.cantidad_convenio ?? 0) + a.cantidad_convenio
       acc.cantidad_comercial = a.cantidad_comercial === null ? null : (acc.cantidad_comercial ?? 0) + a.cantidad_comercial
       acc.meta_pesos = a.meta_pesos === null ? acc.meta_pesos : (acc.meta_pesos ?? 0) + a.meta_pesos
       return acc
     },
-    { pesos_convenio: 0, pesos_comercial: 0, cantidad_convenio: null as number | null, cantidad_comercial: null as number | null, meta_pesos: null as number | null }
+    {
+      pesos_convenio: 0,
+      pesos_comercial: 0,
+      ingreso_rtm_generado_convenio: 0,
+      ingreso_rtm_generado_comercial: 0,
+      cantidad_convenio: null as number | null,
+      cantidad_comercial: null as number | null,
+      meta_pesos: null as number | null,
+    }
   )
   const pesosTotal = agregado.pesos_convenio + agregado.pesos_comercial
-  const pct = calcularPct(pesosTotal, agregado.meta_pesos)
+  const ingresoTotal = agregado.ingreso_rtm_generado_convenio + agregado.ingreso_rtm_generado_comercial
+  const pct = calcularPct(ingresoTotal, agregado.meta_pesos)
   return {
     asesor_id: -1,
     asesor_nombre: 'Todos los asesores',
@@ -1077,9 +1105,21 @@ const resumenActual = computed<MetaComercialAsesorResumen | null>(() => {
     pesos_convenio: agregado.pesos_convenio,
     pesos_comercial: agregado.pesos_comercial,
     pesos_total: pesosTotal,
+    ingreso_rtm_generado_convenio: agregado.ingreso_rtm_generado_convenio,
+    ingreso_rtm_generado_comercial: agregado.ingreso_rtm_generado_comercial,
+    ingreso_rtm_generado_total: ingresoTotal,
     meta_pesos: agregado.meta_pesos,
     pct_avance: pct,
     semaforo: calcularSemaforo(pct),
+  }
+})
+
+/** Composición Convenio/Propio del gráfico de "Meta"/"Proyectado" — Ingreso RTM Generado, no comisión. */
+const composicionIngresoActual = computed(() => {
+  if (!resumenActual.value) return null
+  return {
+    pesos_convenio: resumenActual.value.ingreso_rtm_generado_convenio,
+    pesos_comercial: resumenActual.value.ingreso_rtm_generado_comercial,
   }
 })
 
@@ -1513,11 +1553,12 @@ const headersSemanal = [
 ]
 const headersResumenAsesores = [
   { title: 'Asesor', key: 'asesor_nombre' },
-  { title: 'Convenio', key: 'pesos_convenio' },
-  { title: 'Propio', key: 'pesos_comercial' },
-  { title: 'Total', key: 'pesos_total' },
+  { title: 'Convenio (Ingreso)', key: 'ingreso_rtm_generado_convenio' },
+  { title: 'Propio (Ingreso)', key: 'ingreso_rtm_generado_comercial' },
+  { title: 'Total (Ingreso)', key: 'ingreso_rtm_generado_total' },
   { title: 'Meta', key: 'meta_pesos' },
   { title: '% Avance', key: 'pct_avance' },
+  { title: 'Comisión Ganada', key: 'pesos_total' },
   { title: '', key: 'acciones', sortable: false, width: 48 },
 ]
 const headersProyectado = [

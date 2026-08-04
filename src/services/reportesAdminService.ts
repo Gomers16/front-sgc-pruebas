@@ -1082,15 +1082,21 @@ export interface MetaComercialAsesorResumen {
   es_estimado: boolean
   cantidad_convenio: number | null
   cantidad_comercial: number | null
+  /** Comisión Ganada — dinero pagado/a pagar al asesor. NO se compara contra la meta. */
   pesos_convenio: number
   pesos_comercial: number
   pesos_total: number
+  /** Ingreso RTM Generado — lo que el asesor generó en facturación RTM real (cantidad × Costo Base). Esto SÍ se compara contra meta_pesos. */
+  ingreso_rtm_generado_convenio: number
+  ingreso_rtm_generado_comercial: number
+  ingreso_rtm_generado_total: number
   meta_pesos: number | null
+  /** pct_avance/semaforo ya están calculados contra ingreso_rtm_generado_total, no contra la comisión. */
   pct_avance: number | null
   semaforo: SemaforoColor
   /** Meta en cantidad de vehículos (independiente de meta_pesos) — null si no está definida. */
   meta_vehiculos?: number | null
-  /** Solo disponible en meses históricos (cantidad_convenio + cantidad_comercial); null en meses reales. */
+  /** Vehículos/motos facturados en el mes (real: facturacion_tickets; histórico: detalle reconciliado o estimado). */
   logrado_vehiculos?: number | null
 }
 

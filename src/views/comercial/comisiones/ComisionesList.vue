@@ -69,11 +69,20 @@
             <div class="d-flex align-center gap-1 mb-4" style="flex-wrap:wrap">
               <v-btn
                 size="small"
-                :color="liquidacionFiltroRapido === 'DIARIO' ? 'primary' : undefined"
-                :variant="liquidacionFiltroRapido === 'DIARIO' ? 'flat' : 'outlined'"
-                @click="aplicarFiltroRapidoLiquidacion('DIARIO')"
+                :color="liquidacionFiltroRapido === 'HOY' ? 'primary' : undefined"
+                :variant="liquidacionFiltroRapido === 'HOY' ? 'flat' : 'outlined'"
+                @click="aplicarFiltroHoyLiquidacion()"
               >
-                Diario
+                Hoy
+              </v-btn>
+
+              <v-btn
+                size="small"
+                :color="liquidacionFiltroRapido === 'DIA_ANTERIOR' ? 'primary' : undefined"
+                :variant="liquidacionFiltroRapido === 'DIA_ANTERIOR' ? 'flat' : 'outlined'"
+                @click="aplicarFiltroDiaAnteriorLiquidacion()"
+              >
+                Día Anterior
               </v-btn>
 
               <v-menu v-model="liquidacionMenuSemanal" :close-on-content-click="true">
@@ -3804,11 +3813,12 @@ const liquidacion = ref<LiquidacionState>({
  * volver a abrir.
  */
 async function abrirLiquidacion() {
+  const usaFallbackAyer = !filters.value.desde && !filters.value.hasta
   const ayerISO = toISODate(calcularAyer())
   const desde = filters.value.desde || ayerISO
   const hasta = filters.value.hasta || ayerISO
   liquidacion.value = { open: true, loading: true, error: '', desde, hasta, data: null }
-  liquidacionFiltroRapido.value = ''
+  liquidacionFiltroRapido.value = usaFallbackAyer ? 'DIA_ANTERIOR' : ''
   limpiarSeleccionLiquidacion()
   try {
     liquidacion.value.data = await getLiquidacionRtm(desde, hasta)
@@ -4067,7 +4077,9 @@ watch([() => filters.value.desde, () => filters.value.hasta], ([desde, hasta]) =
  * aislado de filtroRapidoFecha / filters de la vista principal: cambiar el
  * período aquí NO toca ni recarga la tabla de atrás.
  */
-const liquidacionFiltroRapido = ref<FiltroRapidoFecha>('')
+/** Diario de la lista principal ('DIARIO') pasa a 2 conceptos claros en el modal: 'HOY' y 'DIA_ANTERIOR'. */
+type FiltroRapidoFechaLiquidacion = '' | 'HOY' | 'DIA_ANTERIOR' | 'SEMANAL' | 'QUINCENAL' | 'MENSUAL'
+const liquidacionFiltroRapido = ref<FiltroRapidoFechaLiquidacion>('')
 const liquidacionMenuSemanal = ref(false)
 const liquidacionMenuQuincenal = ref(false)
 const menuMensualLiquidacion = ref(false)
@@ -4107,9 +4119,15 @@ async function cambiarPeriodoLiquidacion(desde: string, hasta: string) {
   }
 }
 
-function aplicarFiltroRapidoLiquidacion(tipo: 'DIARIO') {
+function aplicarFiltroHoyLiquidacion() {
+  const hoyISO = toISODate(new Date())
+  liquidacionFiltroRapido.value = 'HOY'
+  cambiarPeriodoLiquidacion(hoyISO, hoyISO)
+}
+
+function aplicarFiltroDiaAnteriorLiquidacion() {
   const ayerISO = toISODate(calcularAyer())
-  liquidacionFiltroRapido.value = tipo
+  liquidacionFiltroRapido.value = 'DIA_ANTERIOR'
   cambiarPeriodoLiquidacion(ayerISO, ayerISO)
 }
 
@@ -4656,7 +4674,13 @@ async function ejecutarAccionMasiva() {
       // el pago sale del modal Liquidar (que ya tiene un rango activo).
       // Para tabla general/panel, el backend calcula fecha_inicio/fecha_fin
       // a partir del min/max de fecha_calculo de las comisiones incluidas.
-      tipo_periodo: esDelModalLiquidacion && liquidacionFiltroRapido.value ? liquidacionFiltroRapido.value : undefined,
+      // tipo_periodo del backend solo conoce 'DIARIO' (no distingue
+      // Hoy/Día Anterior — esa distinción es puramente de la UI del modal).
+      tipo_periodo: esDelModalLiquidacion && liquidacionFiltroRapido.value
+        ? (liquidacionFiltroRapido.value === 'HOY' || liquidacionFiltroRapido.value === 'DIA_ANTERIOR'
+            ? 'DIARIO'
+            : liquidacionFiltroRapido.value)
+        : undefined,
       fecha_inicio: esDelModalLiquidacion ? liquidacion.value.desde : undefined,
       fecha_fin: esDelModalLiquidacion ? liquidacion.value.hasta : undefined,
     })
