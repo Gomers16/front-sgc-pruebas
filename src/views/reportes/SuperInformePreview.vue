@@ -193,6 +193,28 @@
       </v-card-title>
       <v-divider />
       <v-card-text>
+        <v-alert type="info" variant="tonal" density="compact" class="mb-4">
+          <div class="text-caption font-weight-bold mb-2">Reconciliación contra turnos RTM reales</div>
+          <v-row dense class="mb-2">
+            <v-col cols="12" sm="4">
+              <div class="text-caption text-medium-emphasis">Turnos RTM reales del rango</div>
+              <div class="text-body-1 font-weight-bold">{{ formatNum(datos.reconciliacionRtm.turnos_reales_total) }}</div>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <div class="text-caption text-medium-emphasis">Con factura RTM confirmada</div>
+              <div class="text-body-1 font-weight-bold">{{ formatNum(datos.reconciliacionRtm.con_factura_confirmada_rtm) }}</div>
+            </v-col>
+            <v-col cols="12" sm="4">
+              <div class="text-caption text-medium-emphasis">Pendientes / incompletos</div>
+              <div class="text-body-1 font-weight-bold">{{ formatNum(datos.reconciliacionRtm.pendientes_total) }}</div>
+            </v-col>
+          </v-row>
+          <div v-if="datos.reconciliacionRtm.categorias.length" class="text-caption">
+            <div v-for="c in datos.reconciliacionRtm.categorias" :key="c.categoria">
+              • {{ c.label }}: {{ formatNum(c.cantidad) }}
+            </div>
+          </div>
+        </v-alert>
         <v-data-table density="compact" :headers="headersIngresosCanal" :items="filasIngresosCanal" hide-default-footer>
           <template #item.variacion="{ item }">
             <span :style="{ color: item.variacionAbs >= 0 ? '#1e7e34' : '#c0392b' }">{{ item.variacion }}</span>
@@ -218,6 +240,13 @@
       </v-card-title>
       <v-divider />
       <v-card-text>
+        <v-alert type="info" variant="tonal" density="compact" class="mb-3 text-caption">
+          De los {{ formatNum(datos.reconciliacionRtm.turnos_reales_total) }} turnos RTM reales del rango,
+          {{ formatNum(datos.reconciliacionRtm.pendientes_total) }} están pendientes de facturar o con ticket
+          incompleto — ver detalle en sección 3 (Ingresos por Canal). La columna "Turnos" de esta tabla ya incluye
+          el total real (no está filtrada por factura); son las columnas "Real Bruto"/"Real Neto" las que solo
+          reflejan los turnos con ticket confirmado.
+        </v-alert>
         <v-data-table density="compact" :headers="headersServicios" :items="filasServicios" hide-default-footer />
         <v-alert v-if="!datos.servicios.detalle.length" type="info" variant="tonal" density="compact" class="mt-3">
           Sin datos en este rango.
@@ -242,6 +271,11 @@
       </v-card-title>
       <v-divider />
       <v-card-text>
+        <v-alert type="info" variant="tonal" density="compact" class="mb-3 text-caption">
+          De los {{ formatNum(datos.reconciliacionRtm.turnos_reales_total) }} turnos RTM reales del rango,
+          {{ formatNum(datos.reconciliacionRtm.pendientes_total) }} están pendientes de facturar o con ticket
+          incompleto — ver detalle en sección 3 (Ingresos por Canal).
+        </v-alert>
         <v-row dense class="mb-3">
           <v-col cols="4">
             <div class="text-caption text-medium-emphasis">Nuevos</div>
@@ -339,6 +373,7 @@ import type {
   DescuentosPorCanalResponse,
   DescuentosPorAutorizadorResponse,
   ProduccionLiderResponse,
+  ReconciliacionRtmResponse,
 } from '@/services/reportesAdminService'
 
 export interface SuperInformePreviewDatos {
@@ -354,6 +389,7 @@ export interface SuperInformePreviewDatos {
   descuentosCanal: DescuentosPorCanalResponse
   descuentosAutorizador: DescuentosPorAutorizadorResponse
   produccionLider: ProduccionLiderResponse
+  reconciliacionRtm: ReconciliacionRtmResponse
 }
 
 const props = defineProps<{ datos: SuperInformePreviewDatos }>()

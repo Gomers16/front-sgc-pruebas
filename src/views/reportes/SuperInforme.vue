@@ -117,6 +117,7 @@ import {
   getDescuentosPorCanal,
   getDescuentosPorAutorizador,
   getProduccionPorLider,
+  getReconciliacionRtm,
 } from '@/services/reportesAdminService'
 
 type ModoFiltro = 'dia' | 'semana' | 'mes' | 'personalizado'
@@ -234,6 +235,7 @@ async function aplicarFiltro() {
       descuentosCanal,
       descuentosAutorizador,
       produccionLider,
+      reconciliacionRtm,
     ] = await Promise.all([
       getSuperInformeMetaMensual(rango.inicio, rango.fin),
       getSuperInformeMetaComercial(rango.inicio, rango.fin),
@@ -245,6 +247,7 @@ async function aplicarFiltro() {
       getDescuentosPorCanal(rango.inicio, rango.fin),
       getDescuentosPorAutorizador(rango.inicio, rango.fin),
       getProduccionPorLider(rango.inicio, rango.fin),
+      getReconciliacionRtm(rango.inicio, rango.fin),
     ])
 
     previewDatos.value = {
@@ -260,6 +263,7 @@ async function aplicarFiltro() {
       descuentosCanal,
       descuentosAutorizador,
       produccionLider,
+      reconciliacionRtm,
     }
   } catch (e) {
     errorMsg.value = e instanceof Error ? e.message : 'No se pudo generar la previsualización.'

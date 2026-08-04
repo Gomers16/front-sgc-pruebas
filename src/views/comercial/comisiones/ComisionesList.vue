@@ -3804,9 +3804,9 @@ const liquidacion = ref<LiquidacionState>({
  * volver a abrir.
  */
 async function abrirLiquidacion() {
-  const hoy = toISODate(new Date())
-  const desde = filters.value.desde || hoy
-  const hasta = filters.value.hasta || hoy
+  const ayerISO = toISODate(calcularAyer())
+  const desde = filters.value.desde || ayerISO
+  const hasta = filters.value.hasta || ayerISO
   liquidacion.value = { open: true, loading: true, error: '', desde, hasta, data: null }
   liquidacionFiltroRapido.value = ''
   limpiarSeleccionLiquidacion()
@@ -3918,6 +3918,18 @@ function pad2(n: number): string {
 }
 function toISODate(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+/**
+ * Default de "Diario" en Liquidación RTM: el día que normalmente se
+ * liquida es el ANTERIOR (ya cerrado, con toda la facturación
+ * confirmada) — no el día en curso. Exclusivo del flujo de Liquidación;
+ * el filtro "Diario" de la lista principal de comisiones sigue en hoy
+ * (calcularRangoRapido), es un caso de uso distinto.
+ */
+function calcularAyer(): Date {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  return d
 }
 
 const MESES_ABREV = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
@@ -4096,9 +4108,9 @@ async function cambiarPeriodoLiquidacion(desde: string, hasta: string) {
 }
 
 function aplicarFiltroRapidoLiquidacion(tipo: 'DIARIO') {
-  const { desde, hasta } = calcularRangoRapido(tipo)
+  const ayerISO = toISODate(calcularAyer())
   liquidacionFiltroRapido.value = tipo
-  cambiarPeriodoLiquidacion(desde, hasta)
+  cambiarPeriodoLiquidacion(ayerISO, ayerISO)
 }
 
 function seleccionarRangoRapidoLiquidacion(tipo: 'SEMANAL' | 'QUINCENAL' | 'MENSUAL', op: RangoRapido) {

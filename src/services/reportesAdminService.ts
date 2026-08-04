@@ -257,6 +257,30 @@ export async function getProduccionPorLider(
   })
 }
 
+export interface ReconciliacionRtmCategoria {
+  categoria: string
+  label: string
+  cantidad: number
+}
+
+export interface ReconciliacionRtmResponse {
+  fecha_inicio: string
+  fecha_fin: string
+  turnos_reales_total: number
+  con_factura_confirmada_rtm: number
+  pendientes_total: number
+  categorias: ReconciliacionRtmCategoria[]
+}
+
+export async function getReconciliacionRtm(
+  fechaInicio: string,
+  fechaFin: string
+): Promise<ReconciliacionRtmResponse> {
+  return apiFetch<ReconciliacionRtmResponse>('/reportes-admin/super-informe/reconciliacion-rtm', {
+    query: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+  })
+}
+
 export async function getReporteAsesores(
   fechaInicio: string,
   fechaFin: string
@@ -1169,6 +1193,38 @@ export async function getMetaComercialResumen(
 ): Promise<MetaComercialResumenResponse> {
   return apiFetch<MetaComercialResumenResponse>('/reportes-admin/meta-comercial/resumen', {
     query: { mes, anio },
+  })
+}
+
+export interface MetaComercialConfigResponse {
+  mes: number
+  anio: number
+  asesor_id: number
+  asesor_nombre: string
+  meta_pesos: number | null
+  meta_vehiculos: number | null
+}
+
+export async function getMetaComercialConfig(
+  mes: number,
+  anio: number,
+  asesorId: number
+): Promise<MetaComercialConfigResponse> {
+  return apiFetch<MetaComercialConfigResponse>('/reportes-admin/meta-comercial/config', {
+    query: { mes, anio, asesor_id: asesorId },
+  })
+}
+
+export async function guardarMetaComercialConfig(payload: {
+  asesor_id: number
+  mes: number
+  anio: number
+  meta_pesos: number
+  meta_vehiculos: number | null
+}): Promise<MetaComercialConfigResponse> {
+  return apiFetch<MetaComercialConfigResponse>('/reportes-admin/meta-comercial/config', {
+    method: 'POST',
+    body: payload,
   })
 }
 

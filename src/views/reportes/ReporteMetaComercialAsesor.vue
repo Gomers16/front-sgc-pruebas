@@ -80,6 +80,20 @@
             </v-chip>
           </v-col>
         </v-row>
+        <v-row dense class="mt-1">
+          <v-col cols="12" class="text-right">
+            <v-btn
+              variant="tonal"
+              color="primary"
+              prepend-icon="mdi-target"
+              size="small"
+              :disabled="asesorSeleccionado === null"
+              @click="abrirMetaConfigDialog(asesorSeleccionado)"
+            >
+              Configurar meta {{ etiquetaMes(mesSeleccionado) }} {{ anioSeleccionado }}
+            </v-btn>
+          </v-col>
+        </v-row>
         <v-alert
           v-if="resumenGeneral?.nota"
           type="info"
@@ -522,6 +536,15 @@
                 <span v-if="item.pct_avance === null" class="text-caption text-medium-emphasis">Sin meta</span>
                 <v-chip v-else size="small" :color="colorSemaforo(item.semaforo)" variant="tonal">{{ formatPct(item.pct_avance) }}</v-chip>
               </template>
+              <template #item.acciones="{ item }">
+                <v-btn
+                  icon="mdi-target"
+                  size="x-small"
+                  variant="text"
+                  color="primary"
+                  @click="abrirMetaConfigDialog(item.asesor_id)"
+                />
+              </template>
             </v-data-table>
           </v-window-item>
 
@@ -869,6 +892,64 @@
       </v-card>
     </v-dialog>
 
+    <!-- DIALOGO CONFIGURAR META -->
+    <v-dialog v-model="metaConfigDialog.show" max-width="480" persistent>
+      <v-card class="rounded-xl">
+        <v-card-title class="text-subtitle-1">
+          Configurar meta — {{ nombreAsesorDialog }}
+        </v-card-title>
+        <v-card-subtitle>{{ etiquetaMes(mesSeleccionado) }} {{ anioSeleccionado }}</v-card-subtitle>
+        <v-divider />
+        <v-card-text>
+          <v-progress-linear v-if="metaConfigDialog.loading" indeterminate color="primary" class="mb-4" />
+          <v-row dense>
+            <v-col cols="12">
+              <v-text-field
+                v-model="metaConfigDialog.metaPesos"
+                label="Meta $"
+                type="number"
+                min="0"
+                prefix="$"
+                variant="outlined"
+                density="comfortable"
+                :disabled="metaConfigDialog.loading || metaConfigDialog.saving"
+                hint="Meta total en pesos para el mes seleccionado"
+                persistent-hint
+              />
+            </v-col>
+            <v-col cols="12">
+              <v-text-field
+                v-model="metaConfigDialog.metaVehiculos"
+                label="Meta Vehículos (opcional)"
+                type="number"
+                min="0"
+                variant="outlined"
+                density="comfortable"
+                :disabled="metaConfigDialog.loading || metaConfigDialog.saving"
+                hint="Cantidad de vehículos meta — déjalo vacío si no aplica"
+                persistent-hint
+              />
+            </v-col>
+          </v-row>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="metaConfigDialog.saving" @click="metaConfigDialog.show = false">
+            Cancelar
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="metaConfigDialog.saving"
+            :disabled="metaConfigDialog.loading"
+            @click="guardarMetaConfigDialog"
+          >
+            Guardar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snack.show" :timeout="3000">{{ snack.text }}</v-snackbar>
   </v-container>
 </template>
@@ -882,6 +963,8 @@ import {
   getMetaComercialProyectado,
   getMetaComercialDetalleVehiculo,
   getMetaComercialIngresoRealDateo,
+  getMetaComercialConfig,
+  guardarMetaComercialConfig,
   type MetaComercialResumenResponse,
   type MetaComercialDiarioResponse,
   type MetaComercialSemanalResponse,
@@ -1435,6 +1518,7 @@ const headersResumenAsesores = [
   { title: 'Total', key: 'pesos_total' },
   { title: 'Meta', key: 'meta_pesos' },
   { title: '% Avance', key: 'pct_avance' },
+  { title: '', key: 'acciones', sortable: false, width: 48 },
 ]
 const headersProyectado = [
   { title: 'Periodo', key: 'etiqueta' },
@@ -1537,6 +1621,89 @@ async function cargarTodo() {
     snack.show = true
   } finally {
     loading.value = false
+  }
+}
+
+/* ===== Diálogo "Configurar meta" ===== */
+const metaConfigDialog = reactive({
+  show: false,
+  loading: false,
+  saving: false,
+  asesorId: null as number | null,
+  metaPesos: '' as string | number,
+  metaVehiculos: '' as string | number,
+})
+
+async function abrirMetaConfigDialog(asesorIdPreseleccionado: number | null) {
+  const asesorId = asesorIdPreseleccionado ?? asesorSeleccionado.value
+  if (asesorId === null) {
+    snack.text = '⚠️ Selecciona un asesor primero'
+    snack.show = true
+    return
+  }
+  metaConfigDialog.asesorId = asesorId
+  metaConfigDialog.metaPesos = ''
+  metaConfigDialog.metaVehiculos = ''
+  metaConfigDialog.show = true
+  metaConfigDialog.loading = true
+  try {
+    const actual = await getMetaComercialConfig(mesSeleccionado.value, anioSeleccionado.value, asesorId)
+    metaConfigDialog.metaPesos = actual.meta_pesos ?? ''
+    metaConfigDialog.metaVehiculos = actual.meta_vehiculos ?? ''
+  } catch (err) {
+    console.error('Error cargando meta configurada:', err)
+    snack.text = '❌ Error al cargar la meta actual'
+    snack.show = true
+    metaConfigDialog.show = false
+  } finally {
+    metaConfigDialog.loading = false
+  }
+}
+
+const nombreAsesorDialog = computed(() => {
+  const id = metaConfigDialog.asesorId
+  if (id === null) return ''
+  return asesores.value.find((a) => a.id === id)?.nombre ?? ''
+})
+
+async function guardarMetaConfigDialog() {
+  if (metaConfigDialog.asesorId === null) return
+  const metaPesos = Number(metaConfigDialog.metaPesos)
+  if (!Number.isFinite(metaPesos) || metaPesos < 0) {
+    snack.text = '⚠️ Meta $ debe ser un número válido >= 0'
+    snack.show = true
+    return
+  }
+  let metaVehiculos: number | null = null
+  if (metaConfigDialog.metaVehiculos !== '' && metaConfigDialog.metaVehiculos !== null) {
+    const v = Number(metaConfigDialog.metaVehiculos)
+    if (!Number.isInteger(v) || v < 0) {
+      snack.text = '⚠️ Meta Vehículos debe ser un entero >= 0'
+      snack.show = true
+      return
+    }
+    metaVehiculos = v
+  }
+
+  metaConfigDialog.saving = true
+  try {
+    await guardarMetaComercialConfig({
+      asesor_id: metaConfigDialog.asesorId,
+      mes: mesSeleccionado.value,
+      anio: anioSeleccionado.value,
+      meta_pesos: metaPesos,
+      meta_vehiculos: metaVehiculos,
+    })
+    metaConfigDialog.show = false
+    snack.text = '✅ Meta guardada correctamente'
+    snack.show = true
+    await cargarTodo()
+  } catch (err) {
+    console.error('Error guardando meta:', err)
+    snack.text = '❌ Error al guardar la meta'
+    snack.show = true
+  } finally {
+    metaConfigDialog.saving = false
   }
 }
 
