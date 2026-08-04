@@ -1192,14 +1192,14 @@ const textoNarrativoDiario = computed(() => {
 const textoNarrativoSemanal = computed(() => {
   if (!semanal.value) return ''
   const acumulado = semanal.value.semanas.reduce((acc, s) => acc + s.pesos_total, 0)
-  return `Captaciones agrupadas por semana (sábado a viernes)${semanal.value.es_estimado ? ', en pesos ESTIMADOS con tarifa plana' : ', en pesos reales de comisión'}. Acumulado del mes: ${formatMoney(acumulado)}.`
+  return `Captaciones agrupadas por semana (sábado a viernes)${semanal.value.es_estimado ? ', en pesos ESTIMADOS con tarifa plana' : ', en Ingreso RTM Generado (facturación real)'}. Acumulado del mes: ${formatMoney(acumulado)}.`
 })
 const textoNarrativoMeta = computed(() => {
   const r = resumenActual.value
   if (!r) return 'Aún no hay meta ni datos configurados para este mes.'
   if (r.meta_pesos === null) return `${r.asesor_nombre} no tiene meta configurada para ${etiquetaMes(mesSeleccionado.value)} ${anioSeleccionado.value}.`
-  const falta = Math.max(0, r.meta_pesos - r.pesos_total)
-  return `${r.asesor_nombre}: ${formatMoney(r.pesos_total)} de ${formatMoney(r.meta_pesos)} (${formatPct(r.pct_avance)}) — faltan ${formatMoney(falta)} para completar la meta.`
+  const falta = Math.max(0, r.meta_pesos - r.ingreso_rtm_generado_total)
+  return `${r.asesor_nombre}: ${formatMoney(r.ingreso_rtm_generado_total)} de ${formatMoney(r.meta_pesos)} (${formatPct(r.pct_avance)}) — faltan ${formatMoney(falta)} para completar la meta.`
 })
 const textoNarrativoProyectado = computed(() => {
   const p = proyectado.value
@@ -1522,7 +1522,7 @@ const chartProyectadoBarras = computed(() => {
     datasets: [{
       label: `${etiquetaMes(mesSeleccionado.value)} ${anioSeleccionado.value}`,
       backgroundColor: [COLORS.convenio, p?.resumen ? colorGauge(p.resumen.pct_proyeccion ?? 0) : COLORS.meta, COLORS.meta],
-      data: [r?.pesos_total ?? null, p?.resumen?.proyeccion_cierre ?? null, r?.meta_pesos ?? null],
+      data: [r?.ingreso_rtm_generado_total ?? null, p?.resumen?.proyeccion_cierre ?? null, r?.meta_pesos ?? null],
     }],
   }
 })
