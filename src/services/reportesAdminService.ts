@@ -802,11 +802,15 @@ export interface SuperInformeMetaComercialAsesor {
   pesos_convenio: number
   pesos_comercial: number
   pesos_total: number
+  /** meta_pesos/pct_avance/cumplio/faltante se comparan contra ingreso_rtm_generado (abajo), NO contra pesos_total (comisión). */
   meta_pesos: number | null
   pct_avance: number | null
   cumplio: boolean | null
   faltante: number | null
+  /** Proyección de cierre en COMISIÓN — ya no se usa en el KPI card ni en la Tabla A, ver proyeccion_cierre_ingreso. */
   proyeccion_cierre: number
+  /** Proyección de cierre en INGRESO RTM GENERADO — la que se compara contra meta_pesos (Tabla C). */
+  proyeccion_cierre_ingreso: number
   comision_pagada: number
   comision_pendiente: number
   meta_vehiculos: number | null
@@ -846,7 +850,9 @@ export interface SuperInformeMetaComercialResponse {
     pct_avance: number | null
     pesos_convenio: number
     pesos_comercial: number
+    ingreso_rtm_generado: number
     proyeccion_cierre: number | null
+    proyeccion_cierre_ingreso: number | null
     pct_proyeccion: number | null
   }
   asesores: SuperInformeMetaComercialAsesor[]

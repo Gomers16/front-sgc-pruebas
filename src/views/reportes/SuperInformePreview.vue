@@ -86,8 +86,8 @@
         <div>
           <div class="text-subtitle-1 font-weight-bold">2. Meta Comercial por Asesor</div>
           <div class="text-caption text-medium-emphasis">
-            Avance de meta comercial (en pesos) por asesor Comercial, con proyección de cierre individual y
-            comisión pagada vs. pendiente.
+            Comisión ganada por asesor Comercial (sin comparar contra meta) y avance de meta comercial comparado
+            contra el Ingreso RTM Generado — lo que el asesor realmente facturó, no su comisión.
           </div>
         </div>
       </v-card-title>
@@ -98,43 +98,64 @@
         </v-alert>
         <v-row dense>
           <v-col cols="6" sm="3">
-            <div class="text-caption text-medium-emphasis">Total General / Meta</div>
+            <div class="text-caption text-medium-emphasis">Ingreso RTM Generado / Meta</div>
             <div class="text-body-1 font-weight-bold">
-              {{ formatPeso(datos.metaComercial.kpis.pesos_total) }} /
+              {{ formatPeso(datos.metaComercial.kpis.ingreso_rtm_generado) }} /
               {{ datos.metaComercial.kpis.meta_pesos === null ? 'Sin meta' : formatPeso(datos.metaComercial.kpis.meta_pesos) }}
             </div>
           </v-col>
           <v-col cols="6" sm="3">
-            <div class="text-caption text-medium-emphasis">Convenio</div>
+            <div class="text-caption text-medium-emphasis">Convenio (Comisión)</div>
             <div class="text-body-1 font-weight-bold">{{ formatPeso(datos.metaComercial.kpis.pesos_convenio) }}</div>
           </v-col>
           <v-col cols="6" sm="3">
-            <div class="text-caption text-medium-emphasis">Propio (Comercial)</div>
+            <div class="text-caption text-medium-emphasis">Propio (Comisión)</div>
             <div class="text-body-1 font-weight-bold">{{ formatPeso(datos.metaComercial.kpis.pesos_comercial) }}</div>
           </v-col>
           <v-col cols="6" sm="3">
-            <div class="text-caption text-medium-emphasis">Proyección de cierre</div>
+            <div class="text-caption text-medium-emphasis">Proyección de cierre (Ingreso RTM)</div>
             <div class="text-body-1 font-weight-bold">
-              {{ datos.metaComercial.kpis.proyeccion_cierre === null ? '—' : formatPeso(datos.metaComercial.kpis.proyeccion_cierre) }}
+              {{ datos.metaComercial.kpis.proyeccion_cierre_ingreso === null ? '—' : formatPeso(datos.metaComercial.kpis.proyeccion_cierre_ingreso) }}
             </div>
           </v-col>
         </v-row>
+
+        <div class="text-caption font-weight-bold mb-1 mt-4">Comisión</div>
         <v-alert
           v-if="!datos.metaComercial.comision_estado_disponible"
           type="info"
           variant="tonal"
           density="compact"
-          class="mt-3"
+          class="mb-2"
         >
           El desglose Comisión Pagada / Pendiente no está disponible en meses históricos ("N/D" en esos casos).
         </v-alert>
         <v-data-table
-          class="mt-4"
           density="compact"
           :headers="headersMetaComercial"
           :items="filasMetaComercial"
           hide-default-footer
-        >
+        />
+        <v-alert v-if="!datos.metaComercial.asesores.length" type="info" variant="tonal" density="compact" class="mt-3">
+          Sin asesores con datos en este rango.
+        </v-alert>
+        <div class="text-caption text-medium-emphasis mt-1">
+          Comisión ganada por el asesor — no se compara contra meta (la meta se compara contra Ingreso RTM Generado,
+          ver tabla "Avance de Meta Comercial" más abajo).
+        </div>
+
+        <div class="text-caption font-weight-bold mb-1 mt-4">Unidades e Ingreso RTM Generado por Asesor</div>
+        <v-data-table density="compact" :headers="headersMetaComercialVehiculos" :items="filasMetaComercialVehiculos" hide-default-footer />
+        <div class="text-caption text-medium-emphasis mt-1">
+          Motos/Vehículos = unidades facturadas atribuidas al asesor (facturacion_tickets), no filas de comisiones.
+          Ingreso RTM Generado = unidades × Costo Base, NO comisión. Costo Base: en meses reales, config individual
+          del asesor (con fallback al valor Global si no tiene override propio); en meses históricos, la tarifa real
+          de ese asesor/mes. En meses históricos sin detalle por tipo de vehículo cargado, ese mes no aporta a este
+          desglose (sí sigue sumando en la Comisión de arriba).
+        </div>
+
+        <div class="text-caption font-weight-bold mb-1 mt-4">Avance de Meta Comercial (Ingreso RTM)</div>
+        <v-data-table density="compact" :headers="headersIngresoRtmAsesor" :items="filasIngresoRtmAsesor" hide-default-footer>
           <template #item.cumplio="{ item }">
             <v-chip
               v-if="item.cumplio !== '—'"
@@ -147,24 +168,9 @@
             <span v-else>—</span>
           </template>
         </v-data-table>
-        <v-alert v-if="!datos.metaComercial.asesores.length" type="info" variant="tonal" density="compact" class="mt-3">
-          Sin asesores con datos en este rango.
-        </v-alert>
-
-        <div class="text-caption font-weight-bold mb-1 mt-4">Unidades (vehículos)</div>
-        <v-data-table density="compact" :headers="headersMetaComercialVehiculos" :items="filasMetaComercialVehiculos" hide-default-footer />
         <div class="text-caption text-medium-emphasis mt-1">
-          Motos/Vehículos = unidades facturadas atribuidas al asesor (facturacion_tickets), no filas de comisiones.
-          En meses históricos sin detalle por tipo de vehículo cargado, ese mes no aporta a este desglose.
-        </div>
-
-        <div class="text-caption font-weight-bold mb-1 mt-4">Ingreso RTM Generado por Asesor</div>
-        <v-data-table density="compact" :headers="headersIngresoRtmAsesor" :items="filasIngresoRtmAsesor" hide-default-footer />
-        <div class="text-caption text-medium-emphasis mt-1">
-          Ingreso RTM Generado = el ingreso real que el asesor trajo al negocio (unidades × Costo Base), NO su comisión
-          — la comisión ganada sigue en la tabla de arriba, sin cambios. Costo Base: en meses reales, config individual
-          del asesor (con fallback al valor Global si no tiene override propio); en meses históricos, la tarifa real de
-          ese asesor/mes.
+          Meta comparada contra el Ingreso RTM Generado (lo que el asesor facturó), NO contra su comisión. "Faltante"
+          se limita a 0 cuando ya se cumplió la meta.
         </div>
 
         <div class="text-caption font-weight-bold mb-1 mt-4">Descuentos dados por asesor (Comercial y Convenio)</div>
@@ -457,14 +463,10 @@ const filasMetaMensual = computed(() =>
 )
 
 /* ===== 2. Meta Comercial por Asesor ===== */
+/* Tabla A — Comisión (informativa, sin comparación de meta) */
 const headersMetaComercial = [
   { title: 'Asesor', key: 'asesor' },
-  { title: 'Total', key: 'total' },
-  { title: 'Meta', key: 'meta' },
-  { title: '% Avance', key: 'pctAvance' },
-  { title: 'Cumplió', key: 'cumplio' },
-  { title: 'Faltante', key: 'faltante' },
-  { title: 'Proy. Cierre', key: 'proyeccion' },
+  { title: 'Total (Comisión)', key: 'total' },
   { title: 'Com. Pagada', key: 'comisionPagada' },
   { title: 'Com. Pendiente', key: 'comisionPendiente' },
 ]
@@ -472,49 +474,54 @@ const filasMetaComercial = computed(() =>
   props.datos.metaComercial.asesores.map((a) => ({
     asesor: a.asesor_nombre,
     total: formatPeso(a.pesos_total),
-    meta: a.meta_pesos === null ? 'Sin meta' : formatPeso(a.meta_pesos),
-    pctAvance: a.pct_avance === null ? '—' : formatPct(a.pct_avance),
-    cumplio: a.cumplio === null ? '—' : a.cumplio ? 'Sí' : 'No',
-    faltante: a.faltante === null ? '—' : formatPeso(a.faltante),
-    proyeccion: formatPeso(a.proyeccion_cierre),
     comisionPagada: props.datos.metaComercial.comision_estado_disponible ? formatPeso(a.comision_pagada) : 'N/D',
     comisionPendiente: props.datos.metaComercial.comision_estado_disponible ? formatPeso(a.comision_pendiente) : 'N/D',
   }))
 )
 
+/* Tabla B — Unidades e Ingreso RTM Generado por Asesor */
 const headersMetaComercialVehiculos = [
   { title: 'Asesor', key: 'asesor' },
-  { title: 'Meta (Veh)', key: 'meta' },
+  { title: 'Meta (Veh)', key: 'metaVeh' },
   { title: 'Motos', key: 'motos' },
   { title: 'Vehículos', key: 'vehiculos' },
-  { title: 'Faltante (Veh)', key: 'faltante' },
-]
-const filasMetaComercialVehiculos = computed(() =>
-  props.datos.metaComercial.asesores.map((a) => ({
-    asesor: a.asesor_nombre,
-    meta: a.meta_vehiculos === null ? 'Sin meta' : formatNum(a.meta_vehiculos),
-    motos: formatNum(a.logrado_motos),
-    vehiculos: formatNum(a.logrado_vehiculos),
-    faltante: a.faltante_vehiculos === null ? '—' : formatNum(a.faltante_vehiculos),
-  }))
-)
-
-const headersIngresoRtmAsesor = [
-  { title: 'Asesor', key: 'asesor' },
-  { title: 'Motos', key: 'motos' },
-  { title: 'Vehículos', key: 'vehiculos' },
+  { title: 'Faltante (Veh)', key: 'faltanteVeh' },
   { title: 'Costo Base Moto', key: 'costoBaseMoto' },
   { title: 'Costo Base Vehículo', key: 'costoBaseVehiculo' },
   { title: 'Ingreso RTM Generado', key: 'ingreso' },
 ]
-const filasIngresoRtmAsesor = computed(() =>
+const filasMetaComercialVehiculos = computed(() =>
   props.datos.metaComercial.asesores.map((a) => ({
     asesor: a.asesor_nombre,
+    metaVeh: a.meta_vehiculos === null ? 'Sin meta' : formatNum(a.meta_vehiculos),
     motos: formatNum(a.logrado_motos),
     vehiculos: formatNum(a.logrado_vehiculos),
+    faltanteVeh: a.faltante_vehiculos === null ? '—' : formatNum(a.faltante_vehiculos),
     costoBaseMoto: a.costo_base_moto === null ? '—' : formatPeso(a.costo_base_moto),
     costoBaseVehiculo: a.costo_base_vehiculo === null ? '—' : formatPeso(a.costo_base_vehiculo),
     ingreso: formatPeso(a.ingreso_rtm_generado),
+  }))
+)
+
+/* Tabla C — Avance de Meta Comercial, comparado contra Ingreso RTM Generado */
+const headersIngresoRtmAsesor = [
+  { title: 'Asesor', key: 'asesor' },
+  { title: 'Ingreso RTM Generado', key: 'ingreso' },
+  { title: 'Meta ($)', key: 'meta' },
+  { title: '% Avance', key: 'pctAvance' },
+  { title: 'Cumplió', key: 'cumplio' },
+  { title: 'Faltante', key: 'faltante' },
+  { title: 'Proy. Cierre', key: 'proyeccion' },
+]
+const filasIngresoRtmAsesor = computed(() =>
+  props.datos.metaComercial.asesores.map((a) => ({
+    asesor: a.asesor_nombre,
+    ingreso: formatPeso(a.ingreso_rtm_generado),
+    meta: a.meta_pesos === null ? 'Sin meta' : formatPeso(a.meta_pesos),
+    pctAvance: a.pct_avance === null ? '—' : formatPct(a.pct_avance),
+    cumplio: a.cumplio === null ? '—' : a.cumplio ? 'Sí' : 'No',
+    faltante: a.faltante === null ? '—' : formatPeso(a.faltante),
+    proyeccion: formatPeso(a.proyeccion_cierre_ingreso),
   }))
 )
 
