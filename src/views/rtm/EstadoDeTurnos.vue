@@ -478,6 +478,54 @@
               </div>
             </v-alert>
           </div>
+
+          <div v-if="discrepancias" class="mt-4 mt-sm-6">
+            <v-alert
+              type="info"
+              border="start"
+              variant="tonal"
+              :density="$vuetify.display.xs ? 'compact' : 'default'"
+            >
+              <div class="mb-2 text-caption text-sm-body-2">
+                <strong>
+                  Discrepancias RTM vs Tecnoingeniería —
+                  {{ discrepancias.fechaInicio }} a
+                  {{ discrepancias.fechaFin }}
+                </strong>
+              </div>
+              <div class="text-caption text-sm-body-2">
+                <p>Total válido en Tecnoingeniería: {{ discrepancias.resumen.totalTecnoValido }}</p>
+                <p>Coinciden exacto: {{ discrepancias.resumen.totalCoinciden }}</p>
+
+                <v-divider class="my-2" />
+
+                <p>1️⃣ Placa mal digitada: <strong>{{ discrepancias.resumen.totalTipo1PlacaMalDigitada }}</strong></p>
+                <p>2️⃣ Activo en SGC, debe finalizarse: <strong>{{ discrepancias.resumen.totalTipo2ActivoDebeFinalizar }}</strong></p>
+                <p>3️⃣ Turno fantasma (activo sin rastro): <strong>{{ discrepancias.resumen.totalTipo3TurnoFantasma }}</strong></p>
+                <p>4️⃣ Servicio mal asignado: <strong>{{ discrepancias.resumen.totalTipo4ServicioMalAsignado }}</strong></p>
+                <p>5️⃣ Falta en SGC: <strong>{{ discrepancias.resumen.totalTipo5FaltaEnSgc }}</strong></p>
+                <p>6️⃣ Alerta: cobro no registrado: <strong>{{ discrepancias.resumen.totalTipo6AlertaCobroNoRegistrado }}</strong></p>
+                <p>7️⃣ Finalizado sin rastro en Tecno: <strong>{{ discrepancias.resumen.totalTipo7FinalizadoSinRastroTecno }}</strong></p>
+
+                <v-divider class="my-2" />
+
+                <p>Duplicados (2+ finalizado misma placa): {{ discrepancias.resumen.totalDuplicadosFinalizado }}</p>
+                <p>Ambiguos — revisar manualmente: {{ discrepancias.resumen.totalAmbiguosRevisarManual }}</p>
+              </div>
+
+              <v-btn
+                color="primary"
+                variant="tonal"
+                class="mt-2"
+                prepend-icon="mdi-file-excel"
+                size="small"
+                :loading="discrepanciasExcelLoading"
+                @click="descargarExcelDiscrepancias"
+              >
+                Descargar Excel de discrepancias
+              </v-btn>
+            </v-alert>
+          </div>
         </v-card-text>
 
         <v-card-actions class="pa-3 pa-sm-4">
@@ -517,6 +565,7 @@ import { useDisplay } from 'vuetify'
 import { DateTime } from 'luxon'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import repGeneralService, { type RepGeneralImportResponse } from '@/services/repGeneralService'
+import { descargarDiscrepanciasRtmExcel } from '@/services/reportesAdminService'
 import TurnoDetalleDialog from '@/components/rtm/TurnoDetalleDialog.vue'
 
 interface ServicioEnTurno {
@@ -676,6 +725,8 @@ const importDialog = ref(false)
 const importFile = ref<File | File[] | null>(null)
 const importLoading = ref(false)
 const importResult = ref<RepGeneralImportResponse | null>(null)
+const discrepancias = computed(() => importResult.value?.informeDiscrepancias ?? null)
+const discrepanciasExcelLoading = ref(false)
 
 // 👇 HEADERS RESPONSIVE ACTUALIZADOS
 const headersResponsive = computed(() => {
@@ -1010,6 +1061,34 @@ const handleImportRepGeneral = async () => {
     showSnackbar(msg, 'error')
   } finally {
     importLoading.value = false
+  }
+}
+
+/** Dispara la descarga de un Blob como archivo — mismo patrón usado en
+ * ComisionesList.vue para los Excel de reportes-admin. */
+function descargarBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
+
+const descargarExcelDiscrepancias = async () => {
+  if (!discrepancias.value) return
+  discrepanciasExcelLoading.value = true
+  try {
+    const blob = await descargarDiscrepanciasRtmExcel(discrepancias.value.id)
+    const { fechaInicio, fechaFin } = discrepancias.value
+    descargarBlob(blob, `Discrepancias_RTM_${fechaInicio}_${fechaFin}.xlsx`)
+  } catch (error: unknown) {
+    console.error('Error al descargar Excel de discrepancias RTM:', error)
+    showSnackbar('Error al generar el Excel de discrepancias RTM.', 'error')
+  } finally {
+    discrepanciasExcelLoading.value = false
   }
 }
 

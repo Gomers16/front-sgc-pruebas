@@ -751,6 +751,61 @@ export async function descargarHistorialLiquidacionesExcel(params?: {
   })
 }
 
+/* ======================= Discrepancias RTM (SGC vs Tecnoingeniería) ======================= */
+
+export interface DiscrepanciasRtmResumen {
+  totalTecnoValido: number
+  totalSgcFinalizados: number
+  totalCoinciden: number
+  totalTipo1PlacaMalDigitada: number
+  totalTipo2ActivoDebeFinalizar: number
+  totalTipo3TurnoFantasma: number
+  totalTipo4ServicioMalAsignado: number
+  totalTipo5FaltaEnSgc: number
+  totalTipo6AlertaCobroNoRegistrado: number
+  totalTipo7FinalizadoSinRastroTecno: number
+  totalDuplicadosFinalizado: number
+  totalAmbiguosRevisarManual: number
+}
+
+export interface DiscrepanciasRtmItem {
+  id: number
+  fechaInicio: string
+  fechaFin: string
+  archivoNombre: string | null
+  filasCsvTotal: number | null
+  generadoAt: string
+  generadoPor: string | null
+  resumen: DiscrepanciasRtmResumen
+}
+
+export interface DiscrepanciasRtmHistorialResponse {
+  data: DiscrepanciasRtmItem[]
+  total: number
+  page: number
+  perPage: number
+}
+
+export async function getDiscrepanciasRtmHistorial(params: {
+  page?: number
+  perPage?: number
+  fechaInicio?: string
+  fechaFin?: string
+}): Promise<DiscrepanciasRtmHistorialResponse> {
+  return apiFetch<DiscrepanciasRtmHistorialResponse>('/reportes-admin/discrepancias-rtm', {
+    query: {
+      page: params.page,
+      per_page: params.perPage,
+      fecha_inicio: params.fechaInicio,
+      fecha_fin: params.fechaFin,
+    },
+  })
+}
+
+export async function descargarDiscrepanciasRtmExcel(id: number): Promise<Blob> {
+  return apiFetchBlob(`/reportes-admin/discrepancias-rtm/${id}/excel`)
+}
+
 /* ======================= Súper Informe (PDF generado en backend con pdfkit) ======================= */
 
 export async function descargarSuperInformePdf(fechaInicio: string, fechaFin: string): Promise<Blob> {

@@ -431,6 +431,13 @@
             link
             class="nav-item-child"
           />
+          <v-list-item
+            prepend-icon="mdi-file-compare"
+            title="Discrepancias RTM"
+            :to="{ name: 'ReporteDiscrepanciasRtm' }"
+            link
+            class="nav-item-child"
+          />
         </v-list-group>
       </v-list-group>
     </v-list>

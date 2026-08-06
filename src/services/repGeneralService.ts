@@ -19,10 +19,33 @@ export interface RepGeneralImportResumen {
   primerError: string | null
 }
 
+export interface InformeDiscrepanciasResumen {
+  totalTecnoValido: number
+  totalSgcFinalizados: number
+  totalCoinciden: number
+  totalTipo1PlacaMalDigitada: number
+  totalTipo2ActivoDebeFinalizar: number
+  totalTipo3TurnoFantasma: number
+  totalTipo4ServicioMalAsignado: number
+  totalTipo5FaltaEnSgc: number
+  totalTipo6AlertaCobroNoRegistrado: number
+  totalTipo7FinalizadoSinRastroTecno: number
+  totalDuplicadosFinalizado: number
+  totalAmbiguosRevisarManual: number
+}
+
+export interface InformeDiscrepancias {
+  id: number
+  fechaInicio: string
+  fechaFin: string
+  resumen: InformeDiscrepanciasResumen
+}
+
 export interface RepGeneralImportResponse {
   ok: boolean
   message: string
   resumen: RepGeneralImportResumen
+  informeDiscrepancias: InformeDiscrepancias | null
 }
 
 /**

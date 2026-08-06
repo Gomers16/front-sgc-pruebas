@@ -425,6 +425,17 @@ const routes: RouteRecordRaw[] = [
       roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
     },
   },
+  {
+    path: '/reportes-admin/discrepancias-rtm',
+    name: 'ReporteDiscrepanciasRtm',
+    component: () => import('@/views/reportes/ReporteDiscrepanciasRtm.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Discrepancias RTM',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
 ]
 
 const router = createRouter({
