@@ -81,8 +81,29 @@
                 />
               </v-col>
 
+              <!-- Tipo de asesor: informativo, nunca editable (se corrige cambiando el agente) -->
               <v-col cols="12">
                 <div class="text-caption text-sm-body-2">
+                  <strong>Tipo de asesor:</strong> {{ mapTipoCorto(dateo?.agente?.tipo) || '—' }}
+                </div>
+              </v-col>
+
+              <!-- Agente: editable solo con gestionarDateos() -->
+              <v-col cols="12">
+                <v-autocomplete
+                  v-if="editando && can.gestionarDateos()"
+                  v-model="form.agente_id"
+                  :items="agentes"
+                  item-title="nombre"
+                  item-value="id"
+                  label="Agente / Asesor"
+                  variant="outlined"
+                  :density="$vuetify.display.xs ? 'compact' : 'comfortable'"
+                  prepend-inner-icon="mdi-account"
+                  clearable
+                  :loading="agentesLoading"
+                />
+                <div v-else class="text-caption text-sm-body-2">
                   <strong>Agente:</strong> {{ dateo?.agente?.nombre || '—' }}
                   <span v-if="dateo?.agente" class="text-medium-emphasis">
                     ({{ mapTipoCorto(dateo?.agente?.tipo) }})
@@ -90,9 +111,43 @@
                 </div>
               </v-col>
 
+              <!-- Convenio: editable solo con gestionarDateos() -->
               <v-col cols="12">
-                <div class="text-caption text-sm-body-2">
+                <v-autocomplete
+                  v-if="editando && can.gestionarDateos()"
+                  v-model="form.convenio_id"
+                  :items="conveniosAll"
+                  item-title="nombre"
+                  item-value="id"
+                  label="Convenio"
+                  variant="outlined"
+                  :density="$vuetify.display.xs ? 'compact' : 'comfortable'"
+                  prepend-inner-icon="mdi-handshake"
+                  clearable
+                  :loading="conveniosLoading"
+                />
+                <div v-else class="text-caption text-sm-body-2">
                   <strong>Convenio:</strong> {{ dateo?.convenio?.nombre || '—' }}
+                </div>
+              </v-col>
+
+              <!-- Servicio a datear: editable solo con gestionarDateos() -->
+              <v-col cols="12">
+                <v-autocomplete
+                  v-if="editando && can.gestionarDateos()"
+                  v-model="form.servicio_id"
+                  :items="servicios"
+                  item-title="nombre"
+                  item-value="id"
+                  label="Servicio a datear"
+                  variant="outlined"
+                  :density="$vuetify.display.xs ? 'compact' : 'comfortable'"
+                  prepend-inner-icon="mdi-wrench"
+                  clearable
+                  :loading="serviciosLoading"
+                />
+                <div v-else class="text-caption text-sm-body-2">
+                  <strong>Servicio:</strong> {{ dateo?.servicio?.nombreServicio || '—' }}
                 </div>
               </v-col>
 
@@ -155,9 +210,9 @@
           <v-card-actions class="px-3 px-sm-4 pb-3 pb-sm-4 pt-0">
             <v-spacer />
 
-            <!-- Modo lectura: botón Editar -->
+            <!-- Modo lectura: botón Editar (solo SUPER_ADMIN/GERENCIA — gestionarDateos) -->
             <v-btn
-              v-if="!editando"
+              v-if="!editando && can.gestionarDateos()"
               color="primary"
               variant="tonal"
               :size="$vuetify.display.xs ? 'small' : 'default'"
@@ -442,13 +497,19 @@ import {
   updateDateo,
   deleteDateo,
   esDescuentoAvance,
+  listConveniosLight,
   formatDateTime as fmt,
   type Dateo,
   type ResultadoDateo,
 } from '@/services/dateosService'
+import { listAgentesCaptacion } from '@/services/conveniosService'
 import { uploadImage, type UploadImageResponse } from '@/services/uploadsService'
 import descuentosService from '@/services/descuentosService'
 import type { Descuento } from '@/services/descuentosService'
+import serviciosService from '@/services/Servicios_service'
+import { usePermissions } from '@/composables/usePermissions'
+
+const { can } = usePermissions()
 
 const route = useRoute()
 const router = useRouter()
@@ -475,6 +536,53 @@ const canalItems = [
   { title: 'Redes sociales', value: 'REDES' },
 ]
 
+/* ===== Campos sensibles (agente/convenio/servicio) — editables solo con gestionarDateos ===== */
+interface AgenteItem {
+  id: number
+  nombre: string
+  tipo: string
+}
+
+const agentes = ref<AgenteItem[]>([])
+const agentesLoading = ref(false)
+const conveniosAll = ref<{ id: number; nombre: string }[]>([])
+const conveniosLoading = ref(false)
+const servicios = ref<{ id: number; codigoServicio: string; nombre: string }[]>([])
+const serviciosLoading = ref(false)
+
+async function loadAgentesYConvenios() {
+  agentesLoading.value = true
+  conveniosLoading.value = true
+  try {
+    agentes.value = await listAgentesCaptacion()
+  } catch (e) {
+    console.error('Error cargando agentes:', e)
+    agentes.value = []
+  } finally {
+    agentesLoading.value = false
+  }
+  try {
+    conveniosAll.value = await listConveniosLight()
+  } catch (e) {
+    console.error('Error cargando convenios:', e)
+    conveniosAll.value = []
+  } finally {
+    conveniosLoading.value = false
+  }
+}
+
+async function loadServiciosCatalogo() {
+  serviciosLoading.value = true
+  try {
+    servicios.value = await serviciosService.getActivos()
+  } catch (e) {
+    console.error('Error cargando servicios:', e)
+    servicios.value = []
+  } finally {
+    serviciosLoading.value = false
+  }
+}
+
 /* ===== Descuentos ===== */
 const descuentosActivos = ref<Descuento[]>([])
 const descuentosLoading = ref(false)
@@ -492,10 +600,13 @@ const esAvanceSeleccionado = computed(() => {
   return esDescuentoAvance((d as { codigo?: string })?.codigo)
 })
 
-// Debe subir comprobante: avance seleccionado Y es COMERCIAL
+// Debe subir comprobante: el dateo REALMENTE está marcado como avance
+// (dateo.value.es_avance — el mismo campo autoritativo que valida
+// toggleAvance() en el backend), no la selección de descuento (que
+// puede estar desincronizada de es_avance).
 const debeSubirComprobante = computed(() => {
   const tipo = String(dateo.value?.agente?.tipo || '').toUpperCase()
-  return esAvanceSeleccionado.value && tipo.includes('COMERCIAL')
+  return dateo.value?.es_avance === true && tipo.includes('COMERCIAL')
 })
 
 async function loadDescuentos() {
@@ -519,6 +630,10 @@ type FormShape = {
   telefono: string
   canal: 'ASESOR' | 'TELE' | 'FACHADA' | 'REDES'
   descuento_id: number | null
+  // 🆕 Campos sensibles — editables solo con gestionarDateos()
+  agente_id: number | null
+  convenio_id: number | null
+  servicio_id: number | null
   // ++ AVANCE ++
   es_avance: boolean
   comprobante_avance_url: string | null
@@ -536,6 +651,10 @@ type UpdateDateoPayload = {
   telefono: string | null
   canal: 'ASESOR' | 'TELE' | 'FACHADA' | 'REDES'
   descuento_id?: number | null
+  // 🆕 Campos sensibles
+  agente_id?: number | null
+  convenio_id?: number | null
+  servicio_id?: number | null
   // ++ AVANCE ++
   es_avance?: boolean
   comprobante_avance_url?: string | null
@@ -553,6 +672,9 @@ const form = ref<FormShape>({
   telefono: '',
   canal: 'ASESOR',
   descuento_id: null,
+  agente_id: null,
+  convenio_id: null,
+  servicio_id: null,
   // ++ AVANCE ++
   es_avance: false,
   comprobante_avance_url: null,
@@ -631,8 +753,15 @@ watch(evidenciaModel, (val) => {
   }
 })
 
-// Watcher: sincroniza es_avance con el descuento seleccionado
+// Evita que el watcher de abajo pise el es_avance real del dateo con el
+// valor derivado de descuento_id (casi siempre false) durante la carga
+// inicial, cuando load() asigna form.value.descuento_id por primera vez.
+let cargaInicialCompleta = false
+
+// Watcher: sincroniza es_avance con el descuento seleccionado (solo ante
+// cambios genuinos del operador, no durante la carga inicial de la pantalla).
 watch(() => form.value.descuento_id, () => {
+  if (!cargaInicialCompleta) return
   form.value.es_avance = esAvanceSeleccionado.value
   if (!esAvanceSeleccionado.value) {
     handleClearComprobanteAvance()
@@ -734,6 +863,10 @@ async function load() {
     form.value.telefono = d.telefono ?? ''
     form.value.canal = (d.canal ?? 'ASESOR') as 'ASESOR' | 'TELE' | 'FACHADA' | 'REDES'
     form.value.descuento_id = d.descuento_id ?? null
+    // 🆕 Campos sensibles
+    form.value.agente_id = d.agente_id ?? null
+    form.value.convenio_id = d.convenio_id ?? null
+    form.value.servicio_id = d.servicio_id ?? null
     // ++ AVANCE ++
     form.value.es_avance = d.es_avance ?? false
     form.value.comprobante_avance_url = d.comprobante_avance_url ?? null
@@ -751,6 +884,7 @@ async function load() {
     evidenciaFile.value = null
     handleClearComprobanteAvance()
 
+    cargaInicialCompleta = true
     editando.value = false
   } catch (e) {
     const error = e as { response?: { data?: { message?: string } } }
@@ -826,6 +960,12 @@ async function guardar() {
       telefono: form.value.telefono || null,
       canal: form.value.canal,
       descuento_id: form.value.descuento_id ?? null,
+      // 🆕 Campos sensibles — solo se editan de verdad si el usuario tiene
+      // gestionarDateos() (si no, el formulario los deja de solo lectura y
+      // estos valores llegan sin cambios desde load()).
+      agente_id: form.value.agente_id ?? null,
+      convenio_id: form.value.convenio_id ?? null,
+      servicio_id: form.value.servicio_id ?? null,
       // ++ AVANCE ++
       es_avance: form.value.es_avance,
       comprobante_avance_url: form.value.es_avance ? (form.value.comprobante_avance_url ?? null) : null,
@@ -897,6 +1037,8 @@ function volver() {
 onMounted(() => {
   load()
   loadDescuentos()
+  loadAgentesYConvenios()
+  loadServiciosCatalogo()
 })
 </script>
 

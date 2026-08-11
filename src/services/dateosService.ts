@@ -58,6 +58,8 @@ export interface Dateo extends DateoImagenMeta {
   turnoInfo?: TurnoInfo | null
   descuento_id?: number | null
   descuento?: { id: number; codigo: string; nombre: string } | null
+  servicio_id?: number | null
+  servicio?: { id: number; codigoServicio: string; nombreServicio: string } | null
   es_avance?: boolean
   comprobante_avance_url?: string | null
   aprobado_excepcion_por?: number | null
