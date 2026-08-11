@@ -497,9 +497,38 @@
         <v-card-title class="headline text-center text-error font-weight-bold pa-3 pa-sm-4 text-subtitle-1 text-sm-h6">
           Cancelar turno
         </v-card-title>
-        <v-card-text class="text-center text-caption text-sm-body-1 pa-3 pa-sm-4">
-          ¿Seguro que quieres cancelar este turno?<br />
-          Se marcará como <strong>cancelado</strong>, pero conservará sus números de turno.
+        <v-card-text class="text-caption text-sm-body-1 pa-3 pa-sm-4">
+          <p class="text-center mb-3">
+            ¿Seguro que quieres cancelar este turno?<br />
+            Se marcará como <strong>cancelado</strong>, pero conservará sus números de turno.
+          </p>
+
+          <v-alert
+            v-if="cancelTieneEvidencia"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-3 text-left"
+          >
+            Este turno ya tiene <strong>{{ cancelEvidenciaLabel }}</strong> registrada.
+            Cancelarlo puede implicar una devolución u otras consecuencias.
+            Confirma el motivo para continuar.
+          </v-alert>
+
+          <v-textarea
+            v-model="motivoCancelacion"
+            label="Motivo de la cancelación"
+            :placeholder="`Explica por qué se cancela este turno (mínimo ${MOTIVO_CANCELACION_MIN_LEN} caracteres)`"
+            variant="outlined"
+            density="compact"
+            rows="3"
+            auto-grow
+            :rules="[
+              (v: string) =>
+                (!!v && v.trim().length >= MOTIVO_CANCELACION_MIN_LEN) ||
+                `Debes indicar el motivo (mínimo ${MOTIVO_CANCELACION_MIN_LEN} caracteres)`,
+            ]"
+          />
         </v-card-text>
         <v-card-actions class="justify-center pa-3 pa-sm-4">
           <v-btn
@@ -514,6 +543,7 @@
             color="error"
             variant="elevated"
             :size="$vuetify.display.xs ? 'small' : 'default'"
+            :disabled="!motivoCancelacionValido"
             @click="cancelTurno"
           >
             Sí, cancelar
@@ -639,6 +669,7 @@ interface TurnoRawDTO {
   servicioId?: number | null
   servicioCodigo?: string | null
   canalAtribucion?: string | null
+  tieneFacturacion?: boolean | null
   vehiculo?: VehiculoDTO | null
   cliente?: ClienteDTO | null
   captacionDateo?: DateoDTO | null
@@ -733,6 +764,12 @@ const isSaving  = ref(false)
 const isCancelling = ref(false)
 const showConfirmDialog = ref(false)
 const showCancelDialog = ref(false)
+const motivoCancelacion = ref('')
+
+const MOTIVO_CANCELACION_MIN_LEN = 5
+const motivoCancelacionValido = computed(
+  () => motivoCancelacion.value.trim().length >= MOTIVO_CANCELACION_MIN_LEN
+)
 
 const showSnackbar = (message: string, color = 'info', timeout = 4000) => {
   snackbar.value = { show: true, message, color, timeout }
@@ -740,6 +777,19 @@ const showSnackbar = (message: string, color = 'info', timeout = 4000) => {
 
 /** raw turno para metadatos */
 const originalRaw = ref<TurnoRawDTO | null>(null)
+
+/** ¿El turno que se va a cancelar ya tiene evidencia (facturación o certificación)? */
+const cancelTieneFacturacion = computed(() => !!originalRaw.value?.tieneFacturacion)
+const cancelTieneCertificacion = computed(() => !!form.value.horaSalida)
+const cancelTieneEvidencia = computed(
+  () => cancelTieneFacturacion.value || cancelTieneCertificacion.value
+)
+const cancelEvidenciaLabel = computed(() => {
+  const partes: string[] = []
+  if (cancelTieneFacturacion.value) partes.push('facturación')
+  if (cancelTieneCertificacion.value) partes.push('certificación')
+  return partes.join(' y ')
+})
 
 /** Pretty / helpers */
 const fechaBonita = computed(() => {
@@ -1008,10 +1058,19 @@ async function save() {
 
 /** Cancelar turno (usa endpoint cancelar del backend) */
 function openCancelDialog() {
+  motivoCancelacion.value = ''
   showCancelDialog.value = true
 }
 
 async function cancelTurno() {
+  if (!motivoCancelacionValido.value) {
+    showSnackbar(
+      `Debes indicar el motivo de la cancelación (mínimo ${MOTIVO_CANCELACION_MIN_LEN} caracteres).`,
+      'warning'
+    )
+    return
+  }
+
   showCancelDialog.value = false
   const id = Number(route.params.id)
   if (!id) {
@@ -1022,7 +1081,7 @@ async function cancelTurno() {
   isCancelling.value = true
   try {
     const usuarioId = usuarioIdForActions.value
-    await TurnosDelDiaService.cancelarTurno(id, usuarioId)
+    await TurnosDelDiaService.cancelarTurno(id, usuarioId, motivoCancelacion.value.trim())
 
     form.value.estado = 'cancelado'
     if (originalRaw.value) originalRaw.value.estado = 'cancelado'

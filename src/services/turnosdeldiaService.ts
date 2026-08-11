@@ -360,10 +360,10 @@ class TurnosDelDiaService {
     )
   }
 
-  public static cancelarTurno(id: number, usuarioId: number) {
-    return patch<Turno, { usuarioId: number }>(
+  public static cancelarTurno(id: number, usuarioId: number, motivoCancelacion: string) {
+    return patch<Turno, { usuarioId: number; motivoCancelacion: string }>(
       `${this.BASE}/${id}/cancelar`,
-      { usuarioId },
+      { usuarioId, motivoCancelacion },
       { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
     )
   }

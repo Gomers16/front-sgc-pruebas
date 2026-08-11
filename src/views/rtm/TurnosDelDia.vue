@@ -1405,13 +1405,6 @@ const getEtapas = (turno: Turno): Etapa[] => {
     })
   }
 
-  if (turno.estado === 'cancelado' || turno.estado === 'inactivo') {
-    etapas.forEach((etapa) => {
-      etapa.completed = false
-      etapa.funcionario = null  // 👈 AGREGAR ESTA LÍNEA
-    })
-  }
-
   return etapas
 }
 /* ===== Stats ===== */
