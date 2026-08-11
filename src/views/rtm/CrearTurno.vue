@@ -230,6 +230,21 @@
               </v-col>
             </template>
 
+            <!-- Aviso: el dateo encontrado es de otro servicio -->
+            <v-col cols="12" v-if="dateoServicioDesajustado">
+              <v-alert
+                type="warning"
+                icon="mdi-alert-decagram"
+                variant="tonal"
+                density="comfortable"
+                border="start"
+                prominent
+                class="rounded-lg"
+              >
+                Este dateo fue registrado para <strong>{{ busquedaDateo?.servicioCodigo }}</strong>.
+              </v-alert>
+            </v-col>
+
             <!-- 👇 Panel "Datos detectados" SOLO si hay resultados y NO es TRAMITES -->
             <v-col cols="12" v-if="hasBusqueda && !esTramites">
               <v-card variant="tonal" class="pa-3 pa-sm-4 rounded-xl">
@@ -772,6 +787,10 @@ import { TramitesService } from '@/services/tramitesService'
 
 /** ===== Parámetros de búsqueda ===== **/
 const PLACA_REGEX = /^(?:[A-Z]{3}\d{3}|[A-Z]{3}\d{2}[A-Z]?|\d{3}[A-Z]{3})$/
+// Solo para el disparo AUTOMÁTICO mientras se escribe: exige el patrón de
+// 6 caracteres (el formato más común). Las placas de moto de 5 caracteres
+// siguen funcionando vía PLACA_REGEX + botón "Buscar" manual (doSearch(true)).
+const PLACA_COMPLETA_AUTO_REGEX = /^(?:[A-Z]{3}\d{3}|\d{3}[A-Z]{3})$/
 const TEL_LEN = 10
 const AUTO_SEARCH_ON_COMPLETE = true
 
@@ -806,6 +825,8 @@ interface DateoRecienteDTO {
   observacion: string | null; imagen_url: string | null; created_at: string;
   consumido_turno_id: number | null; consumido_at: string | null;
   convenio?: ConvenioDTO | null;
+  servicioId?: number | null;
+  servicioCodigo?: string | null;
 }
 interface ReservaDTO { vigente: boolean; bloqueaHasta: string | null }
 interface CaptacionSugeridaDTO { canal: CanalAtrib; agente: AgenteDTO | null }
@@ -928,6 +949,16 @@ const busquedaCliente  = computed(() => busqueda.value?.cliente ?? null)
 const busquedaDateo    = computed(() => busqueda.value?.dateoReciente ?? null)
 const busquedaDateoConvenio = computed(() => busqueda.value?.dateoReciente?.convenio ?? null)
 const reserva          = computed(() => busqueda.value?.reserva ?? null)
+
+/** Aviso simple: el dateo encontrado fue registrado para un servicio distinto
+ *  al que el operador tiene seleccionado en el dropdown. Recordatorio, no
+ *  bloquea nada — solo si el dateo trae servicioId (los viejos no lo tienen). */
+const dateoServicioDesajustado = computed(() => {
+  const servicioIdDateo = busquedaDateo.value?.servicioId
+  if (servicioIdDateo == null) return false
+  if (!form.value.servicioId) return false
+  return servicioIdDateo !== form.value.servicioId
+})
 
 const convenioDetectado = computed<ConvenioDTO | null>(() => {
   return busquedaDateoConvenio.value || busqueda.value?.convenio || null
@@ -1199,7 +1230,10 @@ async function loadServicios() {
     const data: ServicioDTO[] = await TurnosDelDiaService.getServicios()
     serviciosItems.value = data.map((s) => ({ title: `${s.codigo} — ${s.nombre}`, value: s.id }))
     serviciosMapById.value = Object.fromEntries(data.map((s) => [s.id, s]))
-    if (!form.value.servicioId && data.length >= 1) form.value.servicioId = data[0].id
+    if (!form.value.servicioId && data.length >= 1) {
+      const rtm = data.find((s) => s.codigo?.toUpperCase() === 'RTM')
+      form.value.servicioId = rtm?.id ?? data[0].id
+    }
   } catch (err) {
     console.error('Error al cargar servicios:', err)
     showSnackbar('No se pudieron cargar los servicios', 'error')
@@ -1275,7 +1309,7 @@ onMounted(async () => {
 watch(() => form.value.placa, () => {
   if (!AUTO_SEARCH_ON_COMPLETE || esTramites.value) return
   const p = (form.value.placa || '').trim().toUpperCase()
-  if (PLACA_REGEX.test(p)) doSearch(false)
+  if (PLACA_COMPLETA_AUTO_REGEX.test(p)) doSearch(false)
 })
 watch(() => telefonoBusqueda.value, () => {
   if (!AUTO_SEARCH_ON_COMPLETE || esTramites.value) return
@@ -1288,7 +1322,6 @@ watch(() => form.value.medioEntero, () => {
   }
 })
 watch(() => form.value.servicioId, async () => {
-  busqueda.value = null
   tramiteForm.value = { nombreCliente: '', cedula: '', telefono: '', placa: '' }
   await fetchNextTurnNumbers()
 })

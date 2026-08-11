@@ -41,7 +41,14 @@
 
         <v-row dense>
           <v-col cols="6" sm="3">
-            <div class="text-center">
+            <div
+              class="text-center contador-clicable"
+              :class="{ 'contador-activo-en_proceso': estadoFiltro === 'en_proceso' }"
+              role="button"
+              tabindex="0"
+              @click="toggleEstadoFiltro('en_proceso')"
+              @keydown.enter="toggleEstadoFiltro('en_proceso')"
+            >
               <div class="text-h6 text-sm-h5 font-weight-bold text-light-blue-darken-2">
                 {{ resumenSemaforo.en_proceso }}
               </div>
@@ -49,7 +56,14 @@
             </div>
           </v-col>
           <v-col cols="6" sm="3">
-            <div class="text-center">
+            <div
+              class="text-center contador-clicable"
+              :class="{ 'contador-activo-incompleto': estadoFiltro === 'incompleto' }"
+              role="button"
+              tabindex="0"
+              @click="toggleEstadoFiltro('incompleto')"
+              @keydown.enter="toggleEstadoFiltro('incompleto')"
+            >
               <div class="text-h6 text-sm-h5 font-weight-bold text-amber-darken-3">
                 {{ resumenSemaforo.incompleto }}
               </div>
@@ -57,7 +71,14 @@
             </div>
           </v-col>
           <v-col cols="6" sm="3">
-            <div class="text-center">
+            <div
+              class="text-center contador-clicable"
+              :class="{ 'contador-activo-finalizado': estadoFiltro === 'finalizado' }"
+              role="button"
+              tabindex="0"
+              @click="toggleEstadoFiltro('finalizado')"
+              @keydown.enter="toggleEstadoFiltro('finalizado')"
+            >
               <div class="text-h6 text-sm-h5 font-weight-bold text-green-darken-2">
                 {{ resumenSemaforo.finalizado }}
               </div>
@@ -65,7 +86,14 @@
             </div>
           </v-col>
           <v-col cols="6" sm="3">
-            <div class="text-center">
+            <div
+              class="text-center contador-clicable"
+              :class="{ 'contador-activo-cancelado': estadoFiltro === 'cancelado' }"
+              role="button"
+              tabindex="0"
+              @click="toggleEstadoFiltro('cancelado')"
+              @keydown.enter="toggleEstadoFiltro('cancelado')"
+            >
               <div class="text-h6 text-sm-h5 font-weight-bold text-red-darken-2">
                 {{ resumenSemaforo.cancelado }}
               </div>
@@ -74,10 +102,47 @@
           </v-col>
         </v-row>
 
+        <!-- Sub-filtro: solo visible cuando el filtro activo es 'Incompleto' -->
+        <template v-if="estadoFiltro === 'incompleto'">
+          <v-divider class="my-3" />
+          <div class="d-flex flex-wrap align-center" style="gap: 8px">
+            <span class="text-caption text-sm-body-2 font-weight-bold mr-1">Ver solo:</span>
+            <v-chip
+              size="small"
+              color="amber-darken-3"
+              :variant="subFiltroIncompleto === 'FALTA_FACTURACION' ? 'elevated' : 'outlined'"
+              prepend-icon="mdi-receipt-text-remove-outline"
+              @click="toggleSubFiltroIncompleto('FALTA_FACTURACION')"
+            >
+              Falta facturación
+            </v-chip>
+            <v-chip
+              size="small"
+              color="amber-darken-3"
+              :variant="subFiltroIncompleto === 'FALTA_CERTIFICACION' ? 'elevated' : 'outlined'"
+              prepend-icon="mdi-certificate-outline"
+              @click="toggleSubFiltroIncompleto('FALTA_CERTIFICACION')"
+            >
+              Falta certificación
+            </v-chip>
+          </div>
+        </template>
+
         <v-divider class="my-3" />
 
-        <div class="text-center text-subtitle-2 text-sm-subtitle-1 font-weight-bold">
-          Total visible con el filtro actual: {{ turnosFiltrados.length }}
+        <div class="d-flex flex-wrap align-center justify-center" style="gap: 12px">
+          <span class="text-subtitle-2 text-sm-subtitle-1 font-weight-bold">
+            Total visible con el filtro actual: {{ turnosFiltrados.length }}
+          </span>
+          <v-chip
+            v-if="estadoFiltro !== 'TODOS'"
+            size="small"
+            variant="outlined"
+            prepend-icon="mdi-close"
+            @click="quitarFiltroEstado"
+          >
+            Quitar filtro
+          </v-chip>
         </div>
       </v-card>
 
@@ -1010,7 +1075,31 @@ const servicioFiltroItems = [
   { title: 'Peritaje', value: 'PERI' },
 ]
 
-const turnosFiltrados = computed(() => {
+/* ===== Filtro por estado visual (leyenda clicable) ===== */
+const estadoFiltro = ref<string>('TODOS')
+const subFiltroIncompleto = ref<string>('TODOS')
+
+function toggleEstadoFiltro(estado: EstadoVisual) {
+  estadoFiltro.value = estadoFiltro.value === estado ? 'TODOS' : estado
+  subFiltroIncompleto.value = 'TODOS'
+}
+
+function toggleSubFiltroIncompleto(sub: 'FALTA_FACTURACION' | 'FALTA_CERTIFICACION') {
+  subFiltroIncompleto.value = subFiltroIncompleto.value === sub ? 'TODOS' : sub
+}
+
+function quitarFiltroEstado() {
+  estadoFiltro.value = 'TODOS'
+  subFiltroIncompleto.value = 'TODOS'
+}
+
+/**
+ * Base para los contadores de la leyenda: aplica servicio+placa (los
+ * filtros que ya existían) pero NO el filtro de estado — así los 4
+ * contadores siempre muestran el total real de cada estado, sin
+ * colapsar a 0 cuando el operador filtra las tarjetas por uno de ellos.
+ */
+const turnosParaContadores = computed(() => {
   return turnos.value.filter((t) => {
     const pasaServicio =
       servicioFiltro.value === 'TODOS' ||
@@ -1024,11 +1113,27 @@ const turnosFiltrados = computed(() => {
   })
 })
 
+/** Tarjetas visibles en la grilla: todo lo anterior + el filtro de estado/sub-filtro. */
+const turnosFiltrados = computed(() => {
+  return turnosParaContadores.value.filter((t) => {
+    const pasaEstado = estadoFiltro.value === 'TODOS' || getEstadoVisual(t) === estadoFiltro.value
+
+    const pasaSubfiltro =
+      estadoFiltro.value !== 'incompleto' ||
+      subFiltroIncompleto.value === 'TODOS' ||
+      (subFiltroIncompleto.value === 'FALTA_FACTURACION' && !t.tieneFacturacion && !!t.horaSalida) ||
+      (subFiltroIncompleto.value === 'FALTA_CERTIFICACION' && !!t.tieneFacturacion && !t.horaSalida)
+
+    return pasaEstado && pasaSubfiltro
+  })
+})
+
 /**
- * Resumen del semáforo para el panel superior. A propósito cuenta sobre
- * `turnosFiltrados` (no sobre `turnos`) para reflejar exactamente los
- * turnos que el asesor tiene visibles según el filtro de servicio/placa que
- * tenga puesto — el modal "Estadísticas" histórico cuenta sobre `turnos`
+ * Resumen del semáforo para el panel superior. Cuenta sobre
+ * `turnosParaContadores` (servicio+placa, SIN el filtro de estado) para que
+ * los 4 números siempre reflejen el total real de cada estado — no deben
+ * colapsar a 0 cuando el operador hace clic en uno de ellos para filtrar
+ * las tarjetas. El modal "Estadísticas" histórico cuenta sobre `turnos`
  * sin filtrar, que es un bug conocido y separado de este panel.
  */
 const resumenSemaforo = computed(() => {
@@ -1039,7 +1144,7 @@ const resumenSemaforo = computed(() => {
     cancelado: 0,
   }
 
-  turnosFiltrados.value.forEach((t) => {
+  turnosParaContadores.value.forEach((t) => {
     res[getEstadoVisual(t)]++
   })
 
@@ -1101,8 +1206,9 @@ const abrirObservacionesTurno = (turno: Turno) => {
 
 /**
  * Conteo por estado para el modal "Estadísticas". Fuente de datos alineada
- * con el panel resumen de arriba: mismo array (turnosFiltrados, respeta el
- * filtro de servicio/placa activo) y mismo semáforo centralizado
+ * con el panel resumen de arriba: mismo array (turnosParaContadores, respeta
+ * el filtro de servicio/placa activo pero NO el de estado, para no colapsar
+ * a 0 los demás estados) y mismo semáforo centralizado
  * (getEstadoVisual/estadoVisual del backend) en vez de turno.estado crudo,
  * para no repetir el bug de contar como "Finalizados" turnos que en
  * realidad saltaron una etapa.
@@ -1115,7 +1221,7 @@ const conteoPorEstado = computed(() => {
     cancelados: 0,
   }
 
-  turnosFiltrados.value.forEach((t) => {
+  turnosParaContadores.value.forEach((t) => {
     const ev = getEstadoVisual(t)
     if (ev === 'en_proceso') res.enProceso++
     else if (ev === 'incompleto') res.incompletos++
@@ -1673,6 +1779,32 @@ onMounted(() => {
 }
 .estado-incompleto {
   border: 2px solid #fbbf24;
+}
+
+.contador-clicable {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.contador-clicable:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+.contador-activo-en_proceso {
+  background-color: rgba(56, 189, 248, 0.12);
+  box-shadow: inset 0 0 0 2px #38bdf8;
+}
+.contador-activo-incompleto {
+  background-color: rgba(251, 191, 36, 0.15);
+  box-shadow: inset 0 0 0 2px #fbbf24;
+}
+.contador-activo-finalizado {
+  background-color: rgba(74, 222, 128, 0.12);
+  box-shadow: inset 0 0 0 2px #4ade80;
+}
+.contador-activo-cancelado {
+  background-color: rgba(252, 165, 165, 0.2);
+  box-shadow: inset 0 0 0 2px #fca5a5;
 }
 
 .text-on-primary-text {
