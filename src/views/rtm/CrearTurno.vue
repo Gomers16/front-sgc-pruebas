@@ -481,7 +481,7 @@
                 class="rounded-lg"
               >
                 <strong>⚠️ {{ alertaVentanaServicio.servicio }} próxima a vencer</strong><br />
-                Estás dentro de los 5 días antes del vencimiento
+                Estás dentro de los {{ DIAS_VENTANA_PRE_VENCIMIENTO }} días antes del vencimiento
                 ({{ alertaVentanaServicio.vencimiento }}).
                 El turno se puede crear con normalidad.
               </v-alert>
@@ -1080,6 +1080,57 @@ const captacionChipText = computed(() => {
   return `Sugerencia: ${s.canal}${a}`
 })
 
+/**
+ * Ventana de vigencia RTM/SOAT para el chip de alerta. Mismo criterio que
+ * bloqueoMesesPorServicio() en turnos_rtms_controller.ts::store(): busca el
+ * último turno FINALIZADO de esta placa para el MISMO servicio que se está
+ * creando (servicioId + estado='finalizado'), no la "última visita" general
+ * (que puede ser de otro servicio más reciente y ocultar/confundir la alerta).
+ * Solo aplica a RTM/SOAT — los demás servicios no tienen ventana de bloqueo.
+ */
+const MESES_VIGENCIA_RTM_SOAT = 12
+const DIAS_VENTANA_PRE_VENCIMIENTO = 16
+
+async function refreshAlertaVentanaServicio() {
+  alertaVentanaServicio.value = null
+
+  const cod = (servicioCodigoActual.value ?? '').toUpperCase()
+  if (cod !== 'RTM' && cod !== 'SOAT') return
+
+  const placaActual = (form.value.placa || '').trim().toUpperCase()
+  if (!placaActual || !form.value.servicioId) return
+
+  try {
+    const turnos = await TurnosDelDiaService.fetchTurnos({
+      placa: placaActual,
+      servicioId: form.value.servicioId,
+      estado: 'finalizado',
+      perPage: 5,
+      page: 1,
+    })
+    // El filtro de placa del backend es LIKE (substring) — nos aseguramos acá
+    // de quedarnos solo con coincidencias exactas antes de tomar la primera
+    // (ya vienen ordenadas por fecha desc, turno_numero desc).
+    const lastFinalizado = (turnos ?? []).find(
+      (t) => (t.placa || '').trim().toUpperCase() === placaActual
+    )
+    if (!lastFinalizado?.fecha) return
+
+    const fechaUltima = DateTime.fromISO(lastFinalizado.fecha, { zone: 'America/Bogota' })
+    if (!fechaUltima.isValid) return
+
+    const vencimiento = fechaUltima.plus({ months: MESES_VIGENCIA_RTM_SOAT }).startOf('day')
+    const ventanaDesde = vencimiento.minus({ days: DIAS_VENTANA_PRE_VENCIMIENTO })
+    const hoy = DateTime.now().setZone('America/Bogota').startOf('day')
+
+    if (hoy >= ventanaDesde && hoy < vencimiento) {
+      alertaVentanaServicio.value = { servicio: cod, vencimiento: vencimiento.toISODate()! }
+    }
+  } catch (err) {
+    console.error('Error calculando ventana de vigencia RTM/SOAT:', err)
+  }
+}
+
 /** ===== Buscar ===== **/
 async function doSearch(force: boolean = false) {
   const placa = (form.value.placa || '').trim().toUpperCase()
@@ -1172,24 +1223,10 @@ async function doSearch(force: boolean = false) {
     clienteTelefono.value = resp?.cliente?.telefono ?? (telOk ? telRaw : '')
     clienteEmail.value    = resp?.cliente?.email    ?? ''
 
-    // Detectar ventana de 5 días para RTM/SOAT
-    alertaVentanaServicio.value = null
-    const uvCheck = resp?.ultimaVisita
-    if (uvCheck?.fecha && uvCheck?.servicioCodigo) {
-      const cod = uvCheck.servicioCodigo.toUpperCase()
-      if (cod === 'RTM' || cod === 'SOAT') {
-        const fechaUltima = DateTime.fromISO(uvCheck.fecha, { zone: 'America/Bogota' })
-        const vencimiento = fechaUltima.plus({ months: 12 })
-        const ventanaDesde = vencimiento.minus({ days: 5 })
-        const hoy = DateTime.now().setZone('America/Bogota').startOf('day')
-        if (hoy >= ventanaDesde && hoy < vencimiento) {
-          alertaVentanaServicio.value = {
-            servicio: cod,
-            vencimiento: vencimiento.toISODate()!,
-          }
-        }
-      }
-    }
+    // Ventana de vigencia RTM/SOAT (mismo criterio que el backend, ver
+    // refreshAlertaVentanaServicio): usa form.value.placa/servicioId, no
+    // resp.ultimaVisita (que no filtra por servicio ni por estado).
+    await refreshAlertaVentanaServicio()
 
     if (resp?.captacionSugerida) {
       const canal = resp.captacionSugerida.canal
@@ -1324,6 +1361,7 @@ watch(() => form.value.medioEntero, () => {
 watch(() => form.value.servicioId, async () => {
   tramiteForm.value = { nombreCliente: '', cedula: '', telefono: '', placa: '' }
   await fetchNextTurnNumbers()
+  await refreshAlertaVentanaServicio()
 })
 
 /** ===== Confirmación y submit ===== **/
