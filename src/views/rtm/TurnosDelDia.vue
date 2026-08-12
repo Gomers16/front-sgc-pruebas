@@ -16,10 +16,9 @@
       </v-card-title>
 
       <!-- Panel resumen: leyenda del semáforo + contadores del día.
-           Los contadores se calculan sobre turnosFiltrados (respeta el
-           filtro de servicio/placa activo) — a diferencia del modal
-           "Estadísticas" más abajo, que cuenta sobre todos los turnos del
-           día sin importar el filtro (comportamiento previo, sin cambios). -->
+           Los contadores se calculan sobre turnosParaContadores (respeta el
+           filtro de servicio/placa activo, pero NO el de estado) — mismo
+           criterio que usa el modal "Estadísticas" más abajo. -->
       <v-card variant="outlined" class="pa-3 pa-sm-4 mb-4 mb-sm-6 rounded-lg">
         <div class="d-flex flex-wrap align-center" style="gap: 8px">
           <span class="text-caption text-sm-body-2 font-weight-bold mr-1">Leyenda:</span>
@@ -1133,8 +1132,8 @@ const turnosFiltrados = computed(() => {
  * `turnosParaContadores` (servicio+placa, SIN el filtro de estado) para que
  * los 4 números siempre reflejen el total real de cada estado — no deben
  * colapsar a 0 cuando el operador hace clic en uno de ellos para filtrar
- * las tarjetas. El modal "Estadísticas" histórico cuenta sobre `turnos`
- * sin filtrar, que es un bug conocido y separado de este panel.
+ * las tarjetas. El modal "Estadísticas" usa el mismo criterio (ver
+ * `conteoPorEstado`, `servicioStats` y `calculateStats`).
  */
 const resumenSemaforo = computed(() => {
   const res = {
@@ -1232,11 +1231,17 @@ const conteoPorEstado = computed(() => {
   return res
 })
 
-/* ===== Stats por servicio y tipo vehiculo ===== */
+/**
+ * Stats por servicio y tipo vehiculo para el modal "Estadísticas". Cuenta
+ * sobre `turnosParaContadores` (respeta servicio/placa, NO el filtro de
+ * estado) — mismo criterio que `conteoPorEstado`, para que el desglose por
+ * servicio no colapse cuando el operador tiene un filtro de estado activo
+ * en la pantalla principal.
+ */
 const servicioStats = computed(() => {
   const base: Record<string, { total: number; porTipo: Record<TipoVehiculoStatsKey, number> }> = {}
 
-  turnos.value.forEach((t) => {
+  turnosParaContadores.value.forEach((t) => {
     const servicio = getServicioCodigo(t) || 'SIN_SERVICIO'
     if (!base[servicio]) {
       const porTipoInit = {} as Record<TipoVehiculoStatsKey, number>
@@ -1547,6 +1552,14 @@ const mapMedioToCanalCaptacion = (
   return 'Otros'
 }
 
+/**
+ * Alimenta el gráfico "Por Tipo de Vehículo" y la lista "Canal de captación"
+ * del modal "Estadísticas". Cuenta sobre `turnosParaContadores` (respeta
+ * servicio/placa, NO el filtro de estado) — mismo criterio que
+ * `conteoPorEstado`/`servicioStats`, para que el modal siga mostrando el
+ * desglose completo de los 4 estados aunque la pantalla principal esté
+ * filtrada a uno solo.
+ */
 const calculateStats = () => {
   initTipoVehiculoStats()
   statsData.value.medioEntero = {
@@ -1557,7 +1570,7 @@ const calculateStats = () => {
     Otros: 0,
   }
 
-  turnos.value.forEach((turno) => {
+  turnosParaContadores.value.forEach((turno) => {
     const tipoKey: TipoVehiculoStatsKey =
       turno.tipoVehiculo && TIPO_VEHICULO_KEYS.includes(turno.tipoVehiculo as TipoVehiculoStatsKey)
         ? (turno.tipoVehiculo as TipoVehiculoStatsKey)
