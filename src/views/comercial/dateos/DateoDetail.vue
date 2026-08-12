@@ -446,6 +446,62 @@
           </v-card-actions>
         </v-card>
       </v-col>
+
+      <!-- Documentos de descuento informativo (ej. INFORMATIVO_POLICIA) -->
+      <v-col v-if="tieneDocumentosInformativos" cols="12">
+        <v-card elevation="4" class="rounded-lg rounded-sm-xl">
+          <v-card-title class="text-subtitle-2 text-sm-subtitle-1 font-weight-bold pa-3 pa-sm-4">
+            Documentos de descuento informativo
+          </v-card-title>
+          <v-divider />
+          <v-card-text class="pa-3 pa-sm-4">
+            <div
+              v-for="ticket in dateo?.documentosInformativos"
+              :key="ticket.ticketId"
+              class="mb-4"
+            >
+              <div class="text-caption text-medium-emphasis mb-2">
+                Ticket #{{ ticket.ticketId }} — {{ ticket.descuentoCodigo || '—' }}
+              </div>
+              <v-row dense>
+                <v-col
+                  v-for="doc in docsDelTicket(ticket)"
+                  :key="doc.tipo"
+                  cols="6" sm="4" md="3"
+                >
+                  <v-card variant="outlined" class="pa-2 text-center rounded-lg">
+                    <v-img
+                      v-if="docThumbs[`${ticket.ticketId}:${doc.tipo}`]"
+                      :src="docThumbs[`${ticket.ticketId}:${doc.tipo}`]!"
+                      height="80"
+                      contain
+                      class="rounded mb-1"
+                    />
+                    <v-progress-circular
+                      v-else
+                      indeterminate
+                      size="20"
+                      color="primary"
+                      class="my-3"
+                    />
+                    <div class="text-caption font-weight-medium">{{ doc.label }}</div>
+                    <v-btn
+                      v-if="docThumbs[`${ticket.ticketId}:${doc.tipo}`]"
+                      size="x-small"
+                      variant="text"
+                      prepend-icon="mdi-open-in-new"
+                      :href="docThumbs[`${ticket.ticketId}:${doc.tipo}`]!"
+                      target="_blank"
+                    >
+                      Ver
+                    </v-btn>
+                  </v-card>
+                </v-col>
+              </v-row>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
     </v-row>
 
     <!-- Diálogo eliminar -->
@@ -501,12 +557,14 @@ import {
   formatDateTime as fmt,
   type Dateo,
   type ResultadoDateo,
+  type DocumentoInformativoTicket,
 } from '@/services/dateosService'
 import { listAgentesCaptacion } from '@/services/conveniosService'
 import { uploadImage, type UploadImageResponse } from '@/services/uploadsService'
 import descuentosService from '@/services/descuentosService'
 import type { Descuento } from '@/services/descuentosService'
 import serviciosService from '@/services/Servicios_service'
+import { FacturacionService } from '@/services/facturacion_service'
 import { usePermissions } from '@/composables/usePermissions'
 
 const { can } = usePermissions()
@@ -771,6 +829,7 @@ watch(() => form.value.descuento_id, () => {
 onBeforeUnmount(() => {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   if (comprobanteAvancePreview.value) URL.revokeObjectURL(comprobanteAvancePreview.value)
+  docThumbUrls.forEach((u) => URL.revokeObjectURL(u))
 })
 
 function maxSizeRule(v: File | File[] | null) {
@@ -851,6 +910,48 @@ function formatDateOnly(iso?: string) {
   return `${d}/${m}/${y}`
 }
 
+/* ===== Documentos de descuento informativo ===== */
+const DOC_TIPO_LABELS: Record<'carnet' | 'tarjeta_propiedad' | 'cedula', string> = {
+  carnet: 'Carnet',
+  tarjeta_propiedad: 'Tarjeta de propiedad',
+  cedula: 'Cédula',
+}
+
+const tieneDocumentosInformativos = computed(() =>
+  (dateo.value?.documentosInformativos ?? []).length > 0
+)
+
+function docsDelTicket(ticket: DocumentoInformativoTicket) {
+  const paths: Record<'carnet' | 'tarjeta_propiedad' | 'cedula', string | null> = {
+    carnet: ticket.docCarnetPath,
+    tarjeta_propiedad: ticket.docTarjetaPropiedadPath,
+    cedula: ticket.docCedulaPath,
+  }
+  return (['carnet', 'tarjeta_propiedad', 'cedula'] as const)
+    .filter((tipo) => !!paths[tipo])
+    .map((tipo) => ({ tipo, label: DOC_TIPO_LABELS[tipo] }))
+}
+
+// blob URLs de las miniaturas, clave `${ticketId}:${tipo}`
+const docThumbs = ref<Record<string, string | null>>({})
+const docThumbUrls: string[] = []
+
+async function loadDocumentosInformativos() {
+  docThumbUrls.forEach((u) => URL.revokeObjectURL(u))
+  docThumbUrls.length = 0
+  docThumbs.value = {}
+
+  const tickets = dateo.value?.documentosInformativos ?? []
+  for (const ticket of tickets) {
+    for (const doc of docsDelTicket(ticket)) {
+      const key = `${ticket.ticketId}:${doc.tipo}`
+      const url = await FacturacionService.getDocumentoPoliciaBlob(ticket.ticketId, doc.tipo)
+      docThumbs.value[key] = url
+      if (url) docThumbUrls.push(url)
+    }
+  }
+}
+
 /* ===== Carga ===== */
 async function load() {
   loading.value = true
@@ -886,6 +987,8 @@ async function load() {
 
     cargaInicialCompleta = true
     editando.value = false
+
+    await loadDocumentosInformativos()
   } catch (e) {
     const error = e as { response?: { data?: { message?: string } } }
     const message = error.response?.data?.message || 'No se pudo cargar el dateo'

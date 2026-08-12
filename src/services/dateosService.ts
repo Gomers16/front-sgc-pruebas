@@ -25,6 +25,15 @@ export interface DateoImagenMeta {
   imagen_origen_id?: string | number | null
 }
 
+/** Documento de descuento informativo (ej. INFORMATIVO_POLICIA) subido en Facturación */
+export interface DocumentoInformativoTicket {
+  ticketId: number
+  descuentoCodigo: string | null
+  docCarnetPath: string | null
+  docTarjetaPropiedadPath: string | null
+  docCedulaPath: string | null
+}
+
 /** Información del turno vinculado al dateo */
 export interface TurnoInfo {
   id?: number
@@ -56,6 +65,7 @@ export interface Dateo extends DateoImagenMeta {
   updated_at?: string
   origen?: OrigenDateo
   turnoInfo?: TurnoInfo | null
+  documentosInformativos?: DocumentoInformativoTicket[]
   descuento_id?: number | null
   descuento?: { id: number; codigo: string; nombre: string } | null
   servicio_id?: number | null
