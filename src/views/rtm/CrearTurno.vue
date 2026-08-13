@@ -790,7 +790,7 @@ const PLACA_REGEX = /^(?:[A-Z]{3}\d{3}|[A-Z]{3}\d{2}[A-Z]?|\d{3}[A-Z]{3})$/
 // Solo para el disparo AUTOMÁTICO mientras se escribe: exige el patrón de
 // 6 caracteres (el formato más común). Las placas de moto de 5 caracteres
 // siguen funcionando vía PLACA_REGEX + botón "Buscar" manual (doSearch(true)).
-const PLACA_COMPLETA_AUTO_REGEX = /^(?:[A-Z]{3}\d{3}|\d{3}[A-Z]{3})$/
+const PLACA_COMPLETA_AUTO_REGEX = /^(?:[A-Z]{3}\d{3}|[A-Z]{3}\d{2}[A-Z]|\d{3}[A-Z]{3})$/
 const TEL_LEN = 10
 const AUTO_SEARCH_ON_COMPLETE = true
 
