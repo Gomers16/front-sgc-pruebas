@@ -226,6 +226,56 @@ export const CaptacionDateosService = {
   },
 
   /**
+   * POST /api/captacion-dateos/:id/redatear
+   * Reactiva un dateo en RE_DATEAR: exige evidencia_url (ya subida vía
+   * uploadImage()). Vuelve a PENDIENTE con ventana de exclusividad nueva.
+   */
+  redatear(id: number | string, payload: { evidencia_url: string; observacion?: string | null }) {
+    return post<{
+      id: number
+      resultado: string
+      numero_redateos_usados: number
+      redateado_at: string | null
+      limite_alcanzado: boolean
+      maxRedateos: number
+      bloqueadoHasta?: string | null
+    }>(`${base}/${id}/redatear`, payload)
+  },
+
+  /**
+   * GET /api/captacion-dateos/:id/redateos
+   * Historial de re-dateos de un dateo, más reciente primero.
+   */
+  getRedateos(id: number | string) {
+    return get<{
+      data: {
+        id: number
+        captacion_dateo_id: number
+        numero_redateo: number
+        evidencia_url: string
+        observacion: string | null
+        created_at: string
+        agente_id: number | null
+        agente_nombre: string | null
+        usuario_id: number | null
+        usuario_nombre: string | null
+      }[]
+    }>(`${base}/${id}/redateos`)
+  },
+
+  /** GET /api/captacion-dateos/config/max-redateos (límite global) */
+  getMaxRedateosGlobal() {
+    return get<{ max_redateos: number }>(`${base}/config/max-redateos`)
+  },
+
+  /** GET /api/captacion-dateos/config/max-redateos/asesores?asesorId= (overrides) */
+  getMaxRedateosAsesores(asesorId: number) {
+    return get<{
+      data: { id: number; asesor_id: number; asesor_nombre: string | null; max_redateos: number | null }[]
+    }>(`${base}/config/max-redateos/asesores`, { params: { asesorId } })
+  },
+
+  /**
    * Activa o desactiva el avance de un dateo.
    * PATCH /api/captacion-dateos/:id/avance
    *

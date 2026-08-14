@@ -1162,6 +1162,14 @@ async function loadCatalogos() {
 onMounted(() => {
   const q = route.query.fromFicha as string | undefined
   fromAsesor.value = q ? Number(q) : null
+
+  // 🆕 Prellenar placa/teléfono al llegar desde el modal de re-datear
+  // (dateo que alcanzó el límite de re-dateos → "crear dateo nuevo")
+  const placaQuery = route.query.placa as string | undefined
+  const telefonoQuery = route.query.telefono as string | undefined
+  if (placaQuery) form.value.placa = placaQuery.toUpperCase()
+  if (telefonoQuery) form.value.telefono = telefonoQuery
+
   loadCatalogos()
   loadDescuentos()
   loadServicios() // 🆕

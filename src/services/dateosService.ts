@@ -2,7 +2,13 @@
 import { get, post, put, del, patch } from '@/services/http'
 
 export type CanalCaptacion = 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES'
-export type ResultadoDateo = 'PENDIENTE' | 'EN_PROCESO' | 'EXITOSO' | 'NO_EXITOSO' | 'RE_DATEAR'
+export type ResultadoDateo =
+  | 'PENDIENTE'
+  | 'EN_PROCESO'
+  | 'EXITOSO'
+  | 'NO_EXITOSO'
+  | 'RE_DATEAR'
+  | 'REEMPLAZADO'
 export type OrigenDateo = 'UI' | 'WHATSAPP' | 'IMPORT'
 
 export interface AgenteLight {
@@ -75,6 +81,11 @@ export interface Dateo extends DateoImagenMeta {
   aprobado_excepcion_por?: number | null
   aprobado_excepcion_at?: string | null
   aprobado_excepcion_por_nombre?: string | null
+
+  /** Re-datear con evidencia */
+  numero_redateos_usados?: number
+  redateado_at?: string | null
+  limite_alcanzado?: boolean
 
   /** Comisión ya calculada/unida por el backend (endpoint dateos-comisiones) */
   monto_comision?: number
