@@ -164,6 +164,12 @@ export function usePermissions() {
         'GERENCIA'
       ]),
 
+      // Configurar límite global / overrides por asesor de re-dateos
+      configurarRedateos: () => auth.hasAnyRole([
+        'SUPER_ADMIN',
+        'GERENCIA'
+      ]),
+
       // ==================== COMISIONES ====================
       verComisiones: () => auth.hasAnyRole([
         'SUPER_ADMIN',

@@ -268,11 +268,44 @@ export const CaptacionDateosService = {
     return get<{ max_redateos: number }>(`${base}/config/max-redateos`)
   },
 
-  /** GET /api/captacion-dateos/config/max-redateos/asesores?asesorId= (overrides) */
-  getMaxRedateosAsesores(asesorId: number) {
+  /**
+   * POST /api/captacion-dateos/config/max-redateos
+   * Actualiza el límite global. Roles: SUPER_ADMIN/GERENCIA.
+   */
+  setMaxRedateosGlobal(maxRedateos: number) {
+    return post<{ max_redateos: number }>(`${base}/config/max-redateos`, {
+      max_redateos: maxRedateos,
+    })
+  },
+
+  /**
+   * GET /api/captacion-dateos/config/max-redateos/asesores?asesorId= (overrides)
+   * Sin asesorId devuelve TODOS los overrides existentes.
+   */
+  getMaxRedateosAsesores(asesorId?: number) {
     return get<{
       data: { id: number; asesor_id: number; asesor_nombre: string | null; max_redateos: number | null }[]
-    }>(`${base}/config/max-redateos/asesores`, { params: { asesorId } })
+    }>(`${base}/config/max-redateos/asesores`, { params: asesorId ? { asesorId } : {} })
+  },
+
+  /**
+   * POST /api/captacion-dateos/config/max-redateos/asesores
+   * Crea/actualiza el override de un asesor. max_redateos=null elimina el override.
+   * Roles: SUPER_ADMIN/GERENCIA.
+   */
+  setMaxRedateosAsesor(asesorId: number, maxRedateos: number | null) {
+    return post<{ id: number; asesor_id: number; max_redateos: number | null }>(
+      `${base}/config/max-redateos/asesores`,
+      { asesor_id: asesorId, max_redateos: maxRedateos }
+    )
+  },
+
+  /**
+   * DELETE /api/captacion-dateos/config/max-redateos/asesores/:id
+   * Elimina un override específico. Roles: SUPER_ADMIN/GERENCIA.
+   */
+  deleteMaxRedateosAsesor(id: number) {
+    return del<{ message: string }>(`${base}/config/max-redateos/asesores/${id}`)
   },
 
   /**

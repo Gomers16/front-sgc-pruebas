@@ -5,7 +5,7 @@
       <v-card-title class="py-4 px-4 px-sm-6 d-flex align-center justify-space-between flex-wrap gap-3">
         <div class="text-h5 font-weight-bold">🗒️ Dateos</div>
 
-        <div class="d-flex align-end gap-2">
+        <div class="d-flex align-end gap-2 flex-wrap">
           <v-text-field
             v-model.number="exclusividad.horas"
             label="Horas de exclusividad"
@@ -27,6 +27,30 @@
           >
             Guardar
           </v-btn>
+
+          <template v-if="puedeConfigurarRedateos">
+            <v-text-field
+              v-model.number="maxRedateosGlobal.valor"
+              label="Límite global de re-dateos"
+              type="number"
+              min="1"
+              variant="outlined"
+              density="compact"
+              hide-details
+              style="width: 180px"
+              :loading="maxRedateosGlobal.loading"
+            />
+            <v-btn
+              color="primary"
+              variant="tonal"
+              prepend-icon="mdi-content-save"
+              :disabled="!maxRedateosGlobalCambiado"
+              :loading="maxRedateosGlobal.guardando"
+              @click="guardarMaxRedateosGlobal"
+            >
+              Guardar
+            </v-btn>
+          </template>
         </div>
       </v-card-title>
 
@@ -136,7 +160,75 @@
         </v-row>
       </v-card-text>
 
+      <!-- 🆕 Configuración: límite de re-dateos por asesor (overrides del global) -->
+      <v-expansion-panels v-if="puedeConfigurarRedateos" variant="accordion" class="mx-4 mx-sm-6 mb-4">
+        <v-expansion-panel title="⚙️ Límite de re-dateos por asesor (overrides)">
+          <v-expansion-panel-text>
+            <v-row dense class="mb-3">
+              <v-col cols="12" sm="6" md="4">
+                <v-autocomplete
+                  v-model="maxRedateosAsesorForm.asesorId"
+                  :items="asesoresItems"
+                  item-title="nombre"
+                  item-value="id"
+                  label="Asesor"
+                  density="comfortable"
+                  variant="outlined"
+                  :loading="asesoresLoading"
+                  hide-details
+                  clearable
+                />
+              </v-col>
+              <v-col cols="8" sm="4" md="3">
+                <v-text-field
+                  v-model.number="maxRedateosAsesorForm.maxRedateos"
+                  label="Máx. re-dateos"
+                  type="number"
+                  min="1"
+                  density="comfortable"
+                  variant="outlined"
+                  hide-details
+                />
+              </v-col>
+              <v-col cols="4" sm="2" md="1" class="d-flex align-center">
+                <v-btn
+                  color="primary"
+                  :loading="maxRedateosAsesorForm.guardando"
+                  :disabled="!maxRedateosAsesorForm.asesorId || !maxRedateosAsesorForm.maxRedateos"
+                  @click="guardarMaxRedateosAsesor"
+                  icon="mdi-content-save"
+                />
+              </v-col>
+            </v-row>
 
+            <v-data-table
+              :headers="maxRedateosAsesorHeaders"
+              :items="maxRedateosAsesorOverrides"
+              :loading="maxRedateosAsesorLoading"
+              item-key="id"
+              density="comfortable"
+            >
+              <template #item.asesor="{ item }">
+                {{ item.asesor_nombre || `#${item.asesor_id}` }}
+              </template>
+              <template #item.acciones="{ item }">
+                <v-btn
+                  size="small"
+                  variant="text"
+                  color="error"
+                  icon="mdi-delete"
+                  @click="confirmarEliminarMaxRedateosAsesor(item)"
+                />
+              </template>
+              <template #no-data>
+                <div class="text-center py-4 text-medium-emphasis">
+                  Sin overrides por asesor. Todos usan el límite global.
+                </div>
+              </template>
+            </v-data-table>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
 
       <v-expand-transition>
         <v-alert
@@ -247,14 +339,26 @@
   </div>
 </template>
 
-        <!-- Estado (resultado del dateo) -->
+        <!-- Estado (resultado del dateo) — clickeable cuando está para re-datear -->
         <template #item.resultado="{ item }">
           <div class="d-flex align-center justify-center" style="gap:4px">
             <v-chip
+              v-if="item.resultado === 'RE_DATEAR'"
               :color="chipColorResultado(item.resultado)"
               size="small"
               variant="flat"
-              :prepend-icon="item.resultado === 'RE_DATEAR' ? 'mdi-refresh' : undefined"
+              :prepend-icon="item.limite_alcanzado ? 'mdi-lock' : 'mdi-refresh'"
+              append-icon="mdi-pencil-outline"
+              class="redatear-chip"
+              @click="abrirRedatearModal(item)"
+            >
+              {{ textoResultado(item.resultado) }}{{ item.limite_alcanzado ? ' (agotado)' : '' }}
+            </v-chip>
+            <v-chip
+              v-else
+              :color="chipColorResultado(item.resultado)"
+              size="small"
+              variant="flat"
             >
               {{ textoResultado(item.resultado) }}
             </v-chip>
@@ -263,6 +367,22 @@
                 <v-icon v-bind="props" color="warning" size="18">mdi-shield-alert</v-icon>
               </template>
               <span>Excepción RTM aprobada por {{ item.aprobado_excepcion_por_nombre || '—' }}</span>
+            </v-tooltip>
+            <v-tooltip
+              v-if="(item.numero_redateos_usados ?? 0) > 0"
+              :text="`Ver historial de re-dateos (${item.numero_redateos_usados})`"
+              location="top"
+            >
+              <template #activator="{ props }">
+                <v-btn
+                  v-bind="props"
+                  icon="mdi-history"
+                  size="small"
+                  variant="text"
+                  density="comfortable"
+                  @click="abrirRedatearModal(item)"
+                />
+              </template>
             </v-tooltip>
           </div>
         </template>
@@ -655,6 +775,25 @@
       </v-card>
     </v-dialog>
 
+    <!-- Eliminar override de límite de re-dateos -->
+    <v-dialog v-model="dlgEliminarMaxRedateosAsesor.visible" max-width="420">
+      <v-card>
+        <v-card-title class="text-h6">Eliminar override</v-card-title>
+        <v-card-text>
+          Se eliminará el límite personalizado de
+          <strong>{{ dlgEliminarMaxRedateosAsesor.item?.asesor_nombre || '' }}</strong>.
+          Volverá a usar el límite global.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="dlgEliminarMaxRedateosAsesor.visible = false">Cancelar</v-btn>
+          <v-btn color="error" :loading="dlgEliminarMaxRedateosAsesor.loading" @click="doEliminarMaxRedateosAsesor">
+            Eliminar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Eliminar -->
     <v-dialog v-model="dlgEliminar.visible" max-width="420">
       <v-card>
@@ -765,12 +904,154 @@
       </v-card>
     </v-dialog>
 
+    <!-- 🆕 Modal: Re-datear con evidencia -->
+    <v-dialog
+      v-model="redatearDialog.visible"
+      max-width="640"
+      scrollable
+      persistent
+    >
+      <v-card v-if="redatearDialog.dateo">
+        <v-card-title class="d-flex justify-space-between align-center pa-4">
+          <div>
+            <div class="text-h6">
+              {{ redatearEsPendiente ? 'Re-datear' : 'Historial de re-dateos' }} #{{ redatearDialog.dateo.id }}
+            </div>
+            <div class="text-caption text-medium-emphasis">
+              Placa: {{ redatearDialog.dateo.placa || '—' }}
+              <span v-if="redatearDialog.dateo.telefono"> · Tel: {{ redatearDialog.dateo.telefono }}</span>
+            </div>
+          </div>
+          <v-btn icon="mdi-close" variant="text" :disabled="redatearSubmitting" @click="cerrarRedatearModal" />
+        </v-card-title>
+        <v-divider />
+
+        <v-card-text class="pa-4">
+          <!-- (a) Formulario de re-dateo: solo si el dateo está pendiente de re-datearse y no alcanzó el límite -->
+          <template v-if="redatearEsPendiente && !redatearDialog.dateo.limite_alcanzado">
+            <v-alert type="info" variant="tonal" density="compact" class="mb-4">
+              Re-dateado <strong>{{ redatearDialog.dateo.numero_redateos_usados || 0 }}</strong>
+              de <strong>{{ redatearMaxRedateos ?? '—' }}</strong> veces permitidas.
+            </v-alert>
+
+            <div
+              class="redatear-dropzone mb-3"
+              :class="{ 'redatear-dropzone--active': redatearDragging }"
+              @dragover.prevent="redatearDragging = true"
+              @dragleave.prevent="redatearDragging = false"
+              @drop.prevent="onRedatearDrop"
+              @click="redatearFileInput?.click()"
+            >
+              <div class="text-center">
+                <v-icon size="32" class="mb-1">mdi-camera-plus-outline</v-icon>
+                <div class="text-subtitle-2 font-weight-bold">Suelta la evidencia o pega (Ctrl+V)</div>
+                <div class="text-caption text-medium-emphasis">JPG, PNG o WEBP (hasta 8 MB)</div>
+                <input
+                  ref="redatearFileInput"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  class="d-none"
+                  @change="onRedatearFileChange"
+                />
+              </div>
+            </div>
+
+            <div v-if="redatearPreviewUrl" class="redatear-preview mb-3">
+              <img :src="redatearPreviewUrl" alt="evidencia" />
+            </div>
+
+            <v-textarea
+              v-model="redatearObservacion"
+              label="Observación (opcional)"
+              variant="outlined"
+              rows="2"
+              density="comfortable"
+              hide-details
+              class="mb-3"
+            />
+
+            <v-alert v-if="redatearError" type="error" variant="tonal" density="compact">
+              {{ redatearError }}
+            </v-alert>
+          </template>
+
+          <!-- (b) Aviso de límite alcanzado: solo si sigue pendiente de re-datearse -->
+          <template v-else-if="redatearEsPendiente && redatearDialog.dateo.limite_alcanzado">
+            <v-alert type="warning" variant="tonal" class="mb-3">
+              Este dateo alcanzó el máximo de <strong>{{ redatearMaxRedateos ?? redatearDialog.dateo.numero_redateos_usados }}</strong>
+              re-dateo(s) permitido(s). Para seguir intentando con esta placa/teléfono, crea un dateo nuevo desde cero.
+            </v-alert>
+            <v-btn color="primary" prepend-icon="mdi-plus-circle" @click="irACrearDateoDesdeRedatear">
+              Crear dateo nuevo
+            </v-btn>
+          </template>
+
+          <!-- (b') Modo solo lectura: el dateo ya no está pendiente de re-datearse (RE_DATEAR) -->
+          <v-alert v-else type="info" variant="tonal" density="compact" class="mb-3">
+            Este dateo ya no está pendiente de re-datearse. A continuación su historial.
+          </v-alert>
+
+          <!-- (c) Historial de re-dateos (siempre visible) -->
+          <v-divider class="my-4" />
+          <div class="text-subtitle-2 font-weight-bold mb-2">Historial de re-dateos</div>
+
+          <div v-if="redatearHistorialLoading" class="d-flex justify-center py-4">
+            <v-progress-circular indeterminate color="primary" size="28" />
+          </div>
+          <div v-else-if="!redatearHistorial.length" class="text-medium-emphasis text-caption">
+            Aún no se ha re-dateado este dateo.
+          </div>
+          <v-list v-else density="compact" class="pa-0">
+            <v-list-item v-for="h in redatearHistorial" :key="h.id" class="px-0">
+              <template #prepend>
+                <v-avatar size="42" class="mr-3 evidence-thumb" @click="openViewer(h.evidencia_url)">
+                  <v-img v-if="h.evidencia_url" :src="h.evidencia_url" alt="evidencia" cover />
+                  <v-icon v-else>mdi-image-off</v-icon>
+                </v-avatar>
+              </template>
+              <v-list-item-title class="text-body-2 font-weight-medium">
+                #{{ h.numero_redateo }} — {{ formatDateTime(h.created_at) }}
+              </v-list-item-title>
+              <v-list-item-subtitle class="text-caption">
+                {{ h.usuario_nombre || h.agente_nombre || '—' }}
+                <template v-if="h.observacion"> · {{ h.observacion }}</template>
+              </v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+
+        <v-divider v-if="redatearEsPendiente && !redatearDialog.dateo.limite_alcanzado" />
+        <v-card-actions v-if="redatearEsPendiente && !redatearDialog.dateo.limite_alcanzado" class="pa-4">
+          <v-spacer />
+          <v-btn variant="text" :disabled="redatearSubmitting" @click="cerrarRedatearModal">Cancelar</v-btn>
+          <v-btn
+            color="primary"
+            :loading="redatearSubmitting"
+            :disabled="!redatearFile"
+            @click="confirmarRedatear"
+          >
+            Confirmar re-dateo
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- 🆕 Confirmación explícita antes de ejecutar el re-dateo -->
+    <ConfirmarDialogo
+      v-model="redatearConfirmVisible"
+      title="Confirmar re-dateo"
+      :message="redatearConfirmMessage"
+      confirm-text="Sí, re-datear"
+      confirm-color="primary"
+      @confirm="ejecutarRedatear"
+    />
+
     <v-snackbar v-model="snack.show" :timeout="3000">{{ snack.text }}</v-snackbar>
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   listDateos,
@@ -791,6 +1072,14 @@ import {
 import { listConveniosAsignados } from '@/services/conveniosService'
 import { ClientesService } from '@/services/clientes_service'
 import { calcularReservaCountdown } from '@/composables/useReservaCountdown'
+import { CaptacionDateosService } from '@/services/captacion_dateos_service'
+import { uploadImage } from '@/services/uploadsService'
+import { HttpError } from '@/services/http'
+import { usePermissions } from '@/composables/usePermissions'
+import ConfirmarDialogo from '@/components/UI/ConfirmarDialogo.vue'
+
+const { can } = usePermissions()
+const puedeConfigurarRedateos = computed(() => can.configurarRedateos())
 
 const router = useRouter()
 
@@ -859,6 +1148,314 @@ async function guardarExclusividad() {
   }
 }
 
+/* ═══════════ 🆕 Config: límite de re-dateos (global + overrides por asesor) ═══════════ */
+const maxRedateosGlobal = ref<{ valor: number | null; original: number | null; loading: boolean; guardando: boolean }>({
+  valor: null,
+  original: null,
+  loading: false,
+  guardando: false,
+})
+
+const maxRedateosGlobalCambiado = computed(() => {
+  const { valor, original } = maxRedateosGlobal.value
+  return valor !== null && valor > 0 && valor !== original
+})
+
+async function cargarMaxRedateosGlobal() {
+  maxRedateosGlobal.value.loading = true
+  try {
+    const res = await CaptacionDateosService.getMaxRedateosGlobal()
+    maxRedateosGlobal.value.valor = res.max_redateos
+    maxRedateosGlobal.value.original = res.max_redateos
+  } catch {
+    errorMsg.value = 'No se pudo cargar el límite global de re-dateos'
+  } finally {
+    maxRedateosGlobal.value.loading = false
+  }
+}
+
+async function guardarMaxRedateosGlobal() {
+  if (!maxRedateosGlobalCambiado.value || maxRedateosGlobal.value.valor === null) return
+  maxRedateosGlobal.value.guardando = true
+  try {
+    const res = await CaptacionDateosService.setMaxRedateosGlobal(maxRedateosGlobal.value.valor)
+    maxRedateosGlobal.value.valor = res.max_redateos
+    maxRedateosGlobal.value.original = res.max_redateos
+    snack.text = '✅ Límite global de re-dateos actualizado'
+    snack.show = true
+  } catch {
+    errorMsg.value = 'No se pudo guardar el límite global de re-dateos'
+  } finally {
+    maxRedateosGlobal.value.guardando = false
+  }
+}
+
+interface MaxRedateosAsesorRow {
+  id: number
+  asesor_id: number
+  asesor_nombre: string | null
+  max_redateos: number | null
+}
+
+const maxRedateosAsesorOverrides = ref<MaxRedateosAsesorRow[]>([])
+const maxRedateosAsesorLoading = ref(false)
+const maxRedateosAsesorHeaders = [
+  { title: 'Asesor', key: 'asesor', sortable: false },
+  { title: 'Máx. re-dateos', key: 'max_redateos', sortable: false },
+  { title: 'Acciones', key: 'acciones', sortable: false, align: 'end' as const },
+]
+
+async function cargarMaxRedateosAsesorOverrides() {
+  maxRedateosAsesorLoading.value = true
+  try {
+    const res = await CaptacionDateosService.getMaxRedateosAsesores()
+    maxRedateosAsesorOverrides.value = res.data
+  } catch {
+    maxRedateosAsesorOverrides.value = []
+  } finally {
+    maxRedateosAsesorLoading.value = false
+  }
+}
+
+const maxRedateosAsesorForm = ref<{ asesorId: number | null; maxRedateos: number | null; guardando: boolean }>({
+  asesorId: null,
+  maxRedateos: null,
+  guardando: false,
+})
+
+async function guardarMaxRedateosAsesor() {
+  if (!maxRedateosAsesorForm.value.asesorId || !maxRedateosAsesorForm.value.maxRedateos) return
+  maxRedateosAsesorForm.value.guardando = true
+  try {
+    await CaptacionDateosService.setMaxRedateosAsesor(
+      maxRedateosAsesorForm.value.asesorId,
+      maxRedateosAsesorForm.value.maxRedateos
+    )
+    await cargarMaxRedateosAsesorOverrides()
+    maxRedateosAsesorForm.value = { asesorId: null, maxRedateos: null, guardando: false }
+    snack.text = '✅ Override de re-dateos guardado'
+    snack.show = true
+  } catch {
+    errorMsg.value = 'No se pudo guardar el override de re-dateos'
+  } finally {
+    maxRedateosAsesorForm.value.guardando = false
+  }
+}
+
+const dlgEliminarMaxRedateosAsesor = ref<{ visible: boolean; item: MaxRedateosAsesorRow | null; loading: boolean }>({
+  visible: false,
+  item: null,
+  loading: false,
+})
+
+function confirmarEliminarMaxRedateosAsesor(item: MaxRedateosAsesorRow) {
+  dlgEliminarMaxRedateosAsesor.value = { visible: true, item, loading: false }
+}
+
+async function doEliminarMaxRedateosAsesor() {
+  const item = dlgEliminarMaxRedateosAsesor.value.item
+  if (!item) return
+  dlgEliminarMaxRedateosAsesor.value.loading = true
+  try {
+    await CaptacionDateosService.deleteMaxRedateosAsesor(item.id)
+    await cargarMaxRedateosAsesorOverrides()
+    dlgEliminarMaxRedateosAsesor.value = { visible: false, item: null, loading: false }
+  } catch {
+    errorMsg.value = 'No se pudo eliminar el override de re-dateos'
+    dlgEliminarMaxRedateosAsesor.value.loading = false
+  }
+}
+
+/* ═══════════ 🆕 Re-datear con evidencia ═══════════ */
+interface RedateoHistorialItem {
+  id: number
+  numero_redateo: number
+  evidencia_url: string
+  observacion: string | null
+  created_at: string
+  agente_nombre: string | null
+  usuario_nombre: string | null
+}
+
+const redatearDialog = ref<{ visible: boolean; dateo: Dateo | null }>({
+  visible: false,
+  dateo: null,
+})
+const redatearDragging = ref(false)
+const redatearFileInput = ref<HTMLInputElement | null>(null)
+const redatearFile = ref<File | null>(null)
+const redatearPreviewUrl = ref<string | null>(null)
+const redatearObservacion = ref('')
+const redatearSubmitting = ref(false)
+const redatearError = ref<string | null>(null)
+const redatearMaxRedateos = ref<number | null>(null)
+const redatearHistorial = ref<RedateoHistorialItem[]>([])
+const redatearHistorialLoading = ref(false)
+
+/** true cuando el dateo sigue pendiente de re-datearse; false = modo solo lectura (solo historial) */
+const redatearEsPendiente = computed(() => redatearDialog.value.dateo?.resultado === 'RE_DATEAR')
+
+function limpiarRedatearForm() {
+  if (redatearPreviewUrl.value) URL.revokeObjectURL(redatearPreviewUrl.value)
+  redatearPreviewUrl.value = null
+  redatearFile.value = null
+  redatearObservacion.value = ''
+  redatearError.value = null
+  redatearDragging.value = false
+}
+
+function handleRedatearFile(file: File) {
+  if (redatearPreviewUrl.value) URL.revokeObjectURL(redatearPreviewUrl.value)
+  redatearFile.value = file
+  redatearPreviewUrl.value = URL.createObjectURL(file)
+  redatearError.value = null
+}
+
+function onRedatearFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) handleRedatearFile(file)
+  input.value = ''
+}
+
+function onRedatearDrop(e: DragEvent) {
+  redatearDragging.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file) handleRedatearFile(file)
+}
+
+function onRedatearPaste(e: ClipboardEvent) {
+  if (!redatearDialog.value.visible) return
+  const items = e.clipboardData?.items
+  if (!items) return
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile()
+      if (file) {
+        handleRedatearFile(file)
+        e.preventDefault()
+        break
+      }
+    }
+  }
+}
+
+/** Cascada global → override por asesor, solo para mostrar "X de N" en el modal. */
+async function resolverMaxRedateos(agenteId: number | null): Promise<number | null> {
+  try {
+    const [globalCfg, overrides] = await Promise.all([
+      CaptacionDateosService.getMaxRedateosGlobal(),
+      agenteId
+        ? CaptacionDateosService.getMaxRedateosAsesores(agenteId)
+        : Promise.resolve({ data: [] }),
+    ])
+    const override = overrides.data.find((o) => o.asesor_id === agenteId)
+    if (override && override.max_redateos !== null && override.max_redateos !== undefined) {
+      return override.max_redateos
+    }
+    return globalCfg.max_redateos
+  } catch {
+    return null
+  }
+}
+
+async function cargarHistorialRedateos(dateoId: number) {
+  redatearHistorialLoading.value = true
+  try {
+    const res = await CaptacionDateosService.getRedateos(dateoId)
+    redatearHistorial.value = res.data
+  } catch (e) {
+    console.error('Error cargando historial de re-dateos:', e)
+    redatearHistorial.value = []
+  } finally {
+    redatearHistorialLoading.value = false
+  }
+}
+
+async function abrirRedatearModal(item: Dateo) {
+  limpiarRedatearForm()
+  redatearDialog.value = { visible: true, dateo: item }
+  redatearMaxRedateos.value = null
+  redatearHistorial.value = []
+
+  window.addEventListener('paste', onRedatearPaste)
+
+  const agenteId = item.agente_id ?? null
+  const [max] = await Promise.all([resolverMaxRedateos(agenteId), cargarHistorialRedateos(item.id)])
+  redatearMaxRedateos.value = max
+}
+
+function cerrarRedatearModal() {
+  window.removeEventListener('paste', onRedatearPaste)
+  redatearDialog.value = { visible: false, dateo: null }
+  limpiarRedatearForm()
+}
+
+function actualizarDateoLocal(id: number, patch: Partial<Dateo>) {
+  const idx = rows.value.findIndex((d) => Number(d.id) === Number(id))
+  if (idx !== -1) {
+    rows.value[idx] = { ...rows.value[idx], ...patch }
+  }
+}
+
+/* 🆕 Confirmación explícita antes de ejecutar el re-dateo */
+const redatearConfirmVisible = ref(false)
+const redatearConfirmMessage = computed(() => {
+  const horas = exclusividad.value.horas ?? '—'
+  return `¿Confirmas que quieres re-datear este dateo con la evidencia adjunta? Esta acción reactivará el dateo por una nueva ventana de exclusividad de ${horas} horas.`
+})
+
+function confirmarRedatear() {
+  if (!redatearDialog.value.dateo || !redatearFile.value) return
+  redatearConfirmVisible.value = true
+}
+
+async function ejecutarRedatear() {
+  const dateo = redatearDialog.value.dateo
+  if (!dateo || !redatearFile.value) return
+
+  redatearSubmitting.value = true
+  redatearError.value = null
+  try {
+    const uploaded = await uploadImage(redatearFile.value)
+    const resp = await CaptacionDateosService.redatear(dateo.id, {
+      evidencia_url: uploaded.url,
+      observacion: redatearObservacion.value.trim() || null,
+    })
+
+    actualizarDateoLocal(dateo.id, {
+      resultado: resp.resultado as Dateo['resultado'],
+      numero_redateos_usados: resp.numero_redateos_usados,
+      redateado_at: resp.redateado_at,
+      limite_alcanzado: resp.limite_alcanzado,
+    })
+
+    snack.text = '✅ Dateo re-dateado correctamente'
+    snack.show = true
+    cerrarRedatearModal()
+  } catch (e) {
+    redatearError.value =
+      e instanceof HttpError ? e.message : 'No se pudo re-datear. Intenta de nuevo.'
+  } finally {
+    redatearSubmitting.value = false
+  }
+}
+
+function irACrearDateoDesdeRedatear() {
+  const d = redatearDialog.value.dateo
+  const placa = d?.placa || undefined
+  const telefono = d?.telefono || undefined
+  cerrarRedatearModal()
+  router
+    .push({ name: 'ComercialDateosNuevo', query: { placa, telefono } })
+    .catch(() => {})
+}
+
+onBeforeUnmount(() => {
+  window.removeEventListener('paste', onRedatearPaste)
+  if (redatearPreviewUrl.value) URL.revokeObjectURL(redatearPreviewUrl.value)
+})
+
 const canalItems = [{ title: 'Asesor', value: 'ASESOR' as const }]
 
 const tipoAgenteItems = [
@@ -873,6 +1470,7 @@ const resultadoItems: { title: string; value: ResultadoDateo }[] = [
   { title: 'Exitoso', value: 'EXITOSO' },
   { title: 'No exitoso', value: 'NO_EXITOSO' },
   { title: 'Re-datear', value: 'RE_DATEAR' },
+  { title: 'Reemplazado', value: 'REEMPLAZADO' },
 ]
 
 const headers = [
@@ -1030,6 +1628,7 @@ function chipColorResultado(r?: string) {
   if (r === 'NO_EXITOSO') return 'error'
   if (r === 'EN_PROCESO') return 'info'
   if (r === 'RE_DATEAR') return 'orange'
+  if (r === 'REEMPLAZADO') return 'grey-darken-1'
   return 'warning'
 }
 function textoResultado(r?: string) {
@@ -1037,6 +1636,7 @@ function textoResultado(r?: string) {
   if (r === 'NO_EXITOSO') return 'No exitoso'
   if (r === 'EN_PROCESO') return 'En proceso'
   if (r === 'RE_DATEAR') return 'Re-datear'
+  if (r === 'REEMPLAZADO') return 'Reemplazado'
   return 'Pendiente'
 }
 function reservaCountdown(item: Dateo) {
@@ -1322,6 +1922,10 @@ loadAsesores()
 loadConveniosAll()
 loadItems()
 cargarExclusividad()
+if (puedeConfigurarRedateos.value) {
+  cargarMaxRedateosGlobal()
+  cargarMaxRedateosAsesorOverrides()
+}
 </script>
 
 <style scoped>
@@ -1377,5 +1981,34 @@ cargarExclusividad()
 }
 .tabla-borde {
   border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+/* 🆕 Re-datear con evidencia */
+.redatear-chip { cursor: pointer; }
+
+.redatear-dropzone {
+  border: 2px dashed rgba(0, 0, 0, 0.25);
+  padding: 22px;
+  cursor: pointer;
+  text-align: center;
+  transition: 0.3s;
+  border-radius: 12px;
+}
+.redatear-dropzone--active {
+  background: #fff4c0;
+  border-color: #e3b505;
+}
+.redatear-preview {
+  width: 100%;
+  max-height: 40vh;
+  overflow: auto;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+}
+.redatear-preview img {
+  max-width: 100%;
+  max-height: 38vh;
 }
 </style>

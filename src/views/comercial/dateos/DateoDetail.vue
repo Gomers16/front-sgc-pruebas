@@ -502,6 +502,56 @@
           </v-card-text>
         </v-card>
       </v-col>
+
+      <!-- 🆕 Historial de re-dateos: solo si ya se re-dateó alguna vez -->
+      <v-col v-if="tieneRedateos" cols="12">
+        <v-card elevation="4" class="rounded-lg rounded-sm-xl">
+          <v-card-title class="text-subtitle-2 text-sm-subtitle-1 font-weight-bold pa-3 pa-sm-4">
+            Historial de re-dateos
+          </v-card-title>
+          <v-divider />
+          <v-card-text class="pa-3 pa-sm-4">
+            <div v-if="redateosHistorialLoading" class="d-flex justify-center py-4">
+              <v-progress-circular indeterminate color="primary" size="28" />
+            </div>
+            <v-row v-else dense>
+              <v-col
+                v-for="h in redateosHistorial"
+                :key="h.id"
+                cols="6" sm="4" md="3"
+              >
+                <v-card variant="outlined" class="pa-2 text-center rounded-lg">
+                  <v-img
+                    v-if="h.evidencia_url"
+                    :src="h.evidencia_url"
+                    height="80"
+                    contain
+                    class="rounded mb-1"
+                  />
+                  <div class="text-caption font-weight-medium">#{{ h.numero_redateo }}</div>
+                  <div class="text-caption text-medium-emphasis">{{ fmt(h.created_at) }}</div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ h.usuario_nombre || h.agente_nombre || '—' }}
+                  </div>
+                  <div v-if="h.observacion" class="text-caption text-medium-emphasis font-italic">
+                    {{ h.observacion }}
+                  </div>
+                  <v-btn
+                    v-if="h.evidencia_url"
+                    size="x-small"
+                    variant="text"
+                    prepend-icon="mdi-open-in-new"
+                    :href="h.evidencia_url"
+                    target="_blank"
+                  >
+                    Ver
+                  </v-btn>
+                </v-card>
+              </v-col>
+            </v-row>
+          </v-card-text>
+        </v-card>
+      </v-col>
     </v-row>
 
     <!-- Diálogo eliminar -->
@@ -566,6 +616,7 @@ import type { Descuento } from '@/services/descuentosService'
 import serviciosService from '@/services/Servicios_service'
 import { FacturacionService } from '@/services/facturacion_service'
 import { usePermissions } from '@/composables/usePermissions'
+import { CaptacionDateosService } from '@/services/captacion_dateos_service'
 
 const { can } = usePermissions()
 
@@ -952,6 +1003,35 @@ async function loadDocumentosInformativos() {
   }
 }
 
+/* ===== 🆕 Historial de re-dateos ===== */
+interface RedateoHistorialItem {
+  id: number
+  numero_redateo: number
+  evidencia_url: string
+  observacion: string | null
+  created_at: string
+  agente_nombre: string | null
+  usuario_nombre: string | null
+}
+
+const redateosHistorial = ref<RedateoHistorialItem[]>([])
+const redateosHistorialLoading = ref(false)
+
+const tieneRedateos = computed(() => (dateo.value?.numero_redateos_usados ?? 0) > 0)
+
+async function cargarRedateosHistorial() {
+  redateosHistorialLoading.value = true
+  try {
+    const res = await CaptacionDateosService.getRedateos(id)
+    redateosHistorial.value = res.data
+  } catch (e) {
+    console.error('Error cargando historial de re-dateos:', e)
+    redateosHistorial.value = []
+  } finally {
+    redateosHistorialLoading.value = false
+  }
+}
+
 /* ===== Carga ===== */
 async function load() {
   loading.value = true
@@ -989,6 +1069,10 @@ async function load() {
     editando.value = false
 
     await loadDocumentosInformativos()
+
+    if (tieneRedateos.value) {
+      await cargarRedateosHistorial()
+    }
   } catch (e) {
     const error = e as { response?: { data?: { message?: string } } }
     const message = error.response?.data?.message || 'No se pudo cargar el dateo'

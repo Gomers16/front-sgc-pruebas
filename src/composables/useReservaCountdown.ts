@@ -3,9 +3,11 @@ import { DateTime } from 'luxon'
 
 /**
  * Countdown de exclusividad de un dateo, compartido entre DateosList.vue y
- * FichaComercialAsesor.vue. Se recalcula desde created_at + horas_exclusividad
- * (no desde el campo bloqueadoHasta del modelo CaptacionDateo — ese sigue
- * usando el TTL viejo en días vía .env, ver nota en captacion_dateo.ts).
+ * FichaComercialAsesor.vue. Se recalcula desde redateado_at ?? created_at +
+ * horas_exclusividad — mismo criterio que buildReserva() en el backend
+ * (reserva_dateo_service.ts), para que ambos coincidan siempre. No usa el
+ * campo bloqueadoHasta del modelo CaptacionDateo — ese sigue usando el TTL
+ * viejo en días vía .env, ver nota en captacion_dateo.ts.
  */
 
 export interface ReservaCountdown {
@@ -20,6 +22,8 @@ export interface ReservaCountdown {
 interface DateoParaCountdown {
   created_at: string
   consumido_turno_id?: number | null
+  redateado_at?: string | null
+  resultado?: string
 }
 
 const SIN_APLICAR: ReservaCountdown = { aplica: false, vigente: false, texto: '—' }
@@ -29,12 +33,15 @@ export function calcularReservaCountdown(
   horasExclusividad: number | null
 ): ReservaCountdown {
   if (dateo.consumido_turno_id) return SIN_APLICAR
+  // REEMPLAZADO = historia muerta (dateo viejo sustituido por uno nuevo en la
+  // misma placa/teléfono): la ventana de exclusividad ya no es relevante.
+  if (dateo.resultado === 'REEMPLAZADO') return SIN_APLICAR
   if (!horasExclusividad || horasExclusividad <= 0) return SIN_APLICAR
 
-  const creado = DateTime.fromISO(dateo.created_at)
-  if (!creado.isValid) return SIN_APLICAR
+  const base = dateo.redateado_at ? DateTime.fromISO(dateo.redateado_at) : DateTime.fromISO(dateo.created_at)
+  if (!base.isValid) return SIN_APLICAR
 
-  const bloqueaHasta = creado.plus({ hours: horasExclusividad })
+  const bloqueaHasta = base.plus({ hours: horasExclusividad })
   const minutosRestantes = Math.floor(bloqueaHasta.diff(DateTime.now(), 'minutes').minutes)
 
   if (minutosRestantes <= 0) {

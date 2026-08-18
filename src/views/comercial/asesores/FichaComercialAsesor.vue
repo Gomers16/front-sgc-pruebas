@@ -560,16 +560,46 @@
                 <span v-else class="text-medium-emphasis text-caption">—</span>
               </template>
 
-              <!-- Estado resultado del dateo -->
+              <!-- Estado resultado del dateo — clickeable cuando está para re-datear -->
               <template #item.resultado="{ item }">
-                <v-chip
-                  :color="chipColorResultado(item.resultado)"
-                  size="small"
-                  variant="flat"
-                  :prepend-icon="item.resultado === 'RE_DATEAR' ? 'mdi-refresh' : undefined"
-                >
-                  {{ textoResultado(item.resultado) }}
-                </v-chip>
+                <div class="d-flex align-center justify-center" style="gap:4px">
+                  <v-chip
+                    v-if="item.resultado === 'RE_DATEAR'"
+                    :color="chipColorResultado(item.resultado)"
+                    size="small"
+                    variant="flat"
+                    :prepend-icon="item.limite_alcanzado ? 'mdi-lock' : 'mdi-refresh'"
+                    append-icon="mdi-pencil-outline"
+                    class="redatear-chip"
+                    @click="abrirRedatearModal(item)"
+                  >
+                    {{ textoResultado(item.resultado) }}{{ item.limite_alcanzado ? ' (agotado)' : '' }}
+                  </v-chip>
+                  <v-chip
+                    v-else
+                    :color="chipColorResultado(item.resultado)"
+                    size="small"
+                    variant="flat"
+                  >
+                    {{ textoResultado(item.resultado) }}
+                  </v-chip>
+                  <v-tooltip
+                    v-if="(item.numero_redateos_usados ?? 0) > 0"
+                    :text="`Ver historial de re-dateos (${item.numero_redateos_usados})`"
+                    location="top"
+                  >
+                    <template #activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        icon="mdi-history"
+                        size="small"
+                        variant="text"
+                        density="comfortable"
+                        @click="abrirRedatearModal(item)"
+                      />
+                    </template>
+                  </v-tooltip>
+                </div>
               </template>
 <!-- 🆕 NUEVO: Tipo de cliente -->
               <template #item.tipo_cliente="{ item }">
@@ -772,17 +802,35 @@
 
               <!-- Estado resultado del dateo — clickeable: abre el modal de re-datear -->
               <template #item.resultado="{ item }">
-                <v-chip
-                  :color="chipColorResultado(item.resultado)"
-                  size="small"
-                  variant="flat"
-                  :prepend-icon="item.limite_alcanzado ? 'mdi-lock' : 'mdi-refresh'"
-                  append-icon="mdi-pencil-outline"
-                  class="redatear-chip"
-                  @click="abrirRedatearModal(item)"
-                >
-                  {{ textoResultado(item.resultado) }}{{ item.limite_alcanzado ? ' (agotado)' : '' }}
-                </v-chip>
+                <div class="d-flex align-center justify-center" style="gap:4px">
+                  <v-chip
+                    :color="chipColorResultado(item.resultado)"
+                    size="small"
+                    variant="flat"
+                    :prepend-icon="item.limite_alcanzado ? 'mdi-lock' : 'mdi-refresh'"
+                    append-icon="mdi-pencil-outline"
+                    class="redatear-chip"
+                    @click="abrirRedatearModal(item)"
+                  >
+                    {{ textoResultado(item.resultado) }}{{ item.limite_alcanzado ? ' (agotado)' : '' }}
+                  </v-chip>
+                  <v-tooltip
+                    v-if="(item.numero_redateos_usados ?? 0) > 0"
+                    :text="`Ver historial de re-dateos (${item.numero_redateos_usados})`"
+                    location="top"
+                  >
+                    <template #activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        icon="mdi-history"
+                        size="small"
+                        variant="text"
+                        density="comfortable"
+                        @click="abrirRedatearModal(item)"
+                      />
+                    </template>
+                  </v-tooltip>
+                </div>
               </template>
 
               <!-- Tipo de cliente -->
@@ -1034,7 +1082,9 @@
       <v-card v-if="redatearDialog.dateo">
         <v-card-title class="d-flex justify-space-between align-center pa-4">
           <div>
-            <div class="text-h6">Re-datear #{{ redatearDialog.dateo.id }}</div>
+            <div class="text-h6">
+              {{ redatearEsPendiente ? 'Re-datear' : 'Historial de re-dateos' }} #{{ redatearDialog.dateo.id }}
+            </div>
             <div class="text-caption text-medium-emphasis">
               Placa: {{ redatearDialog.dateo.placa || '—' }}
               <span v-if="redatearDialog.dateo.telefono"> · Tel: {{ redatearDialog.dateo.telefono }}</span>
@@ -1045,8 +1095,8 @@
         <v-divider />
 
         <v-card-text class="pa-4">
-          <!-- (a) Formulario de re-dateo, solo si NO alcanzó el límite -->
-          <template v-if="!redatearDialog.dateo.limite_alcanzado">
+          <!-- (a) Formulario de re-dateo: solo si el dateo está pendiente de re-datearse y no alcanzó el límite -->
+          <template v-if="redatearEsPendiente && !redatearDialog.dateo.limite_alcanzado">
             <v-alert type="info" variant="tonal" density="compact" class="mb-4">
               Re-dateado <strong>{{ redatearDialog.dateo.numero_redateos_usados || 0 }}</strong>
               de <strong>{{ redatearMaxRedateos ?? '—' }}</strong> veces permitidas.
@@ -1093,8 +1143,8 @@
             </v-alert>
           </template>
 
-          <!-- (b) Aviso de límite alcanzado -->
-          <template v-else>
+          <!-- (b) Aviso de límite alcanzado: solo si sigue pendiente de re-datearse -->
+          <template v-else-if="redatearEsPendiente && redatearDialog.dateo.limite_alcanzado">
             <v-alert type="warning" variant="tonal" class="mb-3">
               Este dateo alcanzó el máximo de <strong>{{ redatearMaxRedateos ?? redatearDialog.dateo.numero_redateos_usados }}</strong>
               re-dateo(s) permitido(s). Para seguir intentando con esta placa/teléfono, crea un dateo nuevo desde cero.
@@ -1103,6 +1153,11 @@
               Crear dateo nuevo
             </v-btn>
           </template>
+
+          <!-- (b') Modo solo lectura: el dateo ya no está pendiente de re-datearse (RE_DATEAR) -->
+          <v-alert v-else type="info" variant="tonal" density="compact" class="mb-3">
+            Este dateo ya no está pendiente de re-datearse. A continuación su historial.
+          </v-alert>
 
           <!-- (c) Historial de re-dateos (siempre visible) -->
           <v-divider class="my-4" />
@@ -1133,8 +1188,8 @@
           </v-list>
         </v-card-text>
 
-        <v-divider v-if="!redatearDialog.dateo.limite_alcanzado" />
-        <v-card-actions v-if="!redatearDialog.dateo.limite_alcanzado" class="pa-4">
+        <v-divider v-if="redatearEsPendiente && !redatearDialog.dateo.limite_alcanzado" />
+        <v-card-actions v-if="redatearEsPendiente && !redatearDialog.dateo.limite_alcanzado" class="pa-4">
           <v-spacer />
           <v-btn variant="text" :disabled="redatearSubmitting" @click="cerrarRedatearModal">Cancelar</v-btn>
           <v-btn
@@ -1148,6 +1203,16 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- 🆕 Confirmación explícita antes de ejecutar el re-dateo -->
+    <ConfirmarDialogo
+      v-model="redatearConfirmVisible"
+      title="Confirmar re-dateo"
+      :message="redatearConfirmMessage"
+      confirm-text="Sí, re-datear"
+      confirm-color="primary"
+      @confirm="ejecutarRedatear"
+    />
 
     <v-snackbar v-model="redatearSnack.show" :color="redatearSnack.color" timeout="3500" variant="tonal">
       {{ redatearSnack.text }}
@@ -1164,6 +1229,7 @@ import { useAuthStore } from '@/stores/AuthStore'
 import { listDateosConComision, getExclusividadConfig, type Dateo, formatDateTime } from '@/services/dateosService'
 import { CaptacionDateosService } from '@/services/captacion_dateos_service'
 import { uploadImage } from '@/services/uploadsService'
+import ConfirmarDialogo from '@/components/UI/ConfirmarDialogo.vue'
 import { calcularReservaCountdown } from '@/composables/useReservaCountdown'
 import {
   listMetasMensuales,
@@ -1519,6 +1585,7 @@ function chipColorResultado(r?: string) {
   if (r === 'NO_EXITOSO') return 'error'
   if (r === 'EN_PROCESO') return 'info'
   if (r === 'RE_DATEAR') return 'orange'
+  if (r === 'REEMPLAZADO') return 'grey-darken-1'
   return 'warning'
 }
 
@@ -1527,6 +1594,7 @@ function textoResultado(r?: string) {
   if (r === 'NO_EXITOSO') return 'No exitoso'
   if (r === 'EN_PROCESO') return 'En proceso'
   if (r === 'RE_DATEAR') return 'Re-datear'
+  if (r === 'REEMPLAZADO') return 'Reemplazado'
   return 'Pendiente'
 }
 
@@ -1690,6 +1758,10 @@ const dateosFiltrados = computed(() => {
   const hasta = new Date(filtros.value.hasta + 'T23:59:59')
   const placaQuery = buscarPlaca.value.trim().toUpperCase()
   return dateos.value.filter((d) => {
+    // 🆕 REEMPLAZADO = historia muerta (el dateo viejo tras crear uno nuevo en la
+    // misma placa/teléfono): oculto por defecto, no hay filtro explícito en esta
+    // vista para volver a mostrarlo (a diferencia de DateosList.vue).
+    if (d.resultado === 'REEMPLAZADO') return false
     const tRaw = normalizeCreatedAt(d)
     const t = tRaw ? new Date(tRaw) : null
     const enRango = t ? t >= desde && t <= hasta : true
@@ -1755,6 +1827,9 @@ const redatearMaxRedateos = ref<number | null>(null)
 const redatearHistorial = ref<RedateoHistorialItem[]>([])
 const redatearHistorialLoading = ref(false)
 const redatearSnack = reactive({ show: false, text: '', color: 'success' })
+
+/** true cuando el dateo sigue pendiente de re-datearse; false = modo solo lectura (solo historial) */
+const redatearEsPendiente = computed(() => redatearDialog.value.dateo?.resultado === 'RE_DATEAR')
 
 function limpiarRedatearForm() {
   if (redatearPreviewUrl.value) URL.revokeObjectURL(redatearPreviewUrl.value)
@@ -1859,7 +1934,19 @@ function actualizarDateoLocal(id: number, patch: Partial<DateoConExtras>) {
   }
 }
 
-async function confirmarRedatear() {
+/* 🆕 Confirmación explícita antes de ejecutar el re-dateo */
+const redatearConfirmVisible = ref(false)
+const redatearConfirmMessage = computed(() => {
+  const horas = horasExclusividad.value ?? '—'
+  return `¿Confirmas que quieres re-datear este dateo con la evidencia adjunta? Esta acción reactivará el dateo por una nueva ventana de exclusividad de ${horas} horas.`
+})
+
+function confirmarRedatear() {
+  if (!redatearDialog.value.dateo || !redatearFile.value) return
+  redatearConfirmVisible.value = true
+}
+
+async function ejecutarRedatear() {
   const dateo = redatearDialog.value.dateo
   if (!dateo || !redatearFile.value) return
 
