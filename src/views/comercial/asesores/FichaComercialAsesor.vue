@@ -1762,6 +1762,9 @@ const dateosFiltrados = computed(() => {
     // misma placa/teléfono): oculto por defecto, no hay filtro explícito en esta
     // vista para volver a mostrarlo (a diferencia de DateosList.vue).
     if (d.resultado === 'REEMPLAZADO') return false
+    // 🆕 RE_DATEAR vive únicamente en la pestaña NEW-DATEOS (dateosParaRedatear) —
+    // se excluye aquí para no duplicarlo en la pestaña general "DATEOS".
+    if (d.resultado === 'RE_DATEAR') return false
     const tRaw = normalizeCreatedAt(d)
     const t = tRaw ? new Date(tRaw) : null
     const enRango = t ? t >= desde && t <= hasta : true
