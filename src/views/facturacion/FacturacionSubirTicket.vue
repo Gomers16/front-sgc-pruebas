@@ -709,6 +709,46 @@
                     </div>
                   </v-alert>
                 </v-col>
+
+                <!-- 🆕 Observación opcional: solo cuando el dateo NO tenía
+                     descuento pre-marcado (nada que comparar/override aquí,
+                     es una aplicación nueva en caja) -->
+                <v-col
+                  cols="12"
+                  v-if="descuentoIdEnCaja && turnoMeta.dateoId && !turnoMeta.descuentoId"
+                >
+                  <v-card variant="tonal" color="blue-grey" class="mt-2 pa-3 rounded-lg">
+                    <div class="text-subtitle-2 font-weight-bold mb-2 d-flex align-center" style="gap:6px">
+                      <v-icon size="16">mdi-comment-text-outline</v-icon>
+                      Observación (opcional)
+                    </div>
+                    <div class="text-caption text-medium-emphasis mb-2">
+                      El asesor no dejó ningún descuento marcado en el dateo. Si quieres, deja una nota de por qué se aplica aquí.
+                    </div>
+                    <div class="d-flex flex-wrap mb-2" style="gap:8px">
+                      <v-chip
+                        v-for="razon in RAZONES_RAPIDAS_DESCUENTO"
+                        :key="razon"
+                        size="small"
+                        variant="outlined"
+                        color="blue-grey"
+                        @click="descuentoObservacion = razon"
+                      >
+                        {{ razon }}
+                      </v-chip>
+                    </div>
+                    <v-textarea
+                      v-model="descuentoObservacion"
+                      label="Observación"
+                      variant="outlined"
+                      density="comfortable"
+                      rows="2"
+                      auto-grow
+                      hide-details
+                      placeholder="Ej: el cliente lo pidió en el momento"
+                    />
+                  </v-card>
+                </v-col>
               </v-row>
             </template>
 
@@ -1060,6 +1100,13 @@ const autorizadoPorId = ref<number | null>(null)
 const descuentoDelDateoNombre = ref<string>('')
 // ++ override: permite a la cajera ignorar el descuento pre-marcado del dateo ++
 const overrideDateoDescuento = ref(false)
+// 🆕 Observación opcional cuando el dateo NO tenía descuento pre-marcado y
+// la cajera aplica uno de todas formas — solo se muestra/envía en ese caso.
+const descuentoObservacion = ref<string>('')
+const RAZONES_RAPIDAS_DESCUENTO = [
+  'Asesor no puso descuento',
+  'Cliente pide en caja el descuento',
+] as const
 
 /* ===================== OCR (cliente y backend) ===================== */
 type OCRStatus = 'idle' | 'running' | 'done'
@@ -1697,6 +1744,7 @@ const descuentoMaximo = computed((): number => {
 
 watch(descuentoIdEnCaja, () => {
   descuentoMontoAplicado.value = 0
+  descuentoObservacion.value = ''
   resetDocPolicia()
 })
 watch(descuentoMaximo, (max) => {
@@ -2207,6 +2255,7 @@ function resetAll() {
   descuentoIdEnCaja.value = null
   autorizadoPorId.value = null
   descuentoMontoAplicado.value = 0
+  descuentoObservacion.value = ''
   pinAmbiguo.value = false
 }
 
@@ -2225,6 +2274,7 @@ function openConfirm() {
   descuentoIdEnCaja.value = null
   autorizadoPorId.value = null
   descuentoMontoAplicado.value = 0
+  descuentoObservacion.value = ''
   overrideDateoDescuento.value = false
   resetDocPolicia()
 }
@@ -2325,6 +2375,12 @@ async function confirmarYGuardar() {
         descuento_id: descuentoIdEfectivo.value ?? undefined,
         autorizado_por_id: esCajaOrigen ? (autorizadoPorId.value ?? undefined) : undefined,
         descuento_monto_aplicado: montoDesc > 0 ? montoDesc : undefined,
+        // 🆕 Solo aplica cuando el dateo no tenía descuento pre-marcado (ver
+        // condición del v-if del campo) — en cualquier otro caso queda vacío.
+        descuento_observacion:
+          descuentoIdEnCaja.value && turnoMeta.dateoId && !turnoMeta.descuentoId
+            ? (descuentoObservacion.value.trim() || undefined)
+            : undefined,
       })
     }
 

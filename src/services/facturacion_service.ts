@@ -104,6 +104,8 @@ export interface FacturacionTicket {
   descuento_id: number | null
   descuento_monto_aplicado: number | null
   autorizado_por_id: number | null
+  /** 🆕 Nota de la cajera sobre por qué aplicó este descuento (opcional) */
+  descuento_observacion: string | null
 
   // 🆕 DTO enriquecido del descuento (viene del getById)
   descuentoAplicado?: DescuentoAplicadoDTO | null
@@ -169,6 +171,8 @@ export interface TicketUpdatePayload {
   descuento_monto_aplicado?: number
   /** Total original antes de aplicar el descuento (para trazabilidad) */
   total_sin_descuento?: number
+  /** 🆕 Nota de la cajera sobre por qué aplicó este descuento (opcional) */
+  descuento_observacion?: string | null
 }
 
 /* =============================== Endpoints =============================== */
