@@ -47,8 +47,31 @@
       <v-dialog v-model="liquidacion.open" max-width="1100" scrollable>
         <v-card>
           <v-card-title class="d-flex align-center justify-space-between">
-            <span>Liquidación RTM — {{ liquidacion.desde }} a {{ liquidacion.hasta }}</span>
+            <span class="d-flex align-center gap-1">
+              Liquidación RTM — {{ liquidacion.desde }} a {{ liquidacion.hasta }}
+              <v-tooltip
+                text="Comisiones RTM del período: apruébalas/págalas por sección, exporta las placas seleccionadas a Excel (checkbox 'Exportar', independiente de 'Pagar'), o expande cualquier fila (flecha) para ver el detalle placa por placa."
+                location="bottom"
+                max-width="320"
+              >
+                <template #activator="{ props }">
+                  <v-icon v-bind="props" size="16" color="medium-emphasis">mdi-help-circle-outline</v-icon>
+                </template>
+              </v-tooltip>
+            </span>
             <div class="d-flex align-center gap-1">
+              <v-btn
+                v-if="liquidacion.data"
+                size="small"
+                variant="tonal"
+                color="deep-purple"
+                prepend-icon="mdi-car-multiple"
+                :loading="liquidacionExportLoading"
+                :disabled="!totalSeleccionadosExport"
+                @click="exportarPlacasSeleccionadas"
+              >
+                Exportar Placas Seleccionadas{{ totalSeleccionadosExport ? ` (${totalSeleccionadosExport})` : '' }}
+              </v-btn>
               <v-btn
                 v-if="liquidacion.data"
                 size="small"
@@ -64,106 +87,193 @@
             </div>
           </v-card-title>
           <v-divider />
+          <div v-if="liquidacion.data" class="d-flex align-center gap-1 px-4 px-sm-6 py-2" style="flex-wrap:wrap">
+            <span class="text-caption text-medium-emphasis mr-1">Ir a:</span>
+            <v-chip size="small" variant="outlined" @click="scrollToSeccionLiquidacion('liq-seccion-canal')">Por canal</v-chip>
+            <v-chip size="small" variant="outlined" @click="scrollToSeccionLiquidacion('liq-seccion-descuentos')">Descuentos</v-chip>
+            <v-chip size="small" variant="outlined" @click="scrollToSeccionLiquidacion('liq-seccion-comerciales')">Comerciales</v-chip>
+            <v-chip size="small" variant="outlined" @click="scrollToSeccionLiquidacion('liq-seccion-asesoresConvenio')">Asesores Convenio</v-chip>
+            <v-chip size="small" variant="outlined" @click="scrollToSeccionLiquidacion('liq-seccion-convenios')">Convenios</v-chip>
+          </div>
+
+          <!-- Filtro rápido de fecha DEL MODAL (independiente del de la vista principal) —
+               vive en el header fijo (no en v-card-text, que es scrolleable) para que el
+               botón activo nunca se pierda de vista al usar "Ir a". -->
+          <div v-if="liquidacion.data" class="d-flex align-center gap-1 px-4 px-sm-6 pb-2" style="flex-wrap:wrap">
+            <v-btn
+              size="small"
+              :color="liquidacionFiltroRapido === 'HOY' ? 'primary' : undefined"
+              :variant="liquidacionFiltroRapido === 'HOY' ? 'flat' : 'outlined'"
+              @click="aplicarFiltroHoyLiquidacion()"
+            >
+              Hoy
+            </v-btn>
+
+            <v-btn
+              size="small"
+              :color="liquidacionFiltroRapido === 'DIA_ANTERIOR' ? 'primary' : undefined"
+              :variant="liquidacionFiltroRapido === 'DIA_ANTERIOR' ? 'flat' : 'outlined'"
+              @click="aplicarFiltroDiaAnteriorLiquidacion()"
+            >
+              Día Ant.
+            </v-btn>
+
+            <v-menu v-model="liquidacionMenuSemanal" :close-on-content-click="true">
+              <template #activator="{ props: menuProps }">
+                <v-btn
+                  v-bind="menuProps"
+                  size="small"
+                  append-icon="mdi-menu-down"
+                  :color="liquidacionFiltroRapido === 'SEMANAL' ? 'primary' : undefined"
+                  :variant="liquidacionFiltroRapido === 'SEMANAL' ? 'flat' : 'outlined'"
+                  @click="onClickBotonConMenuLiquidacion('SEMANAL')"
+                >
+                  Semanal
+                </v-btn>
+              </template>
+              <v-list density="compact" min-width="200">
+                <v-list-item
+                  v-for="op in liquidacionOpcionesSemanales"
+                  :key="op.desde"
+                  :active="op.desde === liquidacion.desde && op.hasta === liquidacion.hasta"
+                  color="primary"
+                  @click="seleccionarRangoRapidoLiquidacion('SEMANAL', op)"
+                >
+                  <v-list-item-title>{{ op.label }}</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
+
+            <v-menu v-model="liquidacionMenuQuincenal" :close-on-content-click="true">
+              <template #activator="{ props: menuProps }">
+                <v-btn
+                  v-bind="menuProps"
+                  size="small"
+                  append-icon="mdi-menu-down"
+                  :color="liquidacionFiltroRapido === 'QUINCENAL' ? 'primary' : undefined"
+                  :variant="liquidacionFiltroRapido === 'QUINCENAL' ? 'flat' : 'outlined'"
+                  @click="onClickBotonConMenuLiquidacion('QUINCENAL')"
+                >
+                  Quincenal
+                </v-btn>
+              </template>
+              <v-list density="compact" min-width="200">
+                <v-list-item
+                  v-for="op in liquidacionOpcionesQuincenales"
+                  :key="op.desde"
+                  :active="op.desde === liquidacion.desde && op.hasta === liquidacion.hasta"
+                  color="primary"
+                  @click="seleccionarRangoRapidoLiquidacion('QUINCENAL', op)"
+                >
+                  <v-list-item-title>{{ op.label }}</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
+
+            <v-menu v-model="menuMensualLiquidacion" :close-on-content-click="true">
+              <template #activator="{ props: menuProps }">
+                <v-btn
+                  v-bind="menuProps"
+                  size="small"
+                  append-icon="mdi-menu-down"
+                  :color="liquidacionFiltroRapido === 'MENSUAL' ? 'primary' : undefined"
+                  :variant="liquidacionFiltroRapido === 'MENSUAL' ? 'flat' : 'outlined'"
+                  @click="onClickBotonMensualLiquidacion()"
+                >
+                  Mensual
+                </v-btn>
+              </template>
+              <v-list density="compact" min-width="180" max-height="320" style="overflow-y:auto">
+                <v-list-item
+                  v-for="op in liquidacionOpcionesMensuales"
+                  :key="op.desde"
+                  :active="op.desde === liquidacion.desde && op.hasta === liquidacion.hasta"
+                  color="primary"
+                  @click="seleccionarRangoRapidoLiquidacion('MENSUAL', op)"
+                >
+                  <v-list-item-title>{{ op.label }}</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
+
+            <v-btn
+              size="small"
+              :color="liquidacionFiltroRapido === 'PERSONALIZADO' ? 'primary' : undefined"
+              :variant="liquidacionFiltroRapido === 'PERSONALIZADO' ? 'flat' : 'outlined'"
+              @click="abrirPersonalizadoLiquidacion()"
+            >
+              Personalizado
+            </v-btn>
+
+            <v-text-field
+              v-model="liquidacionBusqueda"
+              prepend-inner-icon="mdi-magnify"
+              label="Buscar placa o nombre"
+              density="compact"
+              variant="outlined"
+              hide-details
+              clearable
+              style="max-width:220px"
+              class="ml-auto"
+            >
+              <template v-if="liquidacionBusquedaLoading" #append-inner>
+                <v-progress-circular indeterminate size="16" width="2" color="primary" />
+              </template>
+            </v-text-field>
+
+            <v-select
+              v-model="liquidacionFiltroEstado"
+              :items="OPCIONES_ESTADO_LIQUIDACION"
+              item-title="title"
+              item-value="value"
+              label="Estado"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="max-width:150px"
+            />
+          </div>
+
+          <div v-if="liquidacionFiltroRapido === 'PERSONALIZADO'" class="d-flex align-end gap-2 px-4 px-sm-6 pb-2" style="flex-wrap:wrap">
+            <v-text-field
+              v-model="liquidacionPersonalizadoDesde"
+              label="Desde"
+              type="date"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="max-width:170px"
+            />
+            <v-text-field
+              v-model="liquidacionPersonalizadoHasta"
+              label="Hasta"
+              type="date"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="max-width:170px"
+            />
+            <v-btn
+              size="small"
+              color="primary"
+              variant="flat"
+              :disabled="!liquidacionPersonalizadoDesde || !liquidacionPersonalizadoHasta"
+              @click="aplicarPersonalizadoLiquidacion()"
+            >
+              Aplicar
+            </v-btn>
+          </div>
+
+          <div
+            v-if="liquidacionBusquedaNormalizada && liquidacionBusquedaSinResultados"
+            class="px-4 px-sm-6 pb-2"
+          >
+            <v-alert type="info" variant="tonal" density="compact" class="text-caption">
+              No se encontró ninguna coincidencia para "{{ liquidacionBusqueda }}" en este período.
+            </v-alert>
+          </div>
+          <v-divider />
           <v-card-text style="max-height: 75vh">
-            <!-- Filtro rápido de fecha DEL MODAL (independiente del de la vista principal) -->
-            <div class="d-flex align-center gap-1 mb-4" style="flex-wrap:wrap">
-              <v-btn
-                size="small"
-                :color="liquidacionFiltroRapido === 'HOY' ? 'primary' : undefined"
-                :variant="liquidacionFiltroRapido === 'HOY' ? 'flat' : 'outlined'"
-                @click="aplicarFiltroHoyLiquidacion()"
-              >
-                Hoy
-              </v-btn>
-
-              <v-btn
-                size="small"
-                :color="liquidacionFiltroRapido === 'DIA_ANTERIOR' ? 'primary' : undefined"
-                :variant="liquidacionFiltroRapido === 'DIA_ANTERIOR' ? 'flat' : 'outlined'"
-                @click="aplicarFiltroDiaAnteriorLiquidacion()"
-              >
-                Día Anterior
-              </v-btn>
-
-              <v-menu v-model="liquidacionMenuSemanal" :close-on-content-click="true">
-                <template #activator="{ props: menuProps }">
-                  <v-btn
-                    v-bind="menuProps"
-                    size="small"
-                    append-icon="mdi-menu-down"
-                    :color="liquidacionFiltroRapido === 'SEMANAL' ? 'primary' : undefined"
-                    :variant="liquidacionFiltroRapido === 'SEMANAL' ? 'flat' : 'outlined'"
-                    @click="onClickBotonConMenuLiquidacion('SEMANAL')"
-                  >
-                    Semanal
-                  </v-btn>
-                </template>
-                <v-list density="compact" min-width="200">
-                  <v-list-item
-                    v-for="op in liquidacionOpcionesSemanales"
-                    :key="op.desde"
-                    :active="op.desde === liquidacion.desde && op.hasta === liquidacion.hasta"
-                    color="primary"
-                    @click="seleccionarRangoRapidoLiquidacion('SEMANAL', op)"
-                  >
-                    <v-list-item-title>{{ op.label }}</v-list-item-title>
-                  </v-list-item>
-                </v-list>
-              </v-menu>
-
-              <v-menu v-model="liquidacionMenuQuincenal" :close-on-content-click="true">
-                <template #activator="{ props: menuProps }">
-                  <v-btn
-                    v-bind="menuProps"
-                    size="small"
-                    append-icon="mdi-menu-down"
-                    :color="liquidacionFiltroRapido === 'QUINCENAL' ? 'primary' : undefined"
-                    :variant="liquidacionFiltroRapido === 'QUINCENAL' ? 'flat' : 'outlined'"
-                    @click="onClickBotonConMenuLiquidacion('QUINCENAL')"
-                  >
-                    Quincenal
-                  </v-btn>
-                </template>
-                <v-list density="compact" min-width="200">
-                  <v-list-item
-                    v-for="op in liquidacionOpcionesQuincenales"
-                    :key="op.desde"
-                    :active="op.desde === liquidacion.desde && op.hasta === liquidacion.hasta"
-                    color="primary"
-                    @click="seleccionarRangoRapidoLiquidacion('QUINCENAL', op)"
-                  >
-                    <v-list-item-title>{{ op.label }}</v-list-item-title>
-                  </v-list-item>
-                </v-list>
-              </v-menu>
-
-              <v-menu v-model="menuMensualLiquidacion" :close-on-content-click="true">
-                <template #activator="{ props: menuProps }">
-                  <v-btn
-                    v-bind="menuProps"
-                    size="small"
-                    append-icon="mdi-menu-down"
-                    :color="liquidacionFiltroRapido === 'MENSUAL' ? 'primary' : undefined"
-                    :variant="liquidacionFiltroRapido === 'MENSUAL' ? 'flat' : 'outlined'"
-                    @click="onClickBotonMensualLiquidacion()"
-                  >
-                    Mensual
-                  </v-btn>
-                </template>
-                <v-list density="compact" min-width="180" max-height="320" style="overflow-y:auto">
-                  <v-list-item
-                    v-for="op in liquidacionOpcionesMensuales"
-                    :key="op.desde"
-                    :active="op.desde === liquidacion.desde && op.hasta === liquidacion.hasta"
-                    color="primary"
-                    @click="seleccionarRangoRapidoLiquidacion('MENSUAL', op)"
-                  >
-                    <v-list-item-title>{{ op.label }}</v-list-item-title>
-                  </v-list-item>
-                </v-list>
-              </v-menu>
-            </div>
-
             <div v-if="liquidacion.loading && !liquidacion.data" class="text-center py-10">
               <v-progress-circular indeterminate color="primary" size="40" />
             </div>
@@ -205,10 +315,32 @@
               </v-card>
 
               <!-- Por canal de captación -->
-              <div class="text-caption text-medium-emphasis mb-2">Por canal de captación</div>
+              <div id="liq-seccion-canal" class="text-caption text-medium-emphasis mb-2 d-flex align-center gap-1">
+                Por canal de captación
+                <v-tooltip text="Turnos y montos agrupados por cómo llegó el cliente (fachada, asesor comercial, asesor convenio, telemercadeo, redes)." location="top">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="14" color="medium-emphasis">mdi-information-outline</v-icon>
+                  </template>
+                </v-tooltip>
+              </div>
               <v-table density="compact" class="mb-4">
                 <thead>
                   <tr>
+                    <th style="width:32px"></th>
+                    <th style="width:52px" class="text-center">
+                      <div class="d-flex flex-column align-center">
+                        <v-tooltip text="Seleccionar para incluir en la exportación de placas a Excel" location="top">
+                          <template #activator="{ props }">
+                            <span v-bind="props" class="text-caption text-deep-purple font-weight-medium">Exportar</span>
+                          </template>
+                        </v-tooltip>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="seccionTodosSeleccionadosExport('canal')"
+                          @update:model-value="toggleSeleccionarTodosExport('canal')"
+                        />
+                      </div>
+                    </th>
                     <th>Canal</th>
                     <th class="text-right">Turnos</th>
                     <th class="text-right">Monto</th>
@@ -216,18 +348,200 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="c in liquidacion.data.por_canal" :key="c.canal">
-                    <td>{{ CANAL_LABELS_LIQUIDACION[c.canal] ?? c.canal }}</td>
-                    <td class="text-right">{{ c.cantidad }}</td>
-                    <td class="text-right">{{ formatCOP(c.monto) }}</td>
-                    <td class="text-right">{{ c.porcentaje }}%</td>
+                  <template v-for="(c, i) in liquidacion.data.por_canal" :key="c.canal">
+                    <tr v-show="filaVisibleBusqueda('canal', i)" style="cursor:pointer" @click="toggleExpandFilaLiquidacion('canal', i)">
+                      <td>
+                        <v-icon size="18">{{ liquidacionExpandido.canal.has(i) ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                      </td>
+                      <td @click.stop>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="liquidacionSeleccionExport.canal.has(i)"
+                          @update:model-value="toggleFilaExport('canal', i)"
+                        />
+                      </td>
+                      <td>{{ CANAL_LABELS_LIQUIDACION[c.canal] ?? c.canal }}</td>
+                      <td class="text-right">{{ c.cantidad }}</td>
+                      <td class="text-right">{{ formatCOP(c.monto) }}</td>
+                      <td class="text-right">{{ c.porcentaje }}%</td>
+                    </tr>
+                    <tr v-if="liquidacionExpandido.canal.has(i)" v-show="filaVisibleBusqueda('canal', i)">
+                      <td colspan="6" class="pa-0">
+                        <div class="pa-3" style="background:rgba(0,0,0,0.03)">
+                          <div v-if="liquidacionDetalleLoading[`canal-${i}`]" class="text-center py-2">
+                            <v-progress-circular indeterminate color="primary" size="20" width="2" />
+                          </div>
+                          <v-table v-else density="compact">
+                            <thead>
+                              <tr>
+                                <th>Placa</th>
+                                <th>Vehículo</th>
+                                <th>Fecha pago</th>
+                                <th class="text-right">Monto</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr
+                                v-for="p in liquidacionDetalleFilas('canal', i)"
+                                :key="p.ticket_id"
+                                :class="{ 'bg-yellow-lighten-3': liquidacionPlacaResaltada && (p.placa ?? '').toUpperCase().includes(liquidacionPlacaResaltada) }"
+                              >
+                                <td>{{ p.placa ?? '—' }}</td>
+                                <td>{{ p.tipo_vehiculo ?? '—' }}</td>
+                                <td>{{ formatDate(p.fecha_pago) }}</td>
+                                <td class="text-right">{{ formatCOP(p.monto) }}</td>
+                              </tr>
+                              <tr v-if="!liquidacionDetalleFilas('canal', i).length">
+                                <td colspan="4" class="text-center text-medium-emphasis">Sin placas en este período</td>
+                              </tr>
+                            </tbody>
+                          </v-table>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+                <tfoot>
+                  <tr class="font-weight-bold" style="background:rgba(0,0,0,0.06)">
+                    <td colspan="3" class="text-right">TOTAL</td>
+                    <td class="text-right">{{ totalesPorCanal.cantidad }}</td>
+                    <td class="text-right">{{ formatCOP(totalesPorCanal.monto) }}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </v-table>
+
+              <!-- Descuentos aplicados -->
+              <div id="liq-seccion-descuentos" class="text-caption text-medium-emphasis mb-2 d-flex align-center gap-1">
+                Descuentos aplicados
+                <v-tooltip location="top" max-width="340">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="14" color="medium-emphasis">mdi-information-outline</v-icon>
+                  </template>
+                  Descuentos aplicados en caja (Informativo Policía, Avance, etc.) en el período, cruzados con la comisión real que resultó para esa placa — el tipo de descuento cambia el cálculo de la comisión, así que acá se puede verificar cuánto se pagó y por qué.
+                </v-tooltip>
+              </div>
+              <v-table density="compact" class="mb-4">
+                <thead>
+                  <tr>
+                    <th style="width:32px"></th>
+                    <th style="width:52px" class="text-center">
+                      <div class="d-flex flex-column align-center">
+                        <v-tooltip text="Seleccionar para incluir en la exportación de placas a Excel" location="top">
+                          <template #activator="{ props }">
+                            <span v-bind="props" class="text-caption text-deep-purple font-weight-medium">Exportar</span>
+                          </template>
+                        </v-tooltip>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="seccionTodosSeleccionadosExport('descuentos')"
+                          @update:model-value="toggleSeleccionarTodosExport('descuentos')"
+                        />
+                      </div>
+                    </th>
+                    <th>Tipo de descuento</th>
+                    <th class="text-right">Veces aplicado</th>
+                    <th class="text-right">Monto total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template v-for="(d, i) in liquidacion.data.descuentos" :key="d.codigo">
+                    <tr v-show="filaVisibleBusqueda('descuentos', i)" style="cursor:pointer" @click="toggleExpandFilaLiquidacion('descuentos', i)">
+                      <td>
+                        <v-icon size="18">{{ liquidacionExpandido.descuentos.has(i) ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                      </td>
+                      <td @click.stop>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="liquidacionSeleccionExport.descuentos.has(i)"
+                          @update:model-value="toggleFilaExport('descuentos', i)"
+                        />
+                      </td>
+                      <td>{{ d.nombre }}</td>
+                      <td class="text-right">{{ d.cantidad }}</td>
+                      <td class="text-right">{{ formatCOP(d.total_descuentos) }}</td>
+                    </tr>
+                    <tr v-if="liquidacionExpandido.descuentos.has(i)" v-show="filaVisibleBusqueda('descuentos', i)">
+                      <td colspan="5" class="pa-0">
+                        <div class="pa-3" style="background:rgba(0,0,0,0.03)">
+                          <div v-if="liquidacionDetalleLoading[`descuentos-${i}`]" class="text-center py-2">
+                            <v-progress-circular indeterminate color="primary" size="20" width="2" />
+                          </div>
+                          <v-table v-else density="compact">
+                            <thead>
+                              <tr>
+                                <th>Placa</th>
+                                <th>Vehículo</th>
+                                <th>Fecha</th>
+                                <th class="text-right">Monto descuento</th>
+                                <th>Comisión resultante</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr
+                                v-for="p in liquidacionDetalleFilas('descuentos', i)"
+                                :key="p.ticket_id"
+                                v-show="filaPlacaVisiblePorEstado(p.tiene_comision ? p.comision_estado : null)"
+                                :class="{ 'bg-yellow-lighten-3': liquidacionPlacaResaltada && (p.placa ?? '').toUpperCase().includes(liquidacionPlacaResaltada) }"
+                              >
+                                <td>{{ p.placa ?? '—' }}</td>
+                                <td>{{ p.tipo_vehiculo ?? '—' }}</td>
+                                <td>{{ formatDate(p.fecha_pago) }}</td>
+                                <td class="text-right">{{ formatCOP(p.monto_descuento) }}</td>
+                                <td>
+                                  <div v-if="p.tiene_comision" class="d-flex align-center gap-1 flex-wrap">
+                                    <v-chip :color="estadoColor(p.comision_estado)" size="x-small" variant="flat">{{ p.comision_estado }}</v-chip>
+                                    <span class="text-caption">
+                                      {{ formatCOP(p.monto_asesor) }}<template v-if="p.monto_convenio"> + {{ formatCOP(p.monto_convenio) }} conv.</template>
+                                    </span>
+                                    <v-tooltip
+                                      :text="p.regla_aplicada ?? 'Sin detalle disponible, comisión anterior a esta funcionalidad'"
+                                      location="top"
+                                      max-width="320"
+                                    >
+                                      <template #activator="{ props }">
+                                        <v-icon v-bind="props" size="14" color="medium-emphasis">mdi-information-outline</v-icon>
+                                      </template>
+                                    </v-tooltip>
+                                  </div>
+                                  <v-chip v-else-if="p.hubo_comision_anulada" color="warning" size="x-small" variant="flat">
+                                    Comisión anulada, sin reemplazo
+                                  </v-chip>
+                                  <v-chip v-else size="x-small" variant="flat">Sin comisión asociada</v-chip>
+                                </td>
+                              </tr>
+                              <tr v-if="!liquidacionDetalleFilas('descuentos', i).length">
+                                <td colspan="5" class="text-center text-medium-emphasis">Sin placas en este período</td>
+                              </tr>
+                            </tbody>
+                          </v-table>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                  <tr v-if="!liquidacion.data.descuentos.length">
+                    <td colspan="5" class="text-center text-medium-emphasis">Sin descuentos aplicados en este período</td>
                   </tr>
                 </tbody>
+                <tfoot>
+                  <tr class="font-weight-bold" style="background:rgba(0,0,0,0.06)">
+                    <td colspan="3" class="text-right">TOTAL</td>
+                    <td class="text-right">{{ totalesDescuentos.cantidad }}</td>
+                    <td class="text-right">{{ formatCOP(totalesDescuentos.monto) }}</td>
+                  </tr>
+                </tfoot>
               </v-table>
 
               <!-- Desglose individual: 3 secciones, cada una con su propia selección y pago -->
               <div class="d-flex align-center justify-space-between mb-2">
-                <div class="text-caption text-medium-emphasis">Asesores Comerciales</div>
+                <div id="liq-seccion-comerciales" class="text-caption text-medium-emphasis d-flex align-center gap-1">
+                  Asesores Comerciales
+                  <v-tooltip text="Comisiones RTM agrupadas por asesor comercial que dateó el cliente, con el monto que le corresponde a cada uno." location="top">
+                    <template #activator="{ props }">
+                      <v-icon v-bind="props" size="14" color="medium-emphasis">mdi-information-outline</v-icon>
+                    </template>
+                  </v-tooltip>
+                </div>
                 <v-btn
                   size="x-small"
                   color="success"
@@ -241,12 +555,34 @@
               <v-table density="compact" class="mb-4">
                 <thead>
                   <tr>
-                    <th style="width:36px">
-                      <v-checkbox-btn
-                        density="compact"
-                        :model-value="seccionTodosSeleccionados('comerciales')"
-                        @update:model-value="toggleSeleccionarTodos('comerciales')"
-                      />
+                    <th style="width:32px"></th>
+                    <th style="width:52px" class="text-center">
+                      <div class="d-flex flex-column align-center">
+                        <v-tooltip text="Seleccionar para incluir en Pagar Seleccionados" location="top">
+                          <template #activator="{ props }">
+                            <span v-bind="props" class="text-caption text-success font-weight-medium">Pagar</span>
+                          </template>
+                        </v-tooltip>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="seccionTodosSeleccionados('comerciales')"
+                          @update:model-value="toggleSeleccionarTodos('comerciales')"
+                        />
+                      </div>
+                    </th>
+                    <th style="width:52px" class="text-center">
+                      <div class="d-flex flex-column align-center">
+                        <v-tooltip text="Seleccionar para incluir en la exportación de placas a Excel" location="top">
+                          <template #activator="{ props }">
+                            <span v-bind="props" class="text-caption text-deep-purple font-weight-medium">Exportar</span>
+                          </template>
+                        </v-tooltip>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="seccionTodosSeleccionadosExport('comerciales')"
+                          @update:model-value="toggleSeleccionarTodosExport('comerciales')"
+                        />
+                      </div>
                     </th>
                     <th>Asesor</th>
                     <th class="text-right">Turnos</th>
@@ -255,28 +591,103 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(r, i) in liquidacion.data.comerciales" :key="r.asesor_id">
-                    <td>
-                      <v-checkbox-btn
-                        v-if="r.comision_ids_pagables.length"
-                        density="compact"
-                        :model-value="liquidacionSel.comerciales.has(i)"
-                        @update:model-value="toggleFila('comerciales', i)"
-                      />
-                    </td>
-                    <td>{{ r.asesor_nombre }}</td>
-                    <td class="text-right">{{ r.cantidad_vehiculos }}</td>
-                    <td class="text-right">{{ formatCOP(r.total_asesor) }}</td>
-                    <td>{{ r.estados }}</td>
-                  </tr>
+                  <template v-for="(r, i) in liquidacion.data.comerciales" :key="r.asesor_id">
+                    <tr v-show="filaVisibleBusqueda('comerciales', i)" style="cursor:pointer" @click="toggleExpandFilaLiquidacion('comerciales', i)">
+                      <td>
+                        <v-icon size="18">{{ liquidacionExpandido.comerciales.has(i) ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                      </td>
+                      <td @click.stop>
+                        <v-checkbox-btn
+                          v-if="r.comision_ids_pagables.length"
+                          density="compact"
+                          :model-value="liquidacionSel.comerciales.has(i)"
+                          @update:model-value="toggleFila('comerciales', i)"
+                        />
+                      </td>
+                      <td @click.stop>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="liquidacionSeleccionExport.comerciales.has(i)"
+                          @update:model-value="toggleFilaExport('comerciales', i)"
+                        />
+                      </td>
+                      <td>{{ r.asesor_nombre }}</td>
+                      <td class="text-right">{{ r.cantidad_vehiculos }}</td>
+                      <td class="text-right">{{ formatCOP(r.total_asesor) }}</td>
+                      <td>
+                        <v-chip v-for="e in estadosDistintos(r.estados)" :key="e" :color="estadoColor(e)" size="x-small" variant="flat" class="mr-1">{{ e }}</v-chip>
+                      </td>
+                    </tr>
+                    <tr v-if="liquidacionExpandido.comerciales.has(i)" v-show="filaVisibleBusqueda('comerciales', i)">
+                      <td colspan="7" class="pa-0">
+                        <div class="pa-3" style="background:rgba(0,0,0,0.03)">
+                          <div v-if="liquidacionDetalleLoading[`comerciales-${i}`]" class="text-center py-2">
+                            <v-progress-circular indeterminate color="primary" size="20" width="2" />
+                          </div>
+                          <v-table v-else density="compact">
+                            <thead>
+                              <tr>
+                                <th>Placa</th>
+                                <th>Vehículo</th>
+                                <th>Estado</th>
+                                <th>Fecha</th>
+                                <th>Clasificación</th>
+                                <th class="text-right">Valor a pagar (asesor)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr
+                                v-for="p in liquidacionDetalleFilas('comerciales', i)"
+                                :key="p.comision_id"
+                                :class="{ 'bg-yellow-lighten-3': liquidacionPlacaResaltada && (p.placa ?? '').toUpperCase().includes(liquidacionPlacaResaltada) }"
+                              >
+                                <td>{{ p.placa ?? '—' }}</td>
+                                <td>{{ p.tipo_vehiculo ?? '—' }}</td>
+                                <td><v-chip :color="estadoColor(p.estado)" size="x-small" variant="flat">{{ p.estado }}</v-chip></td>
+                                <td>{{ formatDate(p.fecha_calculo) }}</td>
+                                <td>
+                                  <div class="d-flex align-center gap-1 flex-wrap">
+                                    <v-chip :color="ESCENARIO_COLORS[p.escenario]" size="x-small" variant="flat">{{ ESCENARIO_LABELS[p.escenario] }}</v-chip>
+                                    <v-chip v-if="p.con_convenio" size="x-small" variant="outlined" color="orange">Convenio: {{ p.convenio_nombre ?? '—' }}</v-chip>
+                                    <v-chip v-if="p.estado_continuidad" :color="CONTINUIDAD_COLORS[p.estado_continuidad]" size="x-small" variant="flat">
+                                      {{ CONTINUIDAD_LABELS[p.estado_continuidad] }}
+                                    </v-chip>
+                                  </div>
+                                </td>
+                                <td class="text-right">{{ formatCOP(p.monto_asesor) }}</td>
+                              </tr>
+                              <tr v-if="!liquidacionDetalleFilas('comerciales', i).length">
+                                <td colspan="6" class="text-center text-medium-emphasis">Sin placas en este período</td>
+                              </tr>
+                            </tbody>
+                          </v-table>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
                   <tr v-if="!liquidacion.data.comerciales.length">
-                    <td colspan="5" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
+                    <td colspan="7" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
                   </tr>
                 </tbody>
+                <tfoot>
+                  <tr class="font-weight-bold" style="background:rgba(0,0,0,0.06)">
+                    <td colspan="4" class="text-right">TOTAL</td>
+                    <td class="text-right">{{ totalesComerciales.cantidad }}</td>
+                    <td class="text-right">{{ formatCOP(totalesComerciales.monto) }}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
               </v-table>
 
               <div class="d-flex align-center justify-space-between mb-2">
-                <div class="text-caption text-medium-emphasis">Asesores Convenio</div>
+                <div id="liq-seccion-asesoresConvenio" class="text-caption text-medium-emphasis d-flex align-center gap-1">
+                  Asesores Convenio
+                  <v-tooltip text="Comisiones RTM agrupadas por asesor tipo convenio, con lo que le corresponde al asesor y al convenio por separado." location="top">
+                    <template #activator="{ props }">
+                      <v-icon v-bind="props" size="14" color="medium-emphasis">mdi-information-outline</v-icon>
+                    </template>
+                  </v-tooltip>
+                </div>
                 <v-btn
                   size="x-small"
                   color="success"
@@ -290,12 +701,34 @@
               <v-table density="compact" class="mb-4">
                 <thead>
                   <tr>
-                    <th style="width:36px">
-                      <v-checkbox-btn
-                        density="compact"
-                        :model-value="seccionTodosSeleccionados('asesoresConvenio')"
-                        @update:model-value="toggleSeleccionarTodos('asesoresConvenio')"
-                      />
+                    <th style="width:32px"></th>
+                    <th style="width:52px" class="text-center">
+                      <div class="d-flex flex-column align-center">
+                        <v-tooltip text="Seleccionar para incluir en Pagar Seleccionados" location="top">
+                          <template #activator="{ props }">
+                            <span v-bind="props" class="text-caption text-success font-weight-medium">Pagar</span>
+                          </template>
+                        </v-tooltip>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="seccionTodosSeleccionados('asesoresConvenio')"
+                          @update:model-value="toggleSeleccionarTodos('asesoresConvenio')"
+                        />
+                      </div>
+                    </th>
+                    <th style="width:52px" class="text-center">
+                      <div class="d-flex flex-column align-center">
+                        <v-tooltip text="Seleccionar para incluir en la exportación de placas a Excel" location="top">
+                          <template #activator="{ props }">
+                            <span v-bind="props" class="text-caption text-deep-purple font-weight-medium">Exportar</span>
+                          </template>
+                        </v-tooltip>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="seccionTodosSeleccionadosExport('asesoresConvenio')"
+                          @update:model-value="toggleSeleccionarTodosExport('asesoresConvenio')"
+                        />
+                      </div>
                     </th>
                     <th>Asesor</th>
                     <th>Convenio</th>
@@ -306,30 +739,108 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(r, i) in liquidacion.data.asesores_convenio" :key="`${r.asesor_id}-${i}`">
-                    <td>
-                      <v-checkbox-btn
-                        v-if="r.comision_ids_pagables.length"
-                        density="compact"
-                        :model-value="liquidacionSel.asesoresConvenio.has(i)"
-                        @update:model-value="toggleFila('asesoresConvenio', i)"
-                      />
-                    </td>
-                    <td>{{ r.asesor_nombre }}</td>
-                    <td>{{ r.convenio_nombre ?? '—' }}</td>
-                    <td class="text-right">{{ r.cantidad_vehiculos }}</td>
-                    <td class="text-right">{{ formatCOP(r.total_asesor) }}</td>
-                    <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
-                    <td>{{ r.estados }}</td>
-                  </tr>
+                  <template v-for="(r, i) in liquidacion.data.asesores_convenio" :key="`${r.asesor_id}-${i}`">
+                    <tr v-show="filaVisibleBusqueda('asesoresConvenio', i)" style="cursor:pointer" @click="toggleExpandFilaLiquidacion('asesoresConvenio', i)">
+                      <td>
+                        <v-icon size="18">{{ liquidacionExpandido.asesoresConvenio.has(i) ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                      </td>
+                      <td @click.stop>
+                        <v-checkbox-btn
+                          v-if="r.comision_ids_pagables.length"
+                          density="compact"
+                          :model-value="liquidacionSel.asesoresConvenio.has(i)"
+                          @update:model-value="toggleFila('asesoresConvenio', i)"
+                        />
+                      </td>
+                      <td @click.stop>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="liquidacionSeleccionExport.asesoresConvenio.has(i)"
+                          @update:model-value="toggleFilaExport('asesoresConvenio', i)"
+                        />
+                      </td>
+                      <td>{{ r.asesor_nombre }}</td>
+                      <td>{{ r.convenio_nombre ?? '—' }}</td>
+                      <td class="text-right">{{ r.cantidad_vehiculos }}</td>
+                      <td class="text-right">{{ formatCOP(r.total_asesor) }}</td>
+                      <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
+                      <td>
+                        <v-chip v-for="e in estadosDistintos(r.estados)" :key="e" :color="estadoColor(e)" size="x-small" variant="flat" class="mr-1">{{ e }}</v-chip>
+                      </td>
+                    </tr>
+                    <tr v-if="liquidacionExpandido.asesoresConvenio.has(i)" v-show="filaVisibleBusqueda('asesoresConvenio', i)">
+                      <td colspan="9" class="pa-0">
+                        <div class="pa-3" style="background:rgba(0,0,0,0.03)">
+                          <div v-if="liquidacionDetalleLoading[`asesoresConvenio-${i}`]" class="text-center py-2">
+                            <v-progress-circular indeterminate color="primary" size="20" width="2" />
+                          </div>
+                          <v-table v-else density="compact">
+                            <thead>
+                              <tr>
+                                <th>Placa</th>
+                                <th>Vehículo</th>
+                                <th>Estado</th>
+                                <th>Fecha</th>
+                                <th>Clasificación</th>
+                                <th class="text-right">Valor a pagar (asesor)</th>
+                                <th class="text-right">Valor a pagar (convenio)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr
+                                v-for="p in liquidacionDetalleFilas('asesoresConvenio', i)"
+                                :key="p.comision_id"
+                                :class="{ 'bg-yellow-lighten-3': liquidacionPlacaResaltada && (p.placa ?? '').toUpperCase().includes(liquidacionPlacaResaltada) }"
+                              >
+                                <td>{{ p.placa ?? '—' }}</td>
+                                <td>{{ p.tipo_vehiculo ?? '—' }}</td>
+                                <td><v-chip :color="estadoColor(p.estado)" size="x-small" variant="flat">{{ p.estado }}</v-chip></td>
+                                <td>{{ formatDate(p.fecha_calculo) }}</td>
+                                <td>
+                                  <div class="d-flex align-center gap-1 flex-wrap">
+                                    <v-chip :color="ESCENARIO_COLORS[p.escenario]" size="x-small" variant="flat">{{ ESCENARIO_LABELS[p.escenario] }}</v-chip>
+                                    <v-chip v-if="p.con_convenio" size="x-small" variant="outlined" color="orange">Convenio: {{ p.convenio_nombre ?? '—' }}</v-chip>
+                                    <v-chip v-if="p.estado_continuidad" :color="CONTINUIDAD_COLORS[p.estado_continuidad]" size="x-small" variant="flat">
+                                      {{ CONTINUIDAD_LABELS[p.estado_continuidad] }}
+                                    </v-chip>
+                                  </div>
+                                </td>
+                                <td class="text-right">{{ formatCOP(p.monto_asesor) }}</td>
+                                <td class="text-right">{{ formatCOP(p.monto_convenio) }}</td>
+                              </tr>
+                              <tr v-if="!liquidacionDetalleFilas('asesoresConvenio', i).length">
+                                <td colspan="7" class="text-center text-medium-emphasis">Sin placas en este período</td>
+                              </tr>
+                            </tbody>
+                          </v-table>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
                   <tr v-if="!liquidacion.data.asesores_convenio.length">
-                    <td colspan="7" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
+                    <td colspan="9" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
                   </tr>
                 </tbody>
+                <tfoot>
+                  <tr class="font-weight-bold" style="background:rgba(0,0,0,0.06)">
+                    <td colspan="5" class="text-right">TOTAL</td>
+                    <td class="text-right">{{ totalesAsesoresConvenio.cantidad }}</td>
+                    <td class="text-right">{{ formatCOP(totalesAsesoresConvenio.montoAsesor) }}</td>
+                    <td class="text-right">{{ formatCOP(totalesAsesoresConvenio.montoConvenio) }}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
               </v-table>
 
               <div class="d-flex align-center justify-space-between mb-2">
-                <div class="text-caption text-medium-emphasis">Convenios</div>
+                <div id="liq-seccion-convenios" class="text-caption text-medium-emphasis d-flex align-center gap-1">
+                  Convenios
+                  <v-tooltip text="Comisiones RTM agrupadas por convenio, sumando lo que le corresponde al convenio por los clientes captados a través de su asesor comercial." location="top">
+                    <template #activator="{ props }">
+                      <v-icon v-bind="props" size="14" color="medium-emphasis">mdi-information-outline</v-icon>
+                    </template>
+                  </v-tooltip>
+                </div>
                 <v-btn
                   size="x-small"
                   color="success"
@@ -343,12 +854,34 @@
               <v-table density="compact">
                 <thead>
                   <tr>
-                    <th style="width:36px">
-                      <v-checkbox-btn
-                        density="compact"
-                        :model-value="seccionTodosSeleccionados('convenios')"
-                        @update:model-value="toggleSeleccionarTodos('convenios')"
-                      />
+                    <th style="width:32px"></th>
+                    <th style="width:52px" class="text-center">
+                      <div class="d-flex flex-column align-center">
+                        <v-tooltip text="Seleccionar para incluir en Pagar Seleccionados" location="top">
+                          <template #activator="{ props }">
+                            <span v-bind="props" class="text-caption text-success font-weight-medium">Pagar</span>
+                          </template>
+                        </v-tooltip>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="seccionTodosSeleccionados('convenios')"
+                          @update:model-value="toggleSeleccionarTodos('convenios')"
+                        />
+                      </div>
+                    </th>
+                    <th style="width:52px" class="text-center">
+                      <div class="d-flex flex-column align-center">
+                        <v-tooltip text="Seleccionar para incluir en la exportación de placas a Excel" location="top">
+                          <template #activator="{ props }">
+                            <span v-bind="props" class="text-caption text-deep-purple font-weight-medium">Exportar</span>
+                          </template>
+                        </v-tooltip>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="seccionTodosSeleccionadosExport('convenios')"
+                          @update:model-value="toggleSeleccionarTodosExport('convenios')"
+                        />
+                      </div>
                     </th>
                     <th>Convenio</th>
                     <th>Asesor comercial</th>
@@ -358,25 +891,94 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(r, i) in liquidacion.data.convenios" :key="`${r.convenio_id}-${i}`">
-                    <td>
-                      <v-checkbox-btn
-                        v-if="r.comision_ids_pagables.length"
-                        density="compact"
-                        :model-value="liquidacionSel.convenios.has(i)"
-                        @update:model-value="toggleFila('convenios', i)"
-                      />
-                    </td>
-                    <td>{{ r.convenio_nombre }}</td>
-                    <td>{{ r.asesor_comercial_nombre }}</td>
-                    <td class="text-right">{{ r.cantidad_vehiculos }}</td>
-                    <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
-                    <td>{{ r.estados }}</td>
-                  </tr>
+                  <template v-for="(r, i) in liquidacion.data.convenios" :key="`${r.convenio_id}-${i}`">
+                    <tr v-show="filaVisibleBusqueda('convenios', i)" style="cursor:pointer" @click="toggleExpandFilaLiquidacion('convenios', i)">
+                      <td>
+                        <v-icon size="18">{{ liquidacionExpandido.convenios.has(i) ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                      </td>
+                      <td @click.stop>
+                        <v-checkbox-btn
+                          v-if="r.comision_ids_pagables.length"
+                          density="compact"
+                          :model-value="liquidacionSel.convenios.has(i)"
+                          @update:model-value="toggleFila('convenios', i)"
+                        />
+                      </td>
+                      <td @click.stop>
+                        <v-checkbox-btn
+                          density="compact"
+                          :model-value="liquidacionSeleccionExport.convenios.has(i)"
+                          @update:model-value="toggleFilaExport('convenios', i)"
+                        />
+                      </td>
+                      <td>{{ r.convenio_nombre }}</td>
+                      <td>{{ r.asesor_comercial_nombre }}</td>
+                      <td class="text-right">{{ r.cantidad_vehiculos }}</td>
+                      <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
+                      <td>
+                        <v-chip v-for="e in estadosDistintos(r.estados)" :key="e" :color="estadoColor(e)" size="x-small" variant="flat" class="mr-1">{{ e }}</v-chip>
+                      </td>
+                    </tr>
+                    <tr v-if="liquidacionExpandido.convenios.has(i)" v-show="filaVisibleBusqueda('convenios', i)">
+                      <td colspan="8" class="pa-0">
+                        <div class="pa-3" style="background:rgba(0,0,0,0.03)">
+                          <div v-if="liquidacionDetalleLoading[`convenios-${i}`]" class="text-center py-2">
+                            <v-progress-circular indeterminate color="primary" size="20" width="2" />
+                          </div>
+                          <v-table v-else density="compact">
+                            <thead>
+                              <tr>
+                                <th>Placa</th>
+                                <th>Vehículo</th>
+                                <th>Estado</th>
+                                <th>Fecha</th>
+                                <th>Asesor</th>
+                                <th>Clasificación</th>
+                                <th class="text-right">Valor a pagar (convenio)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr
+                                v-for="p in liquidacionDetalleFilas('convenios', i)"
+                                :key="p.comision_id"
+                                :class="{ 'bg-yellow-lighten-3': liquidacionPlacaResaltada && (p.placa ?? '').toUpperCase().includes(liquidacionPlacaResaltada) }"
+                              >
+                                <td>{{ p.placa ?? '—' }}</td>
+                                <td>{{ p.tipo_vehiculo ?? '—' }}</td>
+                                <td><v-chip :color="estadoColor(p.estado)" size="x-small" variant="flat">{{ p.estado }}</v-chip></td>
+                                <td>{{ formatDate(p.fecha_calculo) }}</td>
+                                <td>{{ p.asesor_nombre ?? '—' }}</td>
+                                <td>
+                                  <div class="d-flex align-center gap-1 flex-wrap">
+                                    <v-chip :color="ESCENARIO_COLORS[p.escenario]" size="x-small" variant="flat">{{ ESCENARIO_LABELS[p.escenario] }}</v-chip>
+                                    <v-chip v-if="p.estado_continuidad" :color="CONTINUIDAD_COLORS[p.estado_continuidad]" size="x-small" variant="flat">
+                                      {{ CONTINUIDAD_LABELS[p.estado_continuidad] }}
+                                    </v-chip>
+                                  </div>
+                                </td>
+                                <td class="text-right">{{ formatCOP(p.monto_convenio) }}</td>
+                              </tr>
+                              <tr v-if="!liquidacionDetalleFilas('convenios', i).length">
+                                <td colspan="7" class="text-center text-medium-emphasis">Sin placas en este período</td>
+                              </tr>
+                            </tbody>
+                          </v-table>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
                   <tr v-if="!liquidacion.data.convenios.length">
-                    <td colspan="6" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
+                    <td colspan="8" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
                   </tr>
                 </tbody>
+                <tfoot>
+                  <tr class="font-weight-bold" style="background:rgba(0,0,0,0.06)">
+                    <td colspan="5" class="text-right">TOTAL</td>
+                    <td class="text-right">{{ totalesConvenios.cantidad }}</td>
+                    <td class="text-right">{{ formatCOP(totalesConvenios.monto) }}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
               </v-table>
               </div>
             </template>
@@ -2933,9 +3535,16 @@ import {
   descargarLiquidacionRtmExcel,
   descargarTrazabilidadRtmExcel,
   descargarHistorialLiquidacionesExcel,
+  getLiquidacionRtmDetallePlacas,
+  getLiquidacionRtmDetallePlacasCanal,
+  getLiquidacionRtmDetallePlacasDescuento,
+  getLiquidacionRtmBuscarPlaca,
+  exportarLiquidacionRtmPlacas,
   type HistorialLiquidacionItem,
   type HistorialLiquidacionDetalleFila,
   type TrazabilidadRtmResponse,
+  type ExportarPlacasBody,
+  type LiquidacionBuscarPlacaMatch,
 } from '@/services/reportesAdminService'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import TurnoDetalleDialog, { type Turno as TurnoDetalle } from '@/components/rtm/TurnoDetalleDialog.vue'
@@ -3574,6 +4183,11 @@ function calcTotalDetalle(item: ComisionDetailExtended | null): number {
   return item.valor_total || 0
 }
 
+/** Convierte el GROUP_CONCAT de estados de una fila agregada ("PENDIENTE,APROBADA") en la lista de valores distintos, para pintar un chip por cada uno en vez de mostrar el texto plano. */
+function estadosDistintos(estados: string): ComisionEstado[] {
+  return [...new Set(estados.split(',').filter(Boolean))] as ComisionEstado[]
+}
+
 function estadoColor(e: ComisionEstado) {
   switch (e) {
     case 'PENDIENTE': return 'warning'
@@ -3584,14 +4198,27 @@ function estadoColor(e: ComisionEstado) {
   }
 }
 
+/**
+ * dd/mm/aaaa hh:mm am/pm, SIEMPRE en hora de Bogotá (UTC-5, sin horario de
+ * verano) sin importar la zona horaria del navegador — usa timeZone fijo en
+ * vez de confiar en el default local, que antes causaba desfases de horas
+ * cuando el valor venía en UTC (sufijo Z) y el navegador no estaba en
+ * hora de Colombia. Se arma manualmente con formatToParts (locale en-US
+ * solo para obtener "AM"/"PM" limpio, sin puntos) para no depender del
+ * orden/puntuación que da 'es-CO' (que devuelve "a. m."/"p. m.").
+ */
 function formatDate(value?: string | null) {
   if (!value) return '—'
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return value
-  return new Intl.DateTimeFormat('es-CO', {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Bogota',
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hour12: true,
-  }).format(d)
+  }).formatToParts(d)
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
+  const ampm = get('dayPeriod').toLowerCase().replace(/\./g, '')
+  return `${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')} ${ampm}`
 }
 /* ── Editar comisión ── */
 const editDialog = ref<{
@@ -3823,6 +4450,30 @@ const CANAL_LABELS_LIQUIDACION: Record<string, string> = {
   REDES: 'Redes / Marketing Digital',
 }
 
+/** Clasificación de negocio de la placa en el drill-down (Comerciales /
+ * Asesores Convenio / Convenios) — derivada de turnos_rtms.es_recurrente/
+ * es_recuperacion (histórico completo, no depende de reglaAplicada). */
+const ESCENARIO_LABELS: Record<string, string> = {
+  NUEVO: 'Nuevo directo',
+  RECURRENTE: 'Recurrente',
+  RECUPERACION: 'Recuperación',
+}
+const ESCENARIO_COLORS: Record<string, string> = {
+  NUEVO: 'blue',
+  RECURRENTE: 'teal',
+  RECUPERACION: 'purple',
+}
+const CONTINUIDAD_LABELS: Record<string, string> = {
+  CONTINUA: 'Continúa',
+  ROTA: 'Rota',
+  SIN_EVIDENCIA: 'Sin evidencia',
+}
+const CONTINUIDAD_COLORS: Record<string, string> = {
+  CONTINUA: 'success',
+  ROTA: 'error',
+  SIN_EVIDENCIA: 'grey',
+}
+
 interface LiquidacionState {
   open: boolean
   loading: boolean
@@ -3855,6 +4506,7 @@ async function abrirLiquidacion() {
   liquidacion.value = { open: true, loading: true, error: '', desde, hasta, data: null }
   liquidacionFiltroRapido.value = usaFallbackAyer ? 'DIA_ANTERIOR' : ''
   limpiarSeleccionLiquidacion()
+  limpiarExpansionYExportLiquidacion()
   try {
     liquidacion.value.data = await getLiquidacionRtm(desde, hasta)
   } catch (err) {
@@ -3863,6 +4515,157 @@ async function abrirLiquidacion() {
     liquidacion.value.loading = false
   }
 }
+
+/** Scroll suave a una sección del modal (barra "Ir a:") — el v-dialog es
+ * scrollable, así que el overflow real está en v-card-text; scrollIntoView
+ * lo resuelve solo contra ese ancestro, sin necesidad de refs/offsets manuales. */
+function scrollToSeccionLiquidacion(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+/* ── Buscador del modal Liquidación RTM (placa o nombre) ──
+ * Enfoque en 3 capas:
+ *  A) nombre de asesor/convenio/canal/tipo de descuento — en memoria, sobre
+ *     liquidacion.value.data, instantáneo.
+ *  B) placa dentro de filas YA expandidas/cacheadas — también en memoria.
+ *  C) SOLO si A+B no encontraron nada: golpea buscar-placa (debounce), que
+ *     devuelve en qué sección(es) está la placa y auto-expande esas filas.
+ * Las filas NO se filtran del array (v-for sigue sobre el array completo)
+ * para no romper los índices de los que dependen liquidacionExpandido /
+ * liquidacionSeleccionExport / liquidacionDetalleCache — se ocultan con
+ * v-show por fila en el template. */
+const liquidacionBusqueda = ref('')
+const liquidacionBusquedaNormalizada = computed(() => liquidacionBusqueda.value.trim().toUpperCase())
+const liquidacionBusquedaLoading = ref(false)
+const liquidacionBusquedaSinResultados = ref(false)
+const liquidacionBusquedaMatches = ref<LiquidacionBuscarPlacaMatch[]>([])
+/** Placa a resaltar en las filas de detalle ya expandidas — se mantiene en
+ * sync con el texto buscado sin importar si vino de B o de C; el template
+ * simplemente resalta cualquier placa visible que la contenga. */
+const liquidacionPlacaResaltada = computed(() => liquidacionBusquedaNormalizada.value)
+let liquidacionBusquedaTimer: ReturnType<typeof setTimeout> | null = null
+
+function textoBusquedaFila(seccion: SeccionModal, row: any): string {
+  const partes = [
+    row.asesor_nombre,
+    row.convenio_nombre,
+    row.asesor_comercial_nombre,
+    seccion === 'canal' ? (CANAL_LABELS_LIQUIDACION[row.canal] ?? row.canal) : null,
+    seccion === 'descuentos' ? row.nombre : null,
+  ]
+  return partes.filter(Boolean).join(' ').toUpperCase()
+}
+
+function coincideMatchBusqueda(m: LiquidacionBuscarPlacaMatch, seccion: SeccionModal, row: any): boolean {
+  if (m.seccion !== seccion) return false
+  if (seccion === 'canal') return m.canal === row.canal
+  if (seccion === 'descuentos') return m.codigo === row.codigo
+  if (seccion === 'convenios') return m.convenio_id === row.convenio_id
+  return m.asesor_id === row.asesor_id
+}
+
+/** true si la fila debe verse (v-show) dado el texto buscado — combina A+B+C. */
+/** Filtro de estado de comisión (Pendiente/Aprobada/Pagada/Anulada) —
+ * combina en AND con el buscador de texto. A nivel de PLACA (dentro del
+ * drill-down ya expandido) se aplica con filaPlacaVisiblePorEstado(); acá
+ * se aplica a nivel de FILA AGREGADA usando el campo `estados` (el mismo
+ * GROUP_CONCAT que ya alimenta la columna "Estados" en pantalla) — si
+ * ninguna placa de esa fila tiene el estado filtrado, se oculta la fila
+ * completa para no invitar a expandir algo que va a salir vacío. Canal y
+ * Descuentos no traen `estados` a nivel agregado, así que sus filas nunca
+ * se ocultan acá (Descuentos sí se filtra a nivel de placa). */
+const OPCIONES_ESTADO_LIQUIDACION = [
+  { title: 'Todos', value: '' },
+  { title: 'Pendiente', value: 'PENDIENTE' },
+  { title: 'Aprobada', value: 'APROBADA' },
+  { title: 'Pagada', value: 'PAGADA' },
+  { title: 'Anulada', value: 'ANULADA' },
+]
+const liquidacionFiltroEstado = ref<'' | 'PENDIENTE' | 'APROBADA' | 'PAGADA' | 'ANULADA'>('')
+
+function filaPlacaVisiblePorEstado(estado: string | null | undefined): boolean {
+  if (!liquidacionFiltroEstado.value) return true
+  return estado === liquidacionFiltroEstado.value
+}
+
+function filaVisibleBusqueda(seccion: SeccionModal, idx: number): boolean {
+  const row = filasSeccionModal(seccion)[idx]
+  if (!row) return true
+
+  if (liquidacionFiltroEstado.value && typeof row.estados === 'string') {
+    if (!row.estados.split(',').includes(liquidacionFiltroEstado.value)) return false
+  }
+
+  const texto = liquidacionBusquedaNormalizada.value
+  if (!texto) return true
+  if (textoBusquedaFila(seccion, row).includes(texto)) return true // A
+  const cache = liquidacionDetalleCache.get(`${seccion}-${idx}`)
+  if (cache?.some((p: any) => (p.placa ?? '').toUpperCase().includes(texto))) return true // B
+  return liquidacionBusquedaMatches.value.some((m) => coincideMatchBusqueda(m, seccion, row)) // C
+}
+
+/** true si A o B ya encontraron algo en CUALQUIER sección — si es así, C
+ * (buscar-placa) ni se llama, tal como se pidió. */
+function hayCoincidenciaLocalBusqueda(texto: string): boolean {
+  for (const seccion of SECCIONES_MODAL) {
+    const rows = filasSeccionModal(seccion)
+    for (let i = 0; i < rows.length; i++) {
+      if (textoBusquedaFila(seccion, rows[i]).includes(texto)) return true
+      const cache = liquidacionDetalleCache.get(`${seccion}-${i}`)
+      if (cache?.some((p: any) => (p.placa ?? '').toUpperCase().includes(texto))) return true
+    }
+  }
+  return false
+}
+
+/** Expande (si no lo está ya) cada fila que matcheó por buscar-placa, y
+ * scrollea a la sección de la primera coincidencia. */
+async function expandirYScrollearMatchesBusqueda(matches: LiquidacionBuscarPlacaMatch[]) {
+  let primeraSeccion: SeccionModal | null = null
+  for (const m of matches) {
+    const rows = filasSeccionModal(m.seccion)
+    const idx = rows.findIndex((r: any) => coincideMatchBusqueda(m, m.seccion, r))
+    if (idx === -1) continue
+    if (!liquidacionExpandido.value[m.seccion].has(idx)) {
+      await toggleExpandFilaLiquidacion(m.seccion, idx)
+    }
+    if (!primeraSeccion) primeraSeccion = m.seccion
+  }
+  if (primeraSeccion) {
+    await nextTick()
+    scrollToSeccionLiquidacion(`liq-seccion-${primeraSeccion}`)
+  }
+}
+
+watch(liquidacionBusqueda, () => {
+  liquidacionBusquedaMatches.value = []
+  liquidacionBusquedaSinResultados.value = false
+  liquidacionBusquedaLoading.value = false
+  if (liquidacionBusquedaTimer) clearTimeout(liquidacionBusquedaTimer)
+
+  const texto = liquidacionBusquedaNormalizada.value
+  if (!texto) return
+  if (hayCoincidenciaLocalBusqueda(texto)) return // A/B ya resolvieron — no golpea backend
+
+  liquidacionBusquedaTimer = setTimeout(async () => {
+    liquidacionBusquedaLoading.value = true
+    try {
+      const res = await getLiquidacionRtmBuscarPlaca(texto, liquidacion.value.desde, liquidacion.value.hasta)
+      // Ignora la respuesta si el usuario ya cambió el texto mientras esperaba.
+      if (liquidacionBusquedaNormalizada.value !== texto) return
+      if (res.matches.length) {
+        liquidacionBusquedaMatches.value = res.matches
+        await expandirYScrollearMatchesBusqueda(res.matches)
+      } else {
+        liquidacionBusquedaSinResultados.value = true
+      }
+    } catch {
+      if (liquidacionBusquedaNormalizada.value === texto) liquidacionBusquedaSinResultados.value = true
+    } finally {
+      if (liquidacionBusquedaNormalizada.value === texto) liquidacionBusquedaLoading.value = false
+    }
+  }, 400)
+})
 
 /** Recarga los datos del modal ya abierto (mismo rango), tras un pago. */
 async function recargarLiquidacion() {
@@ -3949,6 +4752,211 @@ function pagarSeleccionSeccion(seccion: SeccionLiquidacion) {
  * Liquidación (y desde qué sección), para saber qué refrescar/limpiar al
  * confirmar — el resto de callers de abrirDialogAccionMasiva lo dejan null. */
 const liquidacionPagoPendiente = ref<SeccionLiquidacion | null>(null)
+
+/* ── Drill-down a placa (expandir fila) + selección de exportación ──
+ * Ambos son transversales a las 4 tablas del modal (a diferencia de
+ * liquidacionSel, que es "Pagar seleccionados" y sigue siendo estrictamente
+ * por sección — no se toca nada de eso). 'canal' se agrega acá porque Por
+ * canal de captación también entra al drill-down/export, aunque no
+ * participa de Pagar Seleccionados (esa tabla nunca tuvo botón de pago). */
+type SeccionModal = 'canal' | 'descuentos' | SeccionLiquidacion
+
+function filasSeccionModal(seccion: SeccionModal): any[] {
+  if (!liquidacion.value.data) return []
+  if (seccion === 'canal') return liquidacion.value.data.por_canal
+  if (seccion === 'descuentos') return liquidacion.value.data.descuentos
+  return filasSeccion(seccion)
+}
+
+const SECCIONES_MODAL: SeccionModal[] = ['canal', 'descuentos', 'comerciales', 'asesoresConvenio', 'convenios']
+function estadoVacioExport(): Record<SeccionModal, Set<number>> {
+  return { canal: new Set(), descuentos: new Set(), comerciales: new Set(), asesoresConvenio: new Set(), convenios: new Set() }
+}
+
+/** Expandir/colapsar el drill-down de placas de una fila. */
+const liquidacionExpandido = ref<Record<SeccionModal, Set<number>>>(estadoVacioExport())
+const liquidacionDetalleLoading = ref<Record<string, boolean>>({})
+// any[]: el array es homogéneo en runtime (todo LiquidacionPlacaComision,
+// todo LiquidacionPlacaCanal o todo LiquidacionPlacaDescuento según la
+// sección), pero forzar el tipo union obligaría a castear en cada acceso
+// del template (p.comision_id/p.ticket_id/p.tiene_comision).
+const liquidacionDetalleCache = new Map<string, any[]>()
+
+function limpiarExpansionYExportLiquidacion() {
+  liquidacionExpandido.value = estadoVacioExport()
+  liquidacionDetalleLoading.value = {}
+  liquidacionDetalleCache.clear()
+  liquidacionSeleccionExport.value = estadoVacioExport()
+  liquidacionBusqueda.value = ''
+  liquidacionBusquedaMatches.value = []
+  liquidacionBusquedaSinResultados.value = false
+  liquidacionBusquedaLoading.value = false
+}
+
+async function toggleExpandFilaLiquidacion(seccion: SeccionModal, idx: number) {
+  const set = liquidacionExpandido.value[seccion]
+  if (set.has(idx)) {
+    set.delete(idx)
+    liquidacionExpandido.value = { ...liquidacionExpandido.value }
+    return
+  }
+  set.add(idx)
+  liquidacionExpandido.value = { ...liquidacionExpandido.value }
+
+  const key = `${seccion}-${idx}`
+  if (liquidacionDetalleCache.has(key)) return
+  liquidacionDetalleLoading.value = { ...liquidacionDetalleLoading.value, [key]: true }
+  try {
+    const row = filasSeccionModal(seccion)[idx]
+    if (seccion === 'canal') {
+      const res = await getLiquidacionRtmDetallePlacasCanal(row.canal, liquidacion.value.desde, liquidacion.value.hasta)
+      liquidacionDetalleCache.set(key, res.placas)
+    } else if (seccion === 'descuentos') {
+      const res = await getLiquidacionRtmDetallePlacasDescuento(row.codigo, liquidacion.value.desde, liquidacion.value.hasta)
+      liquidacionDetalleCache.set(key, res.placas)
+    } else {
+      const res = await getLiquidacionRtmDetallePlacas(row.comision_ids ?? [])
+      liquidacionDetalleCache.set(key, res.placas)
+    }
+  } catch {
+    liquidacionDetalleCache.set(key, [])
+  } finally {
+    liquidacionDetalleLoading.value = { ...liquidacionDetalleLoading.value, [key]: false }
+  }
+}
+function liquidacionDetalleFilas(seccion: SeccionModal, idx: number) {
+  return liquidacionDetalleCache.get(`${seccion}-${idx}`) ?? []
+}
+
+/** Selección transversal para "Exportar placas seleccionadas" — un solo
+ * botón visible en el modal, no uno por sección. Cualquier fila es
+ * seleccionable acá (a diferencia de liquidacionSel, que solo habilita
+ * filas con comisiones pagables): exportar placas no depende del estado
+ * de pago de la comisión. */
+const liquidacionSeleccionExport = ref<Record<SeccionModal, Set<number>>>(estadoVacioExport())
+function toggleFilaExport(seccion: SeccionModal, idx: number) {
+  const set = liquidacionSeleccionExport.value[seccion]
+  if (set.has(idx)) set.delete(idx)
+  else set.add(idx)
+  liquidacionSeleccionExport.value = { ...liquidacionSeleccionExport.value }
+}
+function seccionTodosSeleccionadosExport(seccion: SeccionModal): boolean {
+  const filas = filasSeccionModal(seccion)
+  if (!filas.length) return false
+  return filas.every((_, i) => liquidacionSeleccionExport.value[seccion].has(i))
+}
+function toggleSeleccionarTodosExport(seccion: SeccionModal) {
+  const filas = filasSeccionModal(seccion)
+  const set = liquidacionSeleccionExport.value[seccion]
+  if (seccionTodosSeleccionadosExport(seccion)) filas.forEach((_, i) => set.delete(i))
+  else filas.forEach((_, i) => set.add(i))
+  liquidacionSeleccionExport.value = { ...liquidacionSeleccionExport.value }
+}
+
+const totalSeleccionadosExport = computed(() =>
+  SECCIONES_MODAL.reduce((acc, s) => acc + liquidacionSeleccionExport.value[s].size, 0)
+)
+
+const liquidacionExportLoading = ref(false)
+async function exportarPlacasSeleccionadas() {
+  if (!totalSeleccionadosExport.value || !liquidacion.value.data) return
+  liquidacionExportLoading.value = true
+  try {
+    const data = liquidacion.value.data
+    const secciones: ExportarPlacasBody['secciones'] = {}
+
+    const canalIdx = [...liquidacionSeleccionExport.value.canal]
+    if (canalIdx.length) {
+      secciones.canal = canalIdx.map((i) => ({
+        nombre: CANAL_LABELS_LIQUIDACION[data.por_canal[i].canal] ?? data.por_canal[i].canal,
+        canal: data.por_canal[i].canal,
+      }))
+    }
+    const descuentosIdx = [...liquidacionSeleccionExport.value.descuentos]
+    if (descuentosIdx.length) {
+      secciones.descuentos = descuentosIdx.map((i) => ({
+        nombre: data.descuentos[i].nombre,
+        codigo: data.descuentos[i].codigo,
+      }))
+    }
+    const comercialesIdx = [...liquidacionSeleccionExport.value.comerciales]
+    if (comercialesIdx.length) {
+      secciones.comerciales = comercialesIdx.map((i) => ({
+        nombre: data.comerciales[i].asesor_nombre,
+        comision_ids: data.comerciales[i].comision_ids,
+      }))
+    }
+    const asesoresConvenioIdx = [...liquidacionSeleccionExport.value.asesoresConvenio]
+    if (asesoresConvenioIdx.length) {
+      secciones.asesoresConvenio = asesoresConvenioIdx.map((i) => ({
+        nombre: data.asesores_convenio[i].asesor_nombre,
+        comision_ids: data.asesores_convenio[i].comision_ids,
+      }))
+    }
+    const conveniosIdx = [...liquidacionSeleccionExport.value.convenios]
+    if (conveniosIdx.length) {
+      secciones.convenios = conveniosIdx.map((i) => ({
+        nombre: data.convenios[i].convenio_nombre,
+        comision_ids: data.convenios[i].comision_ids,
+      }))
+    }
+
+    const blob = await exportarLiquidacionRtmPlacas({
+      fecha_inicio: liquidacion.value.desde,
+      fecha_fin: liquidacion.value.hasta,
+      secciones,
+    })
+    const nombreArchivo = `Liquidacion_Placas_${liquidacion.value.desde.replace(/-/g, '')}_a_${liquidacion.value.hasta.replace(/-/g, '')}.xlsx`
+    descargarBlob(blob, nombreArchivo)
+  } catch {
+    snack.text = 'Error al exportar las placas seleccionadas'
+    snack.color = 'error'
+    snack.show = true
+  } finally {
+    liquidacionExportLoading.value = false
+  }
+}
+
+/** Totales de fila TOTAL por tabla del modal — SIEMPRE sobre todas las
+ * filas visibles del período (no solo lo seleccionado para pagar/exportar),
+ * sumando directo las columnas que ya trae cada respuesta (cantidad_vehiculos
+ * = turnos por fila), sin queries nuevas al backend. */
+const totalesPorCanal = computed(() => {
+  const rows = liquidacion.value.data?.por_canal ?? []
+  return {
+    cantidad: rows.reduce((acc, r) => acc + r.cantidad, 0),
+    monto: rows.reduce((acc, r) => acc + r.monto, 0),
+  }
+})
+const totalesDescuentos = computed(() => {
+  const rows = liquidacion.value.data?.descuentos ?? []
+  return {
+    cantidad: rows.reduce((acc, r) => acc + r.cantidad, 0),
+    monto: rows.reduce((acc, r) => acc + r.total_descuentos, 0),
+  }
+})
+const totalesComerciales = computed(() => {
+  const rows = liquidacion.value.data?.comerciales ?? []
+  return {
+    cantidad: rows.reduce((acc, r) => acc + r.cantidad_vehiculos, 0),
+    monto: rows.reduce((acc, r) => acc + r.total_asesor, 0),
+  }
+})
+const totalesAsesoresConvenio = computed(() => {
+  const rows = liquidacion.value.data?.asesores_convenio ?? []
+  return {
+    cantidad: rows.reduce((acc, r) => acc + r.cantidad_vehiculos, 0),
+    montoAsesor: rows.reduce((acc, r) => acc + r.total_asesor, 0),
+    montoConvenio: rows.reduce((acc, r) => acc + r.total_convenio, 0),
+  }
+})
+const totalesConvenios = computed(() => {
+  const rows = liquidacion.value.data?.convenios ?? []
+  return {
+    cantidad: rows.reduce((acc, r) => acc + r.cantidad_vehiculos, 0),
+    monto: rows.reduce((acc, r) => acc + r.total_convenio, 0),
+  }
+})
 
 /* ── Filtro rápido de fecha (Diario/Semanal/Quincenal/Mensual) ── */
 type FiltroRapidoFecha = '' | 'DIARIO' | 'SEMANAL' | 'QUINCENAL' | 'MENSUAL'
@@ -4113,11 +5121,26 @@ watch([() => filters.value.desde, () => filters.value.hasta], ([desde, hasta]) =
  * período aquí NO toca ni recarga la tabla de atrás.
  */
 /** Diario de la lista principal ('DIARIO') pasa a 2 conceptos claros en el modal: 'HOY' y 'DIA_ANTERIOR'. */
-type FiltroRapidoFechaLiquidacion = '' | 'HOY' | 'DIA_ANTERIOR' | 'SEMANAL' | 'QUINCENAL' | 'MENSUAL'
+type FiltroRapidoFechaLiquidacion = '' | 'HOY' | 'DIA_ANTERIOR' | 'SEMANAL' | 'QUINCENAL' | 'MENSUAL' | 'PERSONALIZADO'
 const liquidacionFiltroRapido = ref<FiltroRapidoFechaLiquidacion>('')
 const liquidacionMenuSemanal = ref(false)
 const liquidacionMenuQuincenal = ref(false)
 const menuMensualLiquidacion = ref(false)
+
+/** Rango libre ("Personalizado"): inputs propios, separados de
+ * liquidacion.desde/hasta — solo se aplican al hacer click en "Aplicar",
+ * para no disparar una consulta por cada tecla en el date picker. */
+const liquidacionPersonalizadoDesde = ref('')
+const liquidacionPersonalizadoHasta = ref('')
+function abrirPersonalizadoLiquidacion() {
+  liquidacionPersonalizadoDesde.value = liquidacion.value.desde
+  liquidacionPersonalizadoHasta.value = liquidacion.value.hasta
+  liquidacionFiltroRapido.value = 'PERSONALIZADO'
+}
+function aplicarPersonalizadoLiquidacion() {
+  if (!liquidacionPersonalizadoDesde.value || !liquidacionPersonalizadoHasta.value) return
+  cambiarPeriodoLiquidacion(liquidacionPersonalizadoDesde.value, liquidacionPersonalizadoHasta.value)
+}
 
 const liquidacionMesObjetivo = computed(() => {
   if (liquidacion.value.desde) {
@@ -4145,6 +5168,7 @@ async function cambiarPeriodoLiquidacion(desde: string, hasta: string) {
   liquidacion.value.loading = true
   liquidacion.value.error = ''
   limpiarSeleccionLiquidacion()
+  limpiarExpansionYExportLiquidacion()
   try {
     liquidacion.value.data = await getLiquidacionRtm(desde, hasta)
   } catch {

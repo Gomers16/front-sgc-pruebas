@@ -63,6 +63,26 @@ async function apiFetchBlob(endpoint: string, query?: Record<string, unknown>): 
   return await res.blob()
 }
 
+/** Variante POST de apiFetchBlob — para exports cuyo body es demasiado
+ * grande/estructurado para ir en query string (ej. listas de ids agrupadas). */
+async function apiFetchBlobPost(endpoint: string, body: unknown): Promise<Blob> {
+  const url = `${BASE}${endpoint}`
+  const token = sessionStorage.getItem('token') || localStorage.getItem('token')
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+  if (token) (headers as Record<string, string>).Authorization = `Bearer ${token}`
+
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) })
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`
+    try {
+      const err = await res.json()
+      msg = (err as Record<string, unknown>)?.message as string || JSON.stringify(err)
+    } catch {}
+    throw new Error(msg)
+  }
+  return await res.blob()
+}
+
 /* ============================ Tipos ============================ */
 
 export interface IngresoCanal {
@@ -624,11 +644,21 @@ export interface LiquidacionConvenio extends ComisionConvenio {
   monto_pagable: number
 }
 
+export interface LiquidacionDescuentoTipo {
+  codigo: string
+  nombre: string
+  descripcion: string | null
+  cantidad: number
+  total_descuentos: number
+  promedio: number
+}
+
 export interface LiquidacionRtmResponse {
   fecha_inicio: string
   fecha_fin: string
   resumen: { total_comisiones: number; total_monto: number }
   por_canal: LiquidacionPorCanal[]
+  descuentos: LiquidacionDescuentoTipo[]
   comerciales: LiquidacionComercial[]
   asesores_convenio: LiquidacionAsesorConvenio[]
   convenios: LiquidacionConvenio[]
@@ -641,6 +671,116 @@ export async function getLiquidacionRtm(
   return apiFetch<LiquidacionRtmResponse>('/reportes-admin/liquidacion-rtm', {
     query: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
   })
+}
+
+/* ======================= Drill-down a placa (modal Liquidación RTM) ======================= */
+
+export interface LiquidacionPlacaComision {
+  comision_id: number
+  placa: string | null
+  tipo_vehiculo: string | null
+  estado: string
+  fecha_calculo: string | null
+  monto: number
+  monto_asesor: number
+  monto_convenio: number
+  escenario: 'NUEVO' | 'RECURRENTE' | 'RECUPERACION'
+  con_convenio: boolean
+  estado_continuidad: 'CONTINUA' | 'ROTA' | 'SIN_EVIDENCIA' | null
+  asesor_nombre: string | null
+  convenio_nombre: string | null
+}
+
+export interface LiquidacionPlacaCanal {
+  ticket_id: number
+  placa: string | null
+  tipo_vehiculo: string | null
+  fecha_pago: string | null
+  monto: number
+}
+
+/** Cruce descuento → comisión real de esa placa: tiene_comision=false
+ * distingue "nunca hubo comisión" (hubo_comision_anulada=false) de "hubo
+ * una comisión pero quedó anulada sin reemplazo" (hubo_comision_anulada=true). */
+export interface LiquidacionPlacaDescuento {
+  ticket_id: number
+  placa: string | null
+  tipo_vehiculo: string | null
+  fecha_pago: string | null
+  monto_descuento: number
+  tiene_comision: boolean
+  hubo_comision_anulada: boolean
+  comision_estado: string | null
+  monto_asesor: number | null
+  monto_convenio: number | null
+  regla_aplicada: string | null
+}
+
+export async function getLiquidacionRtmDetallePlacas(
+  comisionIds: number[]
+): Promise<{ placas: LiquidacionPlacaComision[] }> {
+  return apiFetch('/reportes-admin/liquidacion-rtm/detalle-placas', {
+    query: { comision_ids: comisionIds.join(',') },
+  })
+}
+
+export async function getLiquidacionRtmDetallePlacasCanal(
+  canal: string,
+  fechaInicio: string,
+  fechaFin: string
+): Promise<{ placas: LiquidacionPlacaCanal[] }> {
+  return apiFetch('/reportes-admin/liquidacion-rtm/detalle-placas-canal', {
+    query: { canal, fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+  })
+}
+
+/** Clave de negocio de dónde aparece una placa dentro del modal — no un
+ * índice de array (frágil), el frontend la resuelve buscando la clave en
+ * los arrays ya cargados de liquidacion.value.data. */
+export interface LiquidacionBuscarPlacaMatch {
+  seccion: 'canal' | 'descuentos' | 'comerciales' | 'asesoresConvenio' | 'convenios'
+  canal?: string
+  codigo?: string
+  asesor_id?: number
+  convenio_id?: number
+}
+
+export async function getLiquidacionRtmBuscarPlaca(
+  placa: string,
+  fechaInicio: string,
+  fechaFin: string
+): Promise<{ matches: LiquidacionBuscarPlacaMatch[] }> {
+  return apiFetch('/reportes-admin/liquidacion-rtm/buscar-placa', {
+    query: { placa, fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+  })
+}
+
+export async function getLiquidacionRtmDetallePlacasDescuento(
+  codigo: string,
+  fechaInicio: string,
+  fechaFin: string
+): Promise<{ placas: LiquidacionPlacaDescuento[] }> {
+  return apiFetch('/reportes-admin/liquidacion-rtm/detalle-placas-descuento', {
+    query: { codigo, fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+  })
+}
+
+/** Body del export transversal: cualquiera de las 4 claves puede venir
+ * vacía/ausente si el usuario no seleccionó nada en esa sección. */
+export interface ExportarPlacasBody {
+  fecha_inicio: string
+  fecha_fin: string
+  secciones: {
+    canal?: { nombre: string; canal: string }[]
+    descuentos?: { nombre: string; codigo: string }[]
+    comerciales?: { nombre: string; comision_ids: number[] }[]
+    asesoresConvenio?: { nombre: string; comision_ids: number[] }[]
+    convenios?: { nombre: string; comision_ids: number[] }[]
+  }
+}
+
+export async function exportarLiquidacionRtmPlacas(body: ExportarPlacasBody): Promise<Blob> {
+  return apiFetchBlobPost('/reportes-admin/liquidacion-rtm/exportar-placas', body)
 }
 
 /* ======================= Historial de Liquidaciones ======================= */
