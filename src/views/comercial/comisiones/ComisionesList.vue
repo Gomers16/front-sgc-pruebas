@@ -920,6 +920,23 @@
                         <span v-else class="text-medium-emphasis text-caption">—</span>
                       </template>
 
+                      <template #item.descuento_caja="{ item }">
+                        <template v-if="item.descuento_codigo_aplicado">
+                          <v-chip size="x-small" color="purple-darken-1" variant="tonal" prepend-icon="mdi-cash-register" class="descuento-chip">
+                            {{ item.descuento_codigo_aplicado }}
+                            <template v-if="item.descuento_monto_aplicado">
+                              · {{ formatCOP(item.descuento_monto_aplicado) }}
+                            </template>
+                          </v-chip>
+                          <v-tooltip v-if="item.descuento_observacion_caja" :text="item.descuento_observacion_caja" location="top">
+                            <template #activator="{ props }">
+                              <v-icon v-bind="props" size="14" color="medium-emphasis" class="mt-1">mdi-information-outline</v-icon>
+                            </template>
+                          </v-tooltip>
+                        </template>
+                        <span v-else class="text-medium-emphasis text-caption">—</span>
+                      </template>
+
                       <template #item.valor_unitario="{ item }">
                         {{ formatCOP(Number(item.monto_asesor ?? item.valor_unitario ?? 0)) }}
                       </template>
@@ -1155,6 +1172,23 @@
                   </v-icon>
                   {{ item.descuento_origen === 'dateo' ? 'Pre-marcado' : 'En caja' }}
                 </div>
+              </template>
+              <span v-else class="text-medium-emphasis text-caption">—</span>
+            </template>
+
+            <template #item.descuento_caja="{ item }">
+              <template v-if="item.descuento_codigo_aplicado">
+                <v-chip size="x-small" color="purple-darken-1" variant="tonal" prepend-icon="mdi-cash-register" class="descuento-chip">
+                  {{ item.descuento_codigo_aplicado }}
+                  <template v-if="item.descuento_monto_aplicado">
+                    · {{ formatCOP(item.descuento_monto_aplicado) }}
+                  </template>
+                </v-chip>
+                <v-tooltip v-if="item.descuento_observacion_caja" :text="item.descuento_observacion_caja" location="top">
+                  <template #activator="{ props }">
+                    <v-icon v-bind="props" size="14" color="medium-emphasis" class="mt-1">mdi-information-outline</v-icon>
+                  </template>
+                </v-tooltip>
               </template>
               <span v-else class="text-medium-emphasis text-caption">—</span>
             </template>
@@ -3046,6 +3080,7 @@ const headers = [
   { title: 'Asesor', key: 'asesor', sortable: false },
   { title: 'Convenio', key: 'convenio', sortable: false },
   { title: 'Descuento', key: 'descuento', sortable: false },
+  { title: 'Descuento en caja', key: 'descuento_caja', sortable: false },
   { title: 'Dateo', key: 'valor_unitario', sortable: true },
   { title: 'Incentivo', key: 'valor_cliente', sortable: false },
   { title: 'Total', key: 'valor_total', sortable: true },

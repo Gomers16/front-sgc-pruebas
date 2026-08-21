@@ -165,6 +165,12 @@ export interface ComisionListItem {
    *  'caja'  = aplicado manualmente por el cajero al confirmar el ticket */
  descuento_origen?: 'dateo' | 'caja' | null
   dateo_observacion?: string | null
+
+  /** 🆕 Snapshot del descuento real aplicado en caja (código + observación,
+   * independiente de la relación ticket/dateo → descuento de arriba). El
+   * monto ya viene en descuento_monto_aplicado. */
+  descuento_codigo_aplicado?: string | null
+  descuento_observacion_caja?: string | null
 }
 
 export interface ComisionDetail extends ComisionListItem {
@@ -498,6 +504,14 @@ function mapComisionToListItem(api: unknown): ComisionListItem {
     descuento,
  descuento_origen,
     dateo_observacion: (a.dateo_observacion ?? a.dateoObservacion ?? null) as string | null,
+
+    // 🆕 Snapshot del descuento real aplicado en caja
+    descuento_codigo_aplicado: (a.descuento_codigo_aplicado ??
+      a.descuentoCodigoAplicado ??
+      null) as string | null,
+    descuento_observacion_caja: (a.descuento_observacion_caja ??
+      a.descuentoObservacionCaja ??
+      null) as string | null,
   }
 }
 

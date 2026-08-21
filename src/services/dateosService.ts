@@ -74,6 +74,13 @@ export interface Dateo extends DateoImagenMeta {
   documentosInformativos?: DocumentoInformativoTicket[]
   descuento_id?: number | null
   descuento?: { id: number; codigo: string; nombre: string } | null
+  /** 🆕 Descuento real aplicado en caja (snapshot, independiente del pre-marcado) */
+  descuento_caja_id?: number | null
+  descuento_caja?: { id: number; codigo: string; nombre: string } | null
+  descuento_caja_observacion?: string | null
+  descuento_caja_aplicado_at?: string | null
+  /** Monto del descuento en caja, resuelto desde la comisión asociada al dateo */
+  descuento_caja_monto?: number | null
   servicio_id?: number | null
   servicio?: { id: number; codigoServicio: string; nombreServicio: string } | null
   es_avance?: boolean

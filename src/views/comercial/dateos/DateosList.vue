@@ -403,6 +403,30 @@
         </template>
 
 
+        <!-- Descuento en caja (real, sincronizado desde la comisión/caja) -->
+        <template #item.descuento_caja="{ item }">
+          <div v-if="item.descuento_caja_id" class="d-flex align-center gap-1">
+            <v-chip
+              size="x-small"
+              color="purple-darken-1"
+              variant="tonal"
+              prepend-icon="mdi-cash-register"
+              class="font-weight-600"
+            >
+              {{ item.descuento_caja?.codigo ?? `#${item.descuento_caja_id}` }}
+              <template v-if="item.descuento_caja_monto">
+                · {{ formatCOP(item.descuento_caja_monto) }}
+              </template>
+            </v-chip>
+            <v-tooltip v-if="item.descuento_caja_observacion" :text="item.descuento_caja_observacion" location="top">
+              <template #activator="{ props }">
+                <v-icon v-bind="props" size="16" color="medium-emphasis">mdi-information-outline</v-icon>
+              </template>
+            </v-tooltip>
+          </div>
+          <span v-else class="text-medium-emphasis">—</span>
+        </template>
+
         <!-- Turno -->
         <template #item.turnoInfo="{ item }">
           <div v-if="item.turnoInfo" class="d-flex align-center justify-center" style="gap:6px">
@@ -1069,6 +1093,7 @@ import {
   type HistoricoPreviewResponse,
   type HistoricoImportarResponse,
 } from '@/services/dateosService'
+import { formatCOP } from '@/services/comisionesService'
 import { listConveniosAsignados } from '@/services/conveniosService'
 import { ClientesService } from '@/services/clientes_service'
 import { calcularReservaCountdown } from '@/composables/useReservaCountdown'
@@ -1485,6 +1510,7 @@ const headers = [
   { title: 'Tipo', key: 'tipo_dateo', sortable: false },  // ← AGREGAR ESTA LÍNEA
   { title: 'Estado', key: 'resultado', sortable: true },
   { title: 'Descuento', key: 'descuento', sortable: false },
+  { title: 'Descuento en caja', key: 'descuento_caja', sortable: false },
   { title: 'Turno', key: 'turnoInfo', sortable: false, align: 'center' as const },
   { title: 'Exclusividad', key: 'exclusividad', sortable: false, align: 'center' as const },
   { title: 'Acciones', key: 'acciones', sortable: false, align: 'end' as const },
