@@ -944,7 +944,6 @@
                                 <th>Fecha</th>
                                 <th>Clasificación</th>
                                 <th>Asesor</th>
-                                <th>Continuidad</th>
                                 <th class="text-right">Valor a pagar (convenio)</th>
                               </tr>
                             </thead>
@@ -970,11 +969,10 @@
                                 <td>{{ formatDate(p.fecha_calculo) }}</td>
                                 <td>{{ ESCENARIO_LABELS[p.escenario] }}</td>
                                 <td>{{ p.asesor_nombre ?? '—' }}</td>
-                                <td>{{ p.estado_continuidad ? CONTINUIDAD_LABELS[p.estado_continuidad] : '—' }}</td>
                                 <td class="text-right">{{ formatCOP(p.monto_convenio) }}</td>
                               </tr>
                               <tr v-if="!liquidacionDetalleFilas('convenios', i).length">
-                                <td colspan="8" class="text-center text-medium-emphasis">Sin placas en este período</td>
+                                <td colspan="7" class="text-center text-medium-emphasis">Sin placas en este período</td>
                               </tr>
                             </tbody>
                           </v-table>
