@@ -717,6 +717,9 @@ export interface LiquidacionPlacaDescuento {
   monto_asesor: number | null
   monto_convenio: number | null
   regla_aplicada: string | null
+  agente_comercial_nombre: string | null
+  asesor_convenio_nombre: string | null
+  convenio_nombre: string | null
 }
 
 export async function getLiquidacionRtmDetallePlacas(
