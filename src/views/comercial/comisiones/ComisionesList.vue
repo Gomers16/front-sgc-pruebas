@@ -376,6 +376,8 @@
                               <tr>
                                 <th>Placa</th>
                                 <th>Vehículo</th>
+                                <th v-if="canalTieneAsesor(c.canal)">Asesor</th>
+                                <th v-if="canalTieneConvenio(c.canal)">Convenio</th>
                                 <th>Fecha pago</th>
                                 <th class="text-right">Monto</th>
                               </tr>
@@ -388,11 +390,18 @@
                               >
                                 <td>{{ p.placa ?? '—' }}</td>
                                 <td>{{ p.tipo_vehiculo ?? '—' }}</td>
+                                <td v-if="canalTieneAsesor(c.canal)">{{ asesorNombrePorCanal(c.canal, p) }}</td>
+                                <td v-if="canalTieneConvenio(c.canal)">{{ p.convenio_nombre ?? '—' }}</td>
                                 <td>{{ formatDate(p.fecha_pago) }}</td>
                                 <td class="text-right">{{ formatCOP(p.monto) }}</td>
                               </tr>
                               <tr v-if="!liquidacionDetalleFilas('canal', i).length">
-                                <td colspan="4" class="text-center text-medium-emphasis">Sin placas en este período</td>
+                                <td
+                                  :colspan="4 + (canalTieneAsesor(c.canal) ? 1 : 0) + (canalTieneConvenio(c.canal) ? 1 : 0)"
+                                  class="text-center text-medium-emphasis"
+                                >
+                                  Sin placas en este período
+                                </td>
                               </tr>
                             </tbody>
                           </v-table>
@@ -3558,6 +3567,7 @@ import {
   type TrazabilidadRtmResponse,
   type ExportarPlacasBody,
   type LiquidacionBuscarPlacaMatch,
+  type LiquidacionPlacaCanal,
 } from '@/services/reportesAdminService'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import TurnoDetalleDialog, { type Turno as TurnoDetalle } from '@/components/rtm/TurnoDetalleDialog.vue'
@@ -4462,6 +4472,15 @@ const CANAL_LABELS_LIQUIDACION: Record<string, string> = {
   TELEMERCADEO: 'Telemercadeo',
   REDES: 'Redes / Marketing Digital',
 }
+
+// Columnas "Asesor"/"Convenio" del drill-down de "Por canal": condicionales
+// por canal de la fila padre (todo el grupo comparte el mismo canal, a
+// diferencia de "Descuentos" donde un mismo grupo mezcla canales).
+const canalTieneAsesor = (canal: string): boolean =>
+  canal === 'ASESOR_COMERCIAL' || canal === 'ASESOR_CONVENIO'
+const canalTieneConvenio = (canal: string): boolean => canal === 'ASESOR_CONVENIO'
+const asesorNombrePorCanal = (canal: string, p: LiquidacionPlacaCanal): string =>
+  (canal === 'ASESOR_COMERCIAL' ? p.agente_comercial_nombre : p.asesor_convenio_nombre) ?? '—'
 
 /** Clasificación de negocio de la placa en el drill-down (Comerciales /
  * Asesores Convenio / Convenios) — derivada de turnos_rtms.es_recurrente/
