@@ -3568,7 +3568,6 @@ import {
   type TrazabilidadRtmResponse,
   type ExportarPlacasBody,
   type LiquidacionBuscarPlacaMatch,
-  type LiquidacionPlacaCanal,
 } from '@/services/reportesAdminService'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import TurnoDetalleDialog, { type Turno as TurnoDetalle } from '@/components/rtm/TurnoDetalleDialog.vue'
