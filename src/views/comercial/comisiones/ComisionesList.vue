@@ -5757,7 +5757,12 @@ async function ejecutarAccionMasiva() {
       tipo_periodo: esDelModalLiquidacion && liquidacionFiltroRapido.value
         ? (liquidacionFiltroRapido.value === 'HOY' || liquidacionFiltroRapido.value === 'DIA_ANTERIOR'
             ? 'DIARIO'
-            : liquidacionFiltroRapido.value)
+            // 'PERSONALIZADO' no es un tipo_periodo que el backend reconozca —
+            // se manda undefined y el backend calcula fecha_inicio/fecha_fin
+            // a partir de fecha_inicio/fecha_fin (ya se envían siempre abajo).
+            : liquidacionFiltroRapido.value === 'PERSONALIZADO'
+              ? undefined
+              : liquidacionFiltroRapido.value)
         : undefined,
       fecha_inicio: esDelModalLiquidacion ? liquidacion.value.desde : undefined,
       fecha_fin: esDelModalLiquidacion ? liquidacion.value.hasta : undefined,
