@@ -639,6 +639,7 @@
                               <tr
                                 v-for="p in liquidacionDetalleFilas('comerciales', i)"
                                 :key="p.comision_id"
+                                v-show="filaPlacaVisiblePorEstado(p.estado)"
                                 :class="{ 'bg-yellow-lighten-3': liquidacionPlacaResaltada && (p.placa ?? '').toUpperCase().includes(liquidacionPlacaResaltada) }"
                               >
                                 <td>{{ p.placa ?? '—' }}</td>
@@ -790,6 +791,7 @@
                               <tr
                                 v-for="p in liquidacionDetalleFilas('asesoresConvenio', i)"
                                 :key="p.comision_id"
+                                v-show="filaPlacaVisiblePorEstado(p.estado)"
                                 :class="{ 'bg-yellow-lighten-3': liquidacionPlacaResaltada && (p.placa ?? '').toUpperCase().includes(liquidacionPlacaResaltada) }"
                               >
                                 <td>{{ p.placa ?? '—' }}</td>
@@ -941,6 +943,7 @@
                               <tr
                                 v-for="p in liquidacionDetalleFilas('convenios', i)"
                                 :key="p.comision_id"
+                                v-show="filaPlacaVisiblePorEstado(p.estado)"
                                 :class="{ 'bg-yellow-lighten-3': liquidacionPlacaResaltada && (p.placa ?? '').toUpperCase().includes(liquidacionPlacaResaltada) }"
                               >
                                 <td>{{ p.placa ?? '—' }}</td>
@@ -4566,14 +4569,16 @@ function coincideMatchBusqueda(m: LiquidacionBuscarPlacaMatch, seccion: SeccionM
 
 /** true si la fila debe verse (v-show) dado el texto buscado — combina A+B+C. */
 /** Filtro de estado de comisión (Pendiente/Aprobada/Pagada/Anulada) —
- * combina en AND con el buscador de texto. A nivel de PLACA (dentro del
- * drill-down ya expandido) se aplica con filaPlacaVisiblePorEstado(); acá
- * se aplica a nivel de FILA AGREGADA usando el campo `estados` (el mismo
- * GROUP_CONCAT que ya alimenta la columna "Estados" en pantalla) — si
- * ninguna placa de esa fila tiene el estado filtrado, se oculta la fila
- * completa para no invitar a expandir algo que va a salir vacío. Canal y
- * Descuentos no traen `estados` a nivel agregado, así que sus filas nunca
- * se ocultan acá (Descuentos sí se filtra a nivel de placa). */
+ * combina en AND con el buscador de texto. Se aplica en dos niveles:
+ * 1) A nivel de PLACA (dentro del drill-down ya expandido) con
+ *    filaPlacaVisiblePorEstado(), cableado en Comerciales, Asesores
+ *    Convenio, Convenios y Descuentos.
+ * 2) A nivel de FILA AGREGADA usando el campo `estados` (el mismo
+ *    GROUP_CONCAT que ya alimenta la columna "Estados" en pantalla) — si
+ *    ninguna placa de esa fila tiene el estado filtrado, se oculta la fila
+ *    completa para no invitar a expandir algo que va a salir vacío. Canal
+ *    y Descuentos no traen `estados` a nivel agregado, así que sus filas
+ *    nunca se ocultan por esta vía (se filtran solo a nivel de placa). */
 const OPCIONES_ESTADO_LIQUIDACION = [
   { title: 'Todos', value: '' },
   { title: 'Pendiente', value: 'PENDIENTE' },
@@ -4791,6 +4796,7 @@ function limpiarExpansionYExportLiquidacion() {
   liquidacionBusquedaMatches.value = []
   liquidacionBusquedaSinResultados.value = false
   liquidacionBusquedaLoading.value = false
+  liquidacionFiltroEstado.value = ''
 }
 
 async function toggleExpandFilaLiquidacion(seccion: SeccionModal, idx: number) {
