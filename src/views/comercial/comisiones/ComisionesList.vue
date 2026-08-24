@@ -632,6 +632,8 @@
                                 <th>Estado</th>
                                 <th>Fecha</th>
                                 <th>Clasificación</th>
+                                <th>Convenio</th>
+                                <th>Continuidad</th>
                                 <th class="text-right">Valor a pagar (asesor)</th>
                               </tr>
                             </thead>
@@ -644,21 +646,24 @@
                               >
                                 <td>{{ p.placa ?? '—' }}</td>
                                 <td>{{ p.tipo_vehiculo ?? '—' }}</td>
-                                <td><v-chip :color="estadoColor(p.estado)" size="x-small" variant="flat">{{ p.estado }}</v-chip></td>
-                                <td>{{ formatDate(p.fecha_calculo) }}</td>
                                 <td>
-                                  <div class="d-flex align-center gap-1 flex-wrap">
-                                    <v-chip :color="ESCENARIO_COLORS[p.escenario]" size="x-small" variant="flat">{{ ESCENARIO_LABELS[p.escenario] }}</v-chip>
-                                    <v-chip v-if="p.con_convenio" size="x-small" variant="outlined" color="orange">Convenio: {{ p.convenio_nombre ?? '—' }}</v-chip>
-                                    <v-chip v-if="p.estado_continuidad" :color="CONTINUIDAD_COLORS[p.estado_continuidad]" size="x-small" variant="flat">
-                                      {{ CONTINUIDAD_LABELS[p.estado_continuidad] }}
-                                    </v-chip>
+                                  <div class="d-flex align-center gap-1">
+                                    <v-chip :color="estadoColor(p.estado)" size="x-small" variant="flat">{{ p.estado }}</v-chip>
+                                    <v-tooltip v-if="tienePagoConvenio(p)" :text="metaPagoTooltip(p)" location="top" max-width="280">
+                                      <template #activator="{ props }">
+                                        <v-icon v-bind="props" size="14" color="medium-emphasis">mdi-credit-card-outline</v-icon>
+                                      </template>
+                                    </v-tooltip>
                                   </div>
                                 </td>
+                                <td>{{ formatDate(p.fecha_calculo) }}</td>
+                                <td>{{ ESCENARIO_LABELS[p.escenario] }}</td>
+                                <td>{{ p.con_convenio ? (p.convenio_nombre ?? '—') : '—' }}</td>
+                                <td>{{ p.estado_continuidad ? CONTINUIDAD_LABELS[p.estado_continuidad] : '—' }}</td>
                                 <td class="text-right">{{ formatCOP(p.monto_asesor) }}</td>
                               </tr>
                               <tr v-if="!liquidacionDetalleFilas('comerciales', i).length">
-                                <td colspan="6" class="text-center text-medium-emphasis">Sin placas en este período</td>
+                                <td colspan="8" class="text-center text-medium-emphasis">Sin placas en este período</td>
                               </tr>
                             </tbody>
                           </v-table>
@@ -783,6 +788,7 @@
                                 <th>Estado</th>
                                 <th>Fecha</th>
                                 <th>Clasificación</th>
+                                <th>Continuidad</th>
                                 <th class="text-right">Valor a pagar (asesor)</th>
                                 <th class="text-right">Valor a pagar (convenio)</th>
                               </tr>
@@ -796,22 +802,24 @@
                               >
                                 <td>{{ p.placa ?? '—' }}</td>
                                 <td>{{ p.tipo_vehiculo ?? '—' }}</td>
-                                <td><v-chip :color="estadoColor(p.estado)" size="x-small" variant="flat">{{ p.estado }}</v-chip></td>
-                                <td>{{ formatDate(p.fecha_calculo) }}</td>
                                 <td>
-                                  <div class="d-flex align-center gap-1 flex-wrap">
-                                    <v-chip :color="ESCENARIO_COLORS[p.escenario]" size="x-small" variant="flat">{{ ESCENARIO_LABELS[p.escenario] }}</v-chip>
-                                    <v-chip v-if="p.con_convenio" size="x-small" variant="outlined" color="orange">Convenio: {{ p.convenio_nombre ?? '—' }}</v-chip>
-                                    <v-chip v-if="p.estado_continuidad" :color="CONTINUIDAD_COLORS[p.estado_continuidad]" size="x-small" variant="flat">
-                                      {{ CONTINUIDAD_LABELS[p.estado_continuidad] }}
-                                    </v-chip>
+                                  <div class="d-flex align-center gap-1">
+                                    <v-chip :color="estadoColor(p.estado)" size="x-small" variant="flat">{{ p.estado }}</v-chip>
+                                    <v-tooltip v-if="tienePagoConvenio(p)" :text="metaPagoTooltip(p)" location="top" max-width="280">
+                                      <template #activator="{ props }">
+                                        <v-icon v-bind="props" size="14" color="medium-emphasis">mdi-credit-card-outline</v-icon>
+                                      </template>
+                                    </v-tooltip>
                                   </div>
                                 </td>
+                                <td>{{ formatDate(p.fecha_calculo) }}</td>
+                                <td>{{ ESCENARIO_LABELS[p.escenario] }}</td>
+                                <td>{{ p.estado_continuidad ? CONTINUIDAD_LABELS[p.estado_continuidad] : '—' }}</td>
                                 <td class="text-right">{{ formatCOP(p.monto_asesor) }}</td>
                                 <td class="text-right">{{ formatCOP(p.monto_convenio) }}</td>
                               </tr>
                               <tr v-if="!liquidacionDetalleFilas('asesoresConvenio', i).length">
-                                <td colspan="7" class="text-center text-medium-emphasis">Sin placas en este período</td>
+                                <td colspan="8" class="text-center text-medium-emphasis">Sin placas en este período</td>
                               </tr>
                             </tbody>
                           </v-table>
@@ -934,8 +942,9 @@
                                 <th>Vehículo</th>
                                 <th>Estado</th>
                                 <th>Fecha</th>
-                                <th>Asesor</th>
                                 <th>Clasificación</th>
+                                <th>Asesor</th>
+                                <th>Continuidad</th>
                                 <th class="text-right">Valor a pagar (convenio)</th>
                               </tr>
                             </thead>
@@ -948,21 +957,24 @@
                               >
                                 <td>{{ p.placa ?? '—' }}</td>
                                 <td>{{ p.tipo_vehiculo ?? '—' }}</td>
-                                <td><v-chip :color="estadoColor(p.estado)" size="x-small" variant="flat">{{ p.estado }}</v-chip></td>
-                                <td>{{ formatDate(p.fecha_calculo) }}</td>
-                                <td>{{ p.asesor_nombre ?? '—' }}</td>
                                 <td>
-                                  <div class="d-flex align-center gap-1 flex-wrap">
-                                    <v-chip :color="ESCENARIO_COLORS[p.escenario]" size="x-small" variant="flat">{{ ESCENARIO_LABELS[p.escenario] }}</v-chip>
-                                    <v-chip v-if="p.estado_continuidad" :color="CONTINUIDAD_COLORS[p.estado_continuidad]" size="x-small" variant="flat">
-                                      {{ CONTINUIDAD_LABELS[p.estado_continuidad] }}
-                                    </v-chip>
+                                  <div class="d-flex align-center gap-1">
+                                    <v-chip :color="estadoColor(p.estado)" size="x-small" variant="flat">{{ p.estado }}</v-chip>
+                                    <v-tooltip v-if="tienePagoConvenio(p)" :text="metaPagoTooltip(p)" location="top" max-width="280">
+                                      <template #activator="{ props }">
+                                        <v-icon v-bind="props" size="14" color="medium-emphasis">mdi-credit-card-outline</v-icon>
+                                      </template>
+                                    </v-tooltip>
                                   </div>
                                 </td>
+                                <td>{{ formatDate(p.fecha_calculo) }}</td>
+                                <td>{{ ESCENARIO_LABELS[p.escenario] }}</td>
+                                <td>{{ p.asesor_nombre ?? '—' }}</td>
+                                <td>{{ p.estado_continuidad ? CONTINUIDAD_LABELS[p.estado_continuidad] : '—' }}</td>
                                 <td class="text-right">{{ formatCOP(p.monto_convenio) }}</td>
                               </tr>
                               <tr v-if="!liquidacionDetalleFilas('convenios', i).length">
-                                <td colspan="7" class="text-center text-medium-emphasis">Sin placas en este período</td>
+                                <td colspan="8" class="text-center text-medium-emphasis">Sin placas en este período</td>
                               </tr>
                             </tbody>
                           </v-table>
@@ -4461,20 +4473,21 @@ const ESCENARIO_LABELS: Record<string, string> = {
   RECURRENTE: 'Recurrente',
   RECUPERACION: 'Recuperación',
 }
-const ESCENARIO_COLORS: Record<string, string> = {
-  NUEVO: 'blue',
-  RECURRENTE: 'teal',
-  RECUPERACION: 'purple',
-}
 const CONTINUIDAD_LABELS: Record<string, string> = {
   CONTINUA: 'Continúa',
   ROTA: 'Rota',
   SIN_EVIDENCIA: 'Sin evidencia',
 }
-const CONTINUIDAD_COLORS: Record<string, string> = {
-  CONTINUA: 'success',
-  ROTA: 'error',
-  SIN_EVIDENCIA: 'grey',
+
+/** Tooltip de método de pago del convenio — se muestra con un ícono junto
+ * al Estado en vez de una columna nueva, para no volver a saturar la tabla
+ * tras la simplificación ya hecha. ("Reporta" se investigó y se descartó:
+ * es un campo de ruteo interno inconsistente, no se muestra en ningún lado.) */
+function tienePagoConvenio(p: any): boolean {
+  return Boolean(p.metodo_pago)
+}
+function metaPagoTooltip(p: any): string {
+  return `Método de pago: ${p.metodo_pago}${p.numero_metodo_pago ? ` (${p.numero_metodo_pago})` : ''}`
 }
 
 interface LiquidacionState {
