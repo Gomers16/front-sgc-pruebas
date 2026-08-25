@@ -443,6 +443,48 @@
       </v-card>
     </v-dialog>
 
+    <!-- 🆕 Modal excepción DATEO_ACTIVO (SUPER_ADMIN / GERENCIA) -->
+    <v-dialog
+      v-model="showExcepcionDateoActivoDialog"
+      :max-width="$vuetify.display.xs ? '100%' : '500'"
+      :fullscreen="$vuetify.display.xs"
+      persistent
+    >
+      <v-card>
+        <v-card-title class="d-flex align-center justify-center py-4 py-sm-6">
+          <v-icon color="warning" :size="$vuetify.display.xs ? 48 : 60">mdi-shield-alert</v-icon>
+        </v-card-title>
+        <v-card-text class="text-center px-3 px-sm-4">
+          <div class="text-subtitle-1 text-sm-h5 font-weight-bold mb-2">
+            Esta placa ya tiene un dateo activo
+          </div>
+          <div class="text-caption text-sm-body-1 text-medium-emphasis">
+            {{ excepcionDateoActivoMensaje }}
+            ¿Deseas continuar de todos modos?
+          </div>
+        </v-card-text>
+        <v-card-actions class="justify-center pb-4 pb-sm-6 gap-2">
+          <v-btn
+            variant="text"
+            :size="$vuetify.display.xs ? 'small' : 'default'"
+            :disabled="loading"
+            @click="showExcepcionDateoActivoDialog = false"
+          >
+            Cancelar
+          </v-btn>
+          <v-btn
+            color="warning"
+            variant="elevated"
+            :size="$vuetify.display.xs ? 'small' : 'default'"
+            :loading="loading"
+            @click="confirmarExcepcionDateoActivo"
+          >
+            Continuar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">
       {{ snackbar.text }}
@@ -521,6 +563,15 @@ const snackbar = ref<{ show: boolean; text: string; color: 'success' | 'error' }
 const showExcepcionRtmDialog = ref(false)
 const excepcionRtmDias = ref<number | null>(null)
 const excepcionAprobada = ref(false)
+
+/* ===== 🆕 Excepción DATEO_ACTIVO (SUPER_ADMIN / GERENCIA) =====
+ * Mismo patrón que la excepción RTM_VIGENTE de arriba, pero para el 409 de
+ * "dateo activo" (placa+servicio con un dateo ya consumido/exitoso dentro de
+ * su TTL post-consumo). Reutiliza el mismo flag confirmar_excepcion al
+ * reenviar — ver submitDateo() — y el mismo excepcionAprobada.value para el
+ * mensaje del diálogo de éxito, que ya es genérico para ambos casos. */
+const showExcepcionDateoActivoDialog = ref(false)
+const excepcionDateoActivoMensaje = ref<string | null>(null)
 
 /* ===== RTM verificación ===== */
 const rtmInfo = ref<RtmVerificacion | null>(null)
@@ -1071,6 +1122,9 @@ async function handleSubmit() {
     if (code === 'RTM_VIGENTE_EXCEPCION_DISPONIBLE' && esPrivilegiado.value) {
       excepcionRtmDias.value = data?.diasExcedidos ?? null
       showExcepcionRtmDialog.value = true
+    } else if (code === 'DATEO_ACTIVO_EXCEPCION_DISPONIBLE' && esPrivilegiado.value) {
+      excepcionDateoActivoMensaje.value = data?.message ?? null
+      showExcepcionDateoActivoDialog.value = true
     } else {
       console.error('❌ Error creando dateo:', error)
       const fallback = error instanceof Error ? error.message : 'Error al crear el dateo'
@@ -1092,6 +1146,26 @@ async function confirmarExcepcionRtm() {
     showSuccessDialog.value = true
   } catch (error) {
     console.error('❌ Error creando dateo con excepción RTM:', error)
+    const data = error instanceof HttpError ? (error.data as { message?: string } | undefined) : undefined
+    const fallback = error instanceof Error ? error.message : 'Error al crear el dateo'
+    const msg = data?.message || fallback
+    snackbar.value = { show: true, color: 'error', text: msg }
+  } finally {
+    loading.value = false
+  }
+}
+
+/** 🆕 El admin confirmó crear el dateo aunque la placa+servicio tenga un
+ * dateo activo (consumido/exitoso) dentro de su TTL post-consumo. */
+async function confirmarExcepcionDateoActivo() {
+  showExcepcionDateoActivoDialog.value = false
+  loading.value = true
+  try {
+    await submitDateo(true)
+    excepcionAprobada.value = true
+    showSuccessDialog.value = true
+  } catch (error) {
+    console.error('❌ Error creando dateo con excepción de dateo activo:', error)
     const data = error instanceof HttpError ? (error.data as { message?: string } | undefined) : undefined
     const fallback = error instanceof Error ? error.message : 'Error al crear el dateo'
     const msg = data?.message || fallback
