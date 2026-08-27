@@ -1,5 +1,5 @@
 // src/services/ticketsService.ts
-import { get, post, patch } from '@/services/http'
+import { get, post, patch, del } from '@/services/http'
 
 export type TicketEstado = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'RESUELTO' | 'CERRADO'
 
@@ -67,6 +67,8 @@ export interface TicketDetalleExcepcionDateo {
   horaIntentoDateo: string
   minutosTotales: number
   minutosExceso: number
+  /** Snapshot calculado y persistido AL CREAR el ticket — no se recalcula. */
+  dentroVentana: boolean
   observacion: string
   evidenciaChatUrl: string
   evidenciaGrupoWhatsappUrl: string
@@ -133,14 +135,57 @@ export interface AprobarTicketExcepcionDateoResponse {
   dateoId: number
   comisionId: number | null
   montoCargoPenalizacion: number
-  saldoActual: number
+  saldoActual: number | null
+  dentroVentana: boolean
 }
 
-export function aprobarTicketExcepcionDateo(id: number, porcentajePenalizacion: number) {
-  return patch<AprobarTicketExcepcionDateoResponse, { porcentaje_penalizacion: number }>(
+/**
+ * porcentajePenalizacion se ignora en el backend cuando el ticket está
+ * dentro de ventana (detalle.dentroVentana === true) — se puede omitir en
+ * ese caso, ver TicketExcepcionDateoDetail.vue.
+ */
+export function aprobarTicketExcepcionDateo(id: number, porcentajePenalizacion?: number) {
+  return patch<AprobarTicketExcepcionDateoResponse, { porcentaje_penalizacion?: number }>(
     `/api/tickets-excepcion-dateo/${id}/aprobar`,
-    { porcentaje_penalizacion: porcentajePenalizacion }
+    porcentajePenalizacion === undefined ? {} : { porcentaje_penalizacion: porcentajePenalizacion }
   )
+}
+
+/* ===================== Config: ventana de ticket sin penalización ===================== */
+
+export function getVentanaTicketGlobal() {
+  return get<{ minutos_ventana: number }>('/api/tickets/config/ventana')
+}
+
+export function setVentanaTicketGlobal(minutosVentana: number) {
+  return post<{ minutos_ventana: number }, { minutos_ventana: number }>(
+    '/api/tickets/config/ventana',
+    { minutos_ventana: minutosVentana }
+  )
+}
+
+export interface VentanaTicketAsesorRow {
+  id: number
+  asesor_id: number
+  asesor_nombre: string | null
+  minutos_ventana: number | null
+}
+
+export function getVentanaTicketAsesores(asesorId?: number) {
+  return get<{ data: VentanaTicketAsesorRow[] }>('/api/tickets/config/ventana/asesores', {
+    params: asesorId ? { asesorId } : {},
+  })
+}
+
+export function setVentanaTicketAsesor(asesorId: number, minutosVentana: number | null) {
+  return post<
+    { id: number; asesor_id: number; minutos_ventana: number | null },
+    { asesor_id: number; minutos_ventana: number | null }
+  >('/api/tickets/config/ventana/asesores', { asesor_id: asesorId, minutos_ventana: minutosVentana })
+}
+
+export function deleteVentanaTicketAsesor(id: number) {
+  return del<{ message: string }>(`/api/tickets/config/ventana/asesores/${id}`)
 }
 
 export function rechazarTicketExcepcionDateo(id: number, motivo: string) {

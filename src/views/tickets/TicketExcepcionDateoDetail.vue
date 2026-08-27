@@ -45,12 +45,24 @@
               <div class="font-weight-600">{{ formatDateTime(detalle.horaIntentoDateo) }}</div>
             </v-col>
             <v-col cols="12" sm="4">
-              <div class="text-caption text-medium-emphasis">Exceso sobre el límite (40 min)</div>
-              <div class="font-weight-600 text-error">
-                {{ detalle.minutosExceso }} min ({{ detalle.minutosTotales }} min en total)
+              <div class="text-caption text-medium-emphasis">Minutos transcurridos</div>
+              <div class="font-weight-600" :class="detalle.dentroVentana ? '' : 'text-error'">
+                {{ detalle.minutosTotales }} min
+                <template v-if="!detalle.dentroVentana">({{ detalle.minutosExceso }} min de exceso)</template>
               </div>
             </v-col>
           </v-row>
+
+          <!-- 🆕 Indicador dentro/fuera de ventana — visible sea cual sea el estado del ticket -->
+          <v-alert
+            :type="detalle.dentroVentana ? 'success' : 'warning'"
+            :icon="detalle.dentroVentana ? 'mdi-clock-check-outline' : 'mdi-clock-alert-outline'"
+            variant="tonal"
+            density="compact"
+            class="mb-2"
+          >
+            <strong>{{ detalle.dentroVentana ? 'Dentro de ventana — sin penalización' : 'Fuera de ventana — requiere penalización' }}</strong>
+          </v-alert>
 
           <v-divider class="my-3" />
 
@@ -78,7 +90,12 @@
           <template v-if="ticket.estado === 'APROBADO'">
             <v-alert type="success" variant="tonal" density="compact">
               Aprobado por {{ nombreUsuario(detalle.aprobadoPor) }} el {{ formatDateTime(detalle.aprobadoAt) }}
-              · Penalización aplicada: <strong>{{ detalle.porcentajePenalizacion }}%</strong>
+              <template v-if="detalle.porcentajePenalizacion !== null">
+                · Penalización aplicada: <strong>{{ detalle.porcentajePenalizacion }}%</strong>
+              </template>
+              <template v-else>
+                · Sin penalización (dentro de ventana)
+              </template>
             </v-alert>
           </template>
           <template v-else-if="ticket.estado === 'RECHAZADO'">
@@ -93,6 +110,7 @@
             <div class="text-subtitle-2 font-weight-bold mb-2">Resolver ticket</div>
 
             <v-text-field
+              v-if="!detalle.dentroVentana"
               v-model.number="porcentaje"
               label="% de penalización"
               type="number"
@@ -103,6 +121,9 @@
               style="max-width: 220px"
               class="mb-3"
             />
+            <div v-else class="text-caption text-medium-emphasis mb-3">
+              Este ticket está dentro de ventana — se aprueba sin penalización.
+            </div>
 
             <div class="d-flex gap-2 flex-wrap">
               <v-btn
@@ -172,9 +193,15 @@
       <v-card>
         <v-card-title class="text-subtitle-1 font-weight-bold">Confirmar aprobación</v-card-title>
         <v-card-text>
-          Esto crea/vincula el dateo, puede generar comisión y registra un CARGO de
-          <strong>{{ porcentaje }}%</strong> en el saldo de penalizaciones del comercial. No se puede
-          deshacer. ¿Continuar?
+          <template v-if="detalle?.dentroVentana">
+            Esto crea/vincula el dateo y puede generar comisión — sin penalización, el ticket
+            quedó dentro de ventana. No se puede deshacer. ¿Continuar?
+          </template>
+          <template v-else>
+            Esto crea/vincula el dateo, puede generar comisión y registra un CARGO de
+            <strong>{{ porcentaje }}%</strong> en el saldo de penalizaciones del comercial. No se puede
+            deshacer. ¿Continuar?
+          </template>
         </v-card-text>
         <v-card-actions class="justify-end">
           <v-btn variant="text" @click="confirmarAprobar = false">Cancelar</v-btn>
@@ -289,9 +316,10 @@ const esResolutor = computed(() => {
   return auth.hasAnyRole(roles)
 })
 
-const porcentajeValido = computed(
-  () => porcentaje.value !== null && porcentaje.value >= 0 && porcentaje.value <= 100
-)
+const porcentajeValido = computed(() => {
+  if (detalle.value?.dentroVentana) return true
+  return porcentaje.value !== null && porcentaje.value >= 0 && porcentaje.value <= 100
+})
 
 const evidenciasList = computed(() => {
   if (!detalle.value) return []
@@ -320,10 +348,14 @@ async function cargar() {
 }
 
 async function aprobar() {
-  if (!ticket.value || !porcentajeValido.value || porcentaje.value === null) return
+  if (!ticket.value || !porcentajeValido.value) return
+  if (!detalle.value?.dentroVentana && porcentaje.value === null) return
   aprobando.value = true
   try {
-    await aprobarTicketExcepcionDateo(ticket.value.id, porcentaje.value)
+    await aprobarTicketExcepcionDateo(
+      ticket.value.id,
+      detalle.value?.dentroVentana ? undefined : (porcentaje.value ?? undefined)
+    )
     confirmarAprobar.value = false
     snackbar.value = { show: true, color: 'success', text: 'Ticket aprobado correctamente.' }
     await cargar()

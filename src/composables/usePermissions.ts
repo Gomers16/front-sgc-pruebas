@@ -170,6 +170,14 @@ export function usePermissions() {
         'GERENCIA'
       ]),
 
+      // ==================== TICKETS ====================
+      // Configurar ventana global / overrides por asesor del ticket de
+      // Excepción de Dateo sin penalización
+      configurarVentanaTicket: () => auth.hasAnyRole([
+        'SUPER_ADMIN',
+        'GERENCIA'
+      ]),
+
       // ==================== COMISIONES ====================
       verComisiones: () => auth.hasAnyRole([
         'SUPER_ADMIN',
