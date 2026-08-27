@@ -10,6 +10,7 @@ Este documento es una referencia completa del frontend, organizada por **módulo
 > Actualizado: 2026-08-23 (modal Liquidación RTM v2 en `ComisionesList.vue`: drill-down de placas por sección con lazy-load, buscador de placa/nombre, filtro por estado de comisión, selección transversal a las 5 secciones y exportación a Excel enriquecida vía `reportesAdminService.ts` — 5 funciones nuevas; fix de `tipo_periodo` que dejaba pasar `'PERSONALIZADO'` sin normalizar hacia el backend en `pagarMasivo`).
 > Actualizado: 2026-08-24 (documentación de `descuento_observacion` en Facturación, sección 3 — campo ya existía en el código desde antes, este es un gap de documentación preexistente que se cierra ahora aprovechando la sincronización pruebas→producción local, no una feature nueva de esta fecha).
 > Actualizado: 2026-08-25 (`DateoCreate.vue`, sección 4.2: nuevo modal de excepción para el 409 `DATEO_ACTIVO_EXCEPCION_DISPONIBLE` — SUPER_ADMIN/GERENCIA pueden confirmar la creación de un dateo aunque exista uno activo/consumido dentro de su ventana de bloqueo. Mismo patrón que el modal ya existente de `RTM_VIGENTE_EXCEPCION_DISPONIBLE` — **gap de documentación detectado de paso:** ese modal RTM_VIGENTE nunca había tenido su propia entrada en este mapa, no se documenta retroactivamente aquí, solo se señala. Complementa el fix de backend de la misma sesión — cadencia de bloqueo por servicio (60 días PREV/PERI), ver módulo Captación Comercial del mapa de backend. Caso real: placa WTP333).
+> Actualizado: 2026-08-27 (nueva sección 9, **Tickets Internos**: bandeja `/tickets`, creación/detalle del tipo `EXCEPCION_DATEO` — ventana de 40 minutos para vincular un dateo a un turno ya en sede, con evidencia fotográfica y aprobación/rechazo con % de penalización — y su integración con `DateoCreate.vue` sección 4.2 [modal `VENTANA_DATEO_VENCIDA`] y la nueva pestaña "Penalizaciones" de `FichaComercialAsesor.vue`. Sección "Patrones establecidos" renumerada de 9 a 10, subsecciones 9.x → 10.x, para dejarle el número 9 al módulo nuevo).
 
 ## Índice
 
@@ -21,8 +22,9 @@ Este documento es una referencia completa del frontend, organizada por **módulo
 6. [Reportes Administrativos](#6-reportes-administrativos)
 7. [Dashboard](#7-dashboard)
 8. [Autenticación / Login](#8-autenticación--login)
-9. [Archivos sin usar / fuera del router](#archivos-sin-usar--fuera-del-router)
-10. [Patrones establecidos del proyecto](#9-patrones-establecidos-del-proyecto)
+9. [Tickets Internos](#9-tickets-internos)
+10. [Archivos sin usar / fuera del router](#archivos-sin-usar--fuera-del-router)
+11. [Patrones establecidos del proyecto](#10-patrones-establecidos-del-proyecto)
 
 Roles del sistema (ver `src/stores/AuthStore.ts` y `src/composables/usePermissions.ts`): `SUPER_ADMIN`, `GERENCIA`, `OPERATIVO_TURNOS`, `TRAMITADOR`, `CONTABILIDAD`, `COMERCIAL`, `TALENTO_HUMANO`.
 
@@ -102,7 +104,7 @@ Cola de gestión de trámites de tránsito (matrículas, traspasos, cambios de p
 - Rutas **sí** tienen `meta.roles` en el router: `['SUPER_ADMIN','GERENCIA','OPERATIVO_TURNOS','TRAMITADOR']` para ambas rutas de Trámites.
 - ⚠️ **Inconsistencia:** `usePermissions.ts::verTramites()` (usado para mostrar/ocultar el link en `AppSidebar.vue`) **no incluye** `OPERATIVO_TURNOS`, pero el `meta.roles` de la ruta sí — un usuario con ese rol no ve el link en el menú pero, si el guard de rutas se activa alguna vez (hoy no existe, ver 9.9), sí podría entrar por URL directa. Revisar cuál de las dos listas es la intención real antes de tocar este módulo.
 
-### Patrones específicos de RTM/Trámites (adicionales a los generales, ver sección 9)
+### Patrones específicos de RTM/Trámites (adicionales a los generales, ver sección 10)
 
 - **Captura de evidencia por cámara/portapapeles**: patrón repetido en `CertificacionTurnoView.vue` y `FacturacionSubirTicket.vue` — dropzone con `@dragover/@drop`, listener global `window.addEventListener('paste', onPaste)` para Ctrl+V, controles de zoom/rotación con CSS `transform`, y `URL.createObjectURL(file)` para preview antes de subir.
 - **Autocompletado por búsqueda unificada**: `CrearTurno.vue` dispara `BusquedasService.unificada()` con debounce implícito (`watch` sobre placa/teléfono validados por regex) y cancela requests en vuelo con `AbortController` — patrón a reutilizar para cualquier futuro autocompletado por placa/teléfono.
@@ -269,7 +271,7 @@ Ciclo de vida de empleados/asesores: datos personales, roles, contratos laborale
 
 ### Componentes reutilizables
 
-`contratos/FiltrosContratos.vue` (selects razón social/usuario/tipo), `FormularioContrato.vue` (formulario grande con v-model múltiples), `PasosContrato.vue` (checklist de pasos con archivo), `AnexoContrato.vue` (subir/reemplazar PDF del contrato), `HistorialContratos.vue` (tabla histórica del usuario), `DialogoCertificado.vue`/`DialogoRecomendacion.vue` (modales genéricos de subir/ver/eliminar archivo, reutilizados para las 5 afiliaciones), `UI/ConfirmarDialogo.vue` (ver patrones, sección 9).
+`contratos/FiltrosContratos.vue` (selects razón social/usuario/tipo), `FormularioContrato.vue` (formulario grande con v-model múltiples), `PasosContrato.vue` (checklist de pasos con archivo), `AnexoContrato.vue` (subir/reemplazar PDF del contrato), `HistorialContratos.vue` (tabla histórica del usuario), `DialogoCertificado.vue`/`DialogoRecomendacion.vue` (modales genéricos de subir/ver/eliminar archivo, reutilizados para las 5 afiliaciones), `UI/ConfirmarDialogo.vue` (ver patrones, sección 10).
 
 ### Roles
 
@@ -340,6 +342,34 @@ Login por correo/contraseña contra backend con JWT bearer; sin registro de usua
 
 ---
 
+## 9. Tickets Internos
+
+Bandeja general de tickets internos, abierta a todos los roles autenticados (el backend filtra qué ve/crea/resuelve cada uno server-side, no el frontend). Hoy solo existe un tipo sembrado en el catálogo `tipos_ticket` — `EXCEPCION_DATEO` (migración `1787000000006_insert_tipo_ticket_excepcion_dateo.ts`) — pero el modelo está pensado para más tipos futuros: la bandeja deriva sus pestañas de `GET /tipos-ticket`, no de un enum hardcodeado.
+
+### Vistas principales
+
+- **`views/tickets/TicketsList.vue`** — `/tickets` (route `TicketsList`) — bandeja general: lista de tickets visibles para el usuario, con pestañas por tipo (derivadas de `GET /tipos-ticket` — los tipos que el usuario puede *crear* — no de los tickets ya cargados, así un tipo con cero tickets todavía aparece si el usuario tiene permiso de crearlo), contador por pestaña, filtro por estado (Pendiente/Aprobado/Rechazado/Resuelto/Cerrado), y botón "Nuevo ticket" (si solo hay un tipo disponible navega directo a su vista de creación vía un mapeo `codigo → nombre de ruta` hardcodeado en el propio componente — cada tipo nuevo de todos modos va a necesitar su propia vista Vue; si hubiera más de un tipo disponible abriría un menú, hoy nunca ocurre). Visible en el sidebar (ícono `mdi-ticket-confirmation-outline`) para todos los roles autenticados, sin gating por rol.
+- **`views/tickets/TicketExcepcionDateoCreate.vue`** — `/tickets/excepcion-dateo/nuevo` (route `TicketExcepcionDateoCreate`, roles `COMERCIAL, SUPER_ADMIN, GERENCIA`) — formulario de creación del único tipo hoy disponible. Se llega acá **solo** desde el modal "Ya pasó la ventana de 40 minutos" (`VENTANA_DATEO_VENCIDA`) de `DateoCreate.vue` (ver sección 4.2), que precarga `turno_id` y `placa` por query string. Pide observación obligatoria y 4 slots de evidencia fotográfica (captura del chat con el cliente, captura del grupo de WhatsApp, captura del bloqueo/excepción — los 3 obligatorios — y evidencia de calamidad, opcional), cada uno con dropzone drag&drop + pegar Ctrl+V (mientras el slot esté enfocado) + click, mismo patrón de captura que `CertificacionTurnoView.vue`/`FacturacionSubirTicket.vue` (ver patrones, sección 10.8). SUPER_ADMIN/GERENCIA ven un selector adicional "a nombre de qué comercial se registra este ticket" (autocomplete combinando `listAgentesCaptacion('ASESOR_COMERCIAL')` + `listAgentesCaptacion('ASESOR_CONVENIO')`, ordenados alfabéticamente); COMERCIAL no ve ese campo — el backend infiere el `comercial_id` de su propia sesión y rechaza si el creador es SUPER_ADMIN/GERENCIA sin `comercial_id` explícito en el body (`tickets_excepcion_dateo_controller.ts::crear()`). Al enviar sube las evidencias con `uploadsService.uploadImage` y llama `crearTicketExcepcionDateo`, luego navega al detalle del ticket recién creado.
+- **`views/tickets/TicketExcepcionDateoDetail.vue`** — `/tickets/:id` (route `TicketDetalle`, cualquier autenticado, `props: true`) — detalle del ticket: placa/turno/comercial, ventana de tiempo (hora de ingreso del turno, hora del intento de dateo, minutos de exceso sobre el límite de 40), observación, y las 3-4 evidencias como miniaturas (click abre la imagen original en pestaña nueva). Si el ticket ya está `APROBADO` o `RECHAZADO` es de **solo lectura para todos los roles sin excepción** — ni quien lo creó ni quien lo resolvió ven acciones — y el backend además rechaza con 400 cualquier `PATCH /aprobar` o `/rechazar` sobre un ticket que no esté `PENDIENTE`, así que no depende solo de ocultar los botones en el frontend. Si está `PENDIENTE` y el usuario tiene alguno de los `rolesResuelve` del tipo de ticket (hoy `SUPER_ADMIN, GERENCIA`), aparecen las acciones de resolución: campo "% de penalización" (0-100) + botón **Aprobar** (diálogo de confirmación que advierte explícitamente que la acción crea/vincula el dateo, puede generar comisión, y registra un CARGO por ese porcentaje en el saldo de penalizaciones del comercial — "no se puede deshacer") o botón **Rechazar** (exige un motivo en texto). Cualquier usuario con acceso al ticket puede agregar comentarios (`POST /api/tickets/comentarios`), visibles también para quien luego lo revise.
+
+### Servicio
+
+- **`services/ticketsService.ts`**: `listTiposTicket()` → `GET /api/tipos-ticket` (catálogo ya filtrado server-side por `roles_creador` del rol autenticado — el frontend no vuelve a filtrar); `listTickets(params)` → `GET /api/tickets` (bandeja, filtrable por `tipo_ticket_id`/`estado`/`creado_por_id`); `getTicket(id)` → `GET /api/tickets/:id`; `agregarComentario(ticketId, mensaje)` → `POST /api/tickets/comentarios`; `crearTicketExcepcionDateo(payload)` → `POST /api/tickets-excepcion-dateo`; `aprobarTicketExcepcionDateo(id, porcentajePenalizacion)` → `PATCH /api/tickets-excepcion-dateo/:id/aprobar`; `rechazarTicketExcepcionDateo(id, motivo)` → `PATCH /api/tickets-excepcion-dateo/:id/rechazar`; `getSaldoPenalizaciones(asesorId)` → `GET /api/saldo-penalizaciones/:asesorId`; `cobrarSaldoPenalizaciones(asesorId, payload)` → `POST /api/saldo-penalizaciones/:asesorId/cobrar`.
+
+### Integración con Comercial → Dateos y Ficha del Asesor
+
+- **`DateoCreate.vue`** (ver sección 4.2): cuando el turno ya lleva más de 40 minutos en sede sin dateo vinculado (409 `VENTANA_DATEO_VENCIDA`), a diferencia de los demás modales 409 (`DATEO_ACTIVO_EXCEPCION_DISPONIBLE`, `RTM_VIGENTE_EXCEPCION_DISPONIBLE`) **no** ofrece ninguna vía de excepción in-place — el modal solo muestra hora de ingreso/intento/exceso y un botón "Crear ticket de excepción" (`irACrearTicketExcepcionDateo()`) que navega a `TicketExcepcionDateoCreate` con `turno_id` y `placa` precargados por query string.
+- **`FichaComercialAsesor.vue`**: pestaña nueva "Penalizaciones" (`v-tab value="penalizaciones"`, visible solo si `puedeVerPenalizaciones`, roles `SUPER_ADMIN, GERENCIA, CONTABILIDAD`) — tarjeta con el saldo actual del asesor, tabla de movimientos (fecha, tipo CARGO/ABONO con chip de color, monto, columna "Origen / Ticket" con link "Ver ticket #N" que navega al detalle cuando el movimiento viene de una penalización o el texto del `origenCobro` si viene de un cobro, saldo resultante), y botón "Cobrar saldo" (deshabilitado si el saldo actual es 0) que abre un diálogo para descontar el saldo vía `COMISION` (exige primero verificar que el asesor cumplió meta ese mes/año reutilizando `GET /reportes-admin/meta-comercial/resumen` — sin endpoint nuevo — y solo habilita el envío si el resultado es explícitamente `CUMPLIO`, nunca con `SIN_DATOS` ni sin verificar) o `NOMINA` (sin esa restricción).
+
+### Roles
+
+- Bandeja `/tickets` y detalle `/tickets/:id`: cualquier rol autenticado — el backend filtra server-side qué tickets ve cada uno (`tickets_controller.ts::index()`).
+- Crear ticket Excepción de Dateo (`/tickets/excepcion-dateo/nuevo`): `COMERCIAL, SUPER_ADMIN, GERENCIA` (`meta.roles` en el router, además reforzado server-side).
+- Aprobar/Rechazar Excepción de Dateo: `SUPER_ADMIN, GERENCIA` (`rolesResuelve` del tipo de ticket, sembrado en la migración `...0006_insert_tipo_ticket_excepcion_dateo.ts`; sin `meta.roles` propio en el router porque la ruta `/tickets/:id` es compartida por cualquier tipo de ticket futuro — el gating de las acciones de resolución es dentro del componente).
+- Ver/cobrar saldo de penalizaciones (pestaña "Penalizaciones" en `FichaComercialAsesor.vue`, endpoints `/api/saldo-penalizaciones/*`): `SUPER_ADMIN, GERENCIA, CONTABILIDAD` — mismos roles que gestionan comisiones.
+
+---
+
 ## Archivos sin usar / fuera del router
 
 - **`views/Vistadesarrollo.vue`** — pantalla genérica "🚧 ¡Estamos Mejorando! 🚧" (placeholder de módulo en construcción, con botón "Volver"). **No está registrada en `src/router/index.ts`** ni referenciada desde ningún otro archivo (`grep` de `Vistadesarrollo` no arroja resultados fuera de sí misma) — parece un componente huérfano de una funcionalidad retirada o pendiente de enlazar. No borrar sin confirmar con el equipo si estaba pensado para algo específico.
@@ -347,15 +377,15 @@ Login por correo/contraseña contra backend con JWT bearer; sin registro de usua
 
 ---
 
-## 9. Patrones establecidos del proyecto
+## 10. Patrones establecidos del proyecto
 
 Reutilizar estos patrones en cualquier feature nueva en vez de inventar de nuevo.
 
-### 9.1 Motor HTTP
+### 10.1 Motor HTTP
 
 `src/services/http.ts` es el motor central: `get/post/put/patch/del/upload/download`. Autoinyecta `Authorization: Bearer <token>` leyendo `sessionStorage` **o** `localStorage` (en ese orden). Content-Type automático (`application/json` salvo `FormData`). Errores no-2xx lanzan `HttpError(status, message, data)`. **Nuevos servicios deben usar este motor**, no reinventar `fetch()` propio — varios servicios más antiguos (`comisionesService.ts`, `prospectosService.ts`, `comprobantesService.ts`, `reportesAdminService.ts`, `captacionCanalesService.ts`) tienen su propio `apiFetch` duplicado; es deuda técnica, no un patrón a copiar.
 
-### 9.2 Descarga de archivos (Excel/PDF/imágenes)
+### 10.2 Descarga de archivos (Excel/PDF/imágenes)
 
 Cuatro variantes conviven — elegir según de dónde sale el archivo:
 
@@ -368,38 +398,38 @@ Evitar `window.open(url, '_blank')` directo a un endpoint API (usado solo en `Tu
 
 **Impresión (caso especial, sin librería PDF):** `ComprobanteDetalle.vue` (Comercial → Comprobantes) genera un string HTML completo con estilos inline, lo escribe en `window.open('', '_blank')` y dispara `window.print()` en el `onload` de esa ventana — no usa `jspdf` ni pide un PDF al backend.
 
-### 9.3 Feedback de acciones
+### 10.3 Feedback de acciones
 
 - **`v-snackbar`** con `ref({show, message/text, color})` y función `showSnackbar()`/`notify()` (éxito/error/warning, timeout 3000-4000ms) — en absolutamente todas las vistas.
 - **`components/UI/ConfirmarDialogo.vue`** — dialog de confirmación genérico reutilizado en todo el proyecto: `v-model` boolean, props `title/message/confirmText/confirmColor`, emite `confirm`/`cancel`. Patrón estándar: armar `confirmDialogTitle/Message/ConfirmText/ConfirmColor` + una variable `currentAction` (string) antes de abrir el diálogo, y un único `handleConfirmAction()` con `switch`/`if` sobre `currentAction` ejecuta la mutación real tras confirmar. Ejemplo canónico: `UsuariosView.vue`, `TramitesView.vue` (usa el mismo componente pero renombrado `ConfirmarDialogo`).
 - **Locks anti-doble-click**: `isProcessing`/`isSaving` ref + objeto `inFlight = {create, update, delete, ...}` para deshabilitar botones y evitar llamadas duplicadas mientras una request está en vuelo.
 - **Errores HTTP específicos**: inspeccionar `status` (409 = duplicado, 422 = validación con `data.errors[]`) para mensajes de error más útiles que el genérico.
 
-### 9.4 Paginación
+### 10.4 Paginación
 
 **No hay un patrón único** — depende de si el volumen de datos lo justifica:
 - **Client-side** (`v-data-table` con todos los datos en memoria, filtrado/ordenado por `computed`): usado en la mayoría de listados medianos (Usuarios, Turnos del Día, Comisiones simples). No manda `page`/`limit` al backend.
 - **Server-side** (`v-data-table-server` con `@update:options`, `items-length`, `page`/`itemsPerPage` en el request): usado donde el volumen puede ser grande — `FacturacionHistorico.vue` es el ejemplo canónico (`onUpdateOptions` sincroniza `pagination.value` y vuelve a pedir al backend).
 - Los servicios que sí paginan devuelven formas de respuesta inconsistentes entre sí (`{data, total, page, perPage}`, `{data, meta:{total, current_page, per_page}}`, `{items}`, `{rows}`) — casi todos los servicios nuevos incluyen un **normalizador de shape** propio (`normalizeListShape`) para tolerar esto. Si se agrega un endpoint paginado nuevo, preferir devolver `{data, meta:{total, current_page, per_page, last_page}}` (el shape más común) y usar/copiar un `normalizeListShape` existente en el cliente.
 
-### 9.5 Normalización de respuestas
+### 10.5 Normalización de respuestas
 
 Helper `toArray<T>(data)` (o `normalizeListShape`) repetido en casi cada servicio para tolerar que el backend devuelva array plano, `{data:[]}`, `{rows:[]}`, o `{items:[]}` indistintamente. **Copiar este patrón** en servicios nuevos evita romper la UI si el backend cambia el envoltorio de respuesta sin avisar.
 
-### 9.6 Trazabilidad / auditoría ("quién hizo qué")
+### 10.6 Trazabilidad / auditoría ("quién hizo qué")
 
 - **Header `x-actor-id`** o campo `actorId`/`autorizado_por_id`/`confirmado_por_id` inyectado automáticamente vía helper `getActorId()` (busca en `localStorage`/`sessionStorage` bajo varias claves posibles: `actorId`, `userId`, `user`, etc.) en los servicios de Contratos y en el flujo de descuentos de Facturación/Comisiones.
 - **Origen dual de una acción** (patrón "pre-marcado vs. manual"): se repite en Descuentos (`origen: 'dateo' | 'caja'`), Liquidaciones (`tipo_origen: 'MODAL_LIQUIDAR' | 'TABLA_GENERAL' | 'PANEL_ASESOR'`) — siempre guardando quién y cuándo confirmó/autorizó, no solo el resultado final.
 
-### 9.7 Formularios grandes / multi-sección
+### 10.7 Formularios grandes / multi-sección
 
 Contratos y Facturación (subir ticket) comparten el patrón de **formulario largo con validación condicional dinámica** (`vee-validate` con `useForm`/`useField`, reglas que cambian según otro campo — ej. `terminoContrato` obligatorio solo si `tipoContrato==='prestacion'`). Para formularios grandes nuevos, preferir extraer el formulario a un componente propio (`FormularioContrato.vue`) en vez de dejarlo inline en la vista, y usar composables (`useContratosFilters`, `useMaestrosRRHH`, `useContratoTermOptions`) para separar la carga de catálogos del estado del formulario.
 
-### 9.8 Captura de evidencia (imagen)
+### 10.8 Captura de evidencia (imagen)
 
 Dropzone + paste (Ctrl+V) + zoom/rotación es un patrón exacto repetido en 3 lugares (`CertificacionTurnoView.vue`, `FacturacionSubirTicket.vue`, y parcialmente en Dateos): `@dragover.prevent`/`@drop.prevent`, `window.addEventListener('paste', ...)` en `onMounted`/removido en `onBeforeUnmount`, `URL.createObjectURL(file)` para preview, `imageRotation`/`imageScale` refs aplicados vía CSS `transform: rotate() scale()`. Vale la pena extraerlo a un composable/componente compartido si se necesita una cuarta vez.
 
-### 9.9 Guard de rutas
+### 10.9 Guard de rutas
 
 **No existe** `router.beforeEach` en `src/router/index.ts`. El control de acceso es:
 1. Visual: `v-if="can.xxx()"` en `AppSidebar.vue` oculta el link si el rol no aplica, pero la URL sigue siendo navegable directamente si se conoce.
