@@ -386,6 +386,20 @@
           <div v-else class="text-caption text-sm-body-1 text-medium-emphasis">
             El dateo ha sido registrado correctamente en el sistema.
           </div>
+
+          <!-- 🆕 Vinculación retroactiva a un turno walk-in existente -->
+          <v-alert
+            v-if="turnoVinculadoRetroactivo"
+            type="info"
+            variant="tonal"
+            density="comfortable"
+            class="rounded-lg mt-3 text-left"
+          >
+            Este dateo se vinculó automáticamente al turno #{{ turnoVinculadoRetroactivo.turno_id }}
+            que ya estaba en la sede (ingresó a las {{ turnoVinculadoRetroactivo.hora_ingreso }}).
+            Quedaban {{ turnoVinculadoRetroactivo.minutos_restantes_ventana }} minutos de la ventana
+            de 40 minutos.
+          </v-alert>
         </v-card-text>
         <v-card-actions class="justify-center pb-4 pb-sm-6">
           <v-btn
@@ -485,6 +499,72 @@
       </v-card>
     </v-dialog>
 
+    <!-- 🆕 Modal VENTANA_DATEO_VENCIDA — sin opción de continuar, solo ticket -->
+    <v-dialog
+      v-model="showVentanaDateoVencidaDialog"
+      :max-width="$vuetify.display.xs ? '100%' : '500'"
+      :fullscreen="$vuetify.display.xs"
+      persistent
+    >
+      <v-card v-if="ventanaDateoVencidaInfo">
+        <v-card-title class="d-flex align-center justify-center py-4 py-sm-6">
+          <v-icon color="error" :size="$vuetify.display.xs ? 48 : 60">mdi-clock-alert-outline</v-icon>
+        </v-card-title>
+        <v-card-text class="text-center px-3 px-sm-4">
+          <div class="text-subtitle-1 text-sm-h5 font-weight-bold mb-2">
+            Ya pasó la ventana de 40 minutos
+          </div>
+          <div class="text-caption text-sm-body-1 text-medium-emphasis mb-3">
+            Este turno ya está en la sede sin un dateo vinculado, y el plazo para
+            registrarlo directamente ya venció.
+          </div>
+
+          <v-table density="compact" class="text-left mx-auto" style="max-width: 320px">
+            <tbody>
+              <tr>
+                <td class="text-medium-emphasis">Hora de ingreso del turno</td>
+                <td class="font-weight-600">{{ ventanaDateoVencidaInfo.horaIngreso }}</td>
+              </tr>
+              <tr>
+                <td class="text-medium-emphasis">Hora de este intento</td>
+                <td class="font-weight-600">{{ ventanaDateoVencidaInfo.horaIntento }}</td>
+              </tr>
+              <tr>
+                <td class="text-medium-emphasis">Exceso sobre el límite (40 min)</td>
+                <td class="font-weight-600 text-error">
+                  {{ ventanaDateoVencidaInfo.minutosExceso }} min
+                  ({{ ventanaDateoVencidaInfo.minutosTarde }} min transcurridos en total)
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+
+          <div class="text-caption text-medium-emphasis mt-3">
+            Para registrar este dateo ahora hay que crear un ticket de
+            "Excepción de Dateo" — gerencia lo revisa y aplica la penalización
+            correspondiente.
+          </div>
+        </v-card-text>
+        <v-card-actions class="justify-center pb-4 pb-sm-6 gap-2">
+          <v-btn
+            variant="text"
+            :size="$vuetify.display.xs ? 'small' : 'default'"
+            @click="showVentanaDateoVencidaDialog = false"
+          >
+            Cancelar
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="elevated"
+            :size="$vuetify.display.xs ? 'small' : 'default'"
+            @click="irACrearTicketExcepcionDateo"
+          >
+            Crear ticket de excepción
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500">
       {{ snackbar.text }}
@@ -564,6 +644,16 @@ const showExcepcionRtmDialog = ref(false)
 const excepcionRtmDias = ref<number | null>(null)
 const excepcionAprobada = ref(false)
 
+/** 🆕 Aviso "te enganchaste a un turno walk-in existente" — independiente de
+ * excepcionAprobada (pueden convivir: un privilegiado puede confirmar una
+ * excepción RTM_VIGENTE/DATEO_ACTIVO Y además caer en vinculación
+ * retroactiva en el mismo request). Se llena solo si el backend lo manda. */
+const turnoVinculadoRetroactivo = ref<{
+  turno_id: number
+  hora_ingreso: string
+  minutos_restantes_ventana: number
+} | null>(null)
+
 /* ===== 🆕 Excepción DATEO_ACTIVO (SUPER_ADMIN / GERENCIA) =====
  * Mismo patrón que la excepción RTM_VIGENTE de arriba, pero para el 409 de
  * "dateo activo" (placa+servicio con un dateo ya consumido/exitoso dentro de
@@ -572,6 +662,18 @@ const excepcionAprobada = ref(false)
  * mensaje del diálogo de éxito, que ya es genérico para ambos casos. */
 const showExcepcionDateoActivoDialog = ref(false)
 const excepcionDateoActivoMensaje = ref<string | null>(null)
+
+/* ===== 🆕 VENTANA_DATEO_VENCIDA — turno walk-in sin dateo, fuera de los 40
+ * min. Sin "Continuar de todos modos": no hay excepción/override para esta
+ * regla, solo la vía del ticket "Excepción de Dateo". ===== */
+const showVentanaDateoVencidaDialog = ref(false)
+const ventanaDateoVencidaInfo = ref<{
+  turnoId: number
+  horaIngreso: string
+  horaIntento: string
+  minutosTarde: number
+  minutosExceso: number
+} | null>(null)
 
 /* ===== RTM verificación ===== */
 const rtmInfo = ref<RtmVerificacion | null>(null)
@@ -1108,14 +1210,23 @@ async function handleSubmit() {
     }
 
     excepcionAprobada.value = false
-    await submitDateo(false)
+    const dateoCreado = await submitDateo(false)
+    turnoVinculadoRetroactivo.value = dateoCreado?.turno_vinculado_retroactivo ?? null
     showSuccessDialog.value = true
   } catch (error) {
     // http.ts lanza HttpError (fetch-based), no un error estilo axios: el body
     // del backend viene en error.data, NO en error.response.data.
     const data =
       error instanceof HttpError
-        ? (error.data as { code?: string; diasExcedidos?: number; message?: string } | undefined)
+        ? (error.data as {
+            code?: string
+            diasExcedidos?: number
+            message?: string
+            turnoId?: number
+            horaIngreso?: string
+            minutosTarde?: number
+            minutosExceso?: number
+          } | undefined)
         : undefined
     const code = data?.code
 
@@ -1125,6 +1236,20 @@ async function handleSubmit() {
     } else if (code === 'DATEO_ACTIVO_EXCEPCION_DISPONIBLE' && esPrivilegiado.value) {
       excepcionDateoActivoMensaje.value = data?.message ?? null
       showExcepcionDateoActivoDialog.value = true
+    } else if (code === 'VENTANA_DATEO_VENCIDA' && data?.turnoId) {
+      ventanaDateoVencidaInfo.value = {
+        turnoId: data.turnoId,
+        horaIngreso: data.horaIngreso ?? '—',
+        horaIntento: new Intl.DateTimeFormat('es-CO', {
+          timeZone: 'America/Bogota',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }).format(new Date()),
+        minutosTarde: data.minutosTarde ?? 0,
+        minutosExceso: data.minutosExceso ?? 0,
+      }
+      showVentanaDateoVencidaDialog.value = true
     } else {
       console.error('❌ Error creando dateo:', error)
       const fallback = error instanceof Error ? error.message : 'Error al crear el dateo'
@@ -1141,7 +1266,8 @@ async function confirmarExcepcionRtm() {
   showExcepcionRtmDialog.value = false
   loading.value = true
   try {
-    await submitDateo(true)
+    const dateoCreado = await submitDateo(true)
+    turnoVinculadoRetroactivo.value = dateoCreado?.turno_vinculado_retroactivo ?? null
     excepcionAprobada.value = true
     showSuccessDialog.value = true
   } catch (error) {
@@ -1161,7 +1287,8 @@ async function confirmarExcepcionDateoActivo() {
   showExcepcionDateoActivoDialog.value = false
   loading.value = true
   try {
-    await submitDateo(true)
+    const dateoCreado = await submitDateo(true)
+    turnoVinculadoRetroactivo.value = dateoCreado?.turno_vinculado_retroactivo ?? null
     excepcionAprobada.value = true
     showSuccessDialog.value = true
   } catch (error) {
@@ -1173,6 +1300,21 @@ async function confirmarExcepcionDateoActivo() {
   } finally {
     loading.value = false
   }
+}
+
+/** 🆕 El turno ya pasó los 40 min sin dateo — no hay excepción posible acá,
+ * se navega a crear el ticket "Excepción de Dateo" con el turno/placa ya
+ * identificados. */
+function irACrearTicketExcepcionDateo() {
+  showVentanaDateoVencidaDialog.value = false
+  const info = ventanaDateoVencidaInfo.value
+  if (!info) return
+  router
+    .push({
+      name: 'TicketExcepcionDateoCreate',
+      query: { turno_id: String(info.turnoId), placa: form.value.placa || '' },
+    })
+    .catch(() => {})
 }
 
 function handleConfirmSuccess() {

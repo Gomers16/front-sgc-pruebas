@@ -201,6 +201,33 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: 'MainLayout' },
   },
 
+  // Tickets internos — bandeja general abierta a todos los roles autenticados
+  // (el propio backend filtra qué ve cada uno, ver tickets_controller.ts::index()).
+  {
+    path: '/tickets',
+    name: 'TicketsList',
+    component: () => import('@/views/tickets/TicketsList.vue'),
+    meta: { layout: 'MainLayout', title: 'Tickets', requiresAuth: true },
+  },
+  {
+    path: '/tickets/excepcion-dateo/nuevo',
+    name: 'TicketExcepcionDateoCreate',
+    component: () => import('@/views/tickets/TicketExcepcionDateoCreate.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Nuevo ticket · Excepción de Dateo',
+      requiresAuth: true,
+      roles: ['COMERCIAL', 'SUPER_ADMIN', 'GERENCIA'],
+    },
+  },
+  {
+    path: '/tickets/:id(\\d+)',
+    name: 'TicketDetalle',
+    component: () => import('@/views/tickets/TicketExcepcionDateoDetail.vue'),
+    props: true,
+    meta: { layout: 'MainLayout', title: 'Detalle de ticket', requiresAuth: true },
+  },
+
   // Prospectos
   {
     path: '/comercial/prospectos',

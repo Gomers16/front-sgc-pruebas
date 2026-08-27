@@ -295,6 +295,13 @@
               <v-icon>mdi-refresh</v-icon>
             </span>
           </v-tab>
+
+          <v-tab v-if="puedeVerPenalizaciones" value="penalizaciones" prepend-icon="mdi-cash-minus">
+            <span :class="$vuetify.display.xs ? 'd-none' : ''">Penalizaciones</span>
+            <span :class="$vuetify.display.xs ? '' : 'd-none'">
+              <v-icon>mdi-cash-minus</v-icon>
+            </span>
+          </v-tab>
         </v-tabs>
 
         <v-window v-model="tab" :touch="false">
@@ -860,9 +867,179 @@
           </v-window-item>
           <!-- FIN TAB NEW-DATEOS -->
 
+          <!-- ==================== TAB PENALIZACIONES ==================== -->
+          <v-window-item v-if="puedeVerPenalizaciones" value="penalizaciones">
+            <v-progress-linear v-if="penalizaciones.loading" indeterminate color="primary" class="mb-3" />
+
+            <v-row dense class="mb-3">
+              <v-col cols="12" sm="6" md="4">
+                <v-card variant="tonal" color="error" class="pa-4 rounded-lg">
+                  <div class="text-caption">Saldo actual</div>
+                  <div class="text-h5 font-weight-bold">{{ money(penalizaciones.saldoActual) }}</div>
+                </v-card>
+              </v-col>
+              <v-col cols="12" sm="6" md="8" class="d-flex align-end justify-end">
+                <v-btn
+                  color="primary"
+                  prepend-icon="mdi-cash-check"
+                  :disabled="penalizaciones.saldoActual <= 0"
+                  @click="abrirCobrarSaldo"
+                >
+                  Cobrar saldo
+                </v-btn>
+              </v-col>
+            </v-row>
+
+            <v-alert
+              v-if="!penalizaciones.loading && penalizaciones.movimientos.length === 0"
+              type="info"
+              variant="tonal"
+            >
+              Este comercial no tiene movimientos de penalización.
+            </v-alert>
+
+            <v-table v-else density="compact">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th>Monto</th>
+                  <th>Origen / Ticket</th>
+                  <th>Saldo resultante</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="m in penalizaciones.movimientos" :key="m.id">
+                  <td>{{ fmtDate(m.createdAt) }}</td>
+                  <td>
+                    <v-chip size="x-small" :color="m.tipo === 'CARGO' ? 'error' : 'success'" variant="flat">
+                      {{ m.tipo }}
+                    </v-chip>
+                  </td>
+                  <td>{{ money(Number(m.monto)) }}</td>
+                  <td>
+                    <a
+                      v-if="m.tipo === 'CARGO' && m.ticketId"
+                      href="#"
+                      @click.prevent="verTicketPenalizacion(m.ticketId)"
+                    >
+                      Ver ticket #{{ m.ticketId }}
+                    </a>
+                    <span v-else-if="m.origenCobro">{{ m.origenCobro }}</span>
+                    <span v-else>—</span>
+                  </td>
+                  <td>{{ money(Number(m.saldoResultante)) }}</td>
+                </tr>
+              </tbody>
+            </v-table>
+          </v-window-item>
+          <!-- FIN TAB PENALIZACIONES -->
+
         </v-window>
       </v-card-text>
     </v-card>
+
+    <!-- Cobrar saldo de penalizaciones -->
+    <v-dialog v-model="cobrarDialog.show" max-width="480">
+      <v-card>
+        <v-card-title class="text-subtitle-1 font-weight-bold">Cobrar saldo de penalizaciones</v-card-title>
+        <v-card-text>
+          <div class="text-caption text-medium-emphasis mb-3">
+            Saldo actual: <strong>{{ money(penalizaciones.saldoActual) }}</strong>
+          </div>
+
+          <v-text-field
+            v-model.number="cobrarDialog.monto"
+            label="Monto a cobrar"
+            type="number"
+            min="1"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+          />
+
+          <v-radio-group v-model="cobrarDialog.origen" density="compact" inline class="mb-2">
+            <v-radio label="Comisión" value="COMISION" />
+            <v-radio label="Nómina" value="NOMINA" />
+          </v-radio-group>
+
+          <template v-if="cobrarDialog.origen === 'COMISION'">
+            <div class="d-flex gap-2 mb-2">
+              <v-select
+                v-model.number="cobrarDialog.mes"
+                :items="mesesItems"
+                label="Mes"
+                variant="outlined"
+                density="compact"
+                style="max-width: 160px"
+              />
+              <v-text-field
+                v-model.number="cobrarDialog.anio"
+                label="Año"
+                type="number"
+                variant="outlined"
+                density="compact"
+                style="max-width: 120px"
+              />
+              <v-btn
+                variant="tonal"
+                size="small"
+                :loading="cobrarDialog.verificando"
+                @click="verificarCumplimientoMeta"
+              >
+                Verificar meta
+              </v-btn>
+            </div>
+
+            <v-alert
+              v-if="cobrarDialog.metaStatus !== null"
+              :type="
+                cobrarDialog.metaStatus === 'CUMPLIO'
+                  ? 'success'
+                  : cobrarDialog.metaStatus === 'NO_CUMPLIO'
+                    ? 'error'
+                    : 'warning'
+              "
+              variant="tonal"
+              density="compact"
+              class="mb-2"
+            >
+              <template v-if="cobrarDialog.metaStatus === 'CUMPLIO'">
+                Cumplió la meta ese mes ({{ cobrarDialog.pctAvance }}% de avance). Se puede cobrar de comisiones.
+              </template>
+              <template v-else-if="cobrarDialog.metaStatus === 'NO_CUMPLIO'">
+                NO cumplió la meta ese mes ({{ cobrarDialog.pctAvance }}% de avance). No se puede cobrar de comisiones.
+              </template>
+              <template v-else>
+                No hay datos suficientes para evaluar la meta ese mes (sin meta configurada o sin
+                comisiones registradas) — no se puede confirmar el cobro por comisiones hasta
+                verificarlo manualmente.
+              </template>
+            </v-alert>
+          </template>
+
+          <v-textarea
+            v-model="cobrarDialog.observacion"
+            label="Observación (opcional)"
+            variant="outlined"
+            density="compact"
+            rows="2"
+            auto-grow
+          />
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="cobrarDialog.show = false">Cancelar</v-btn>
+          <v-btn
+            color="primary"
+            :loading="cobrarDialog.enviando"
+            :disabled="!cobrarDialogValido"
+            @click="confirmarCobro"
+          >
+            Cobrar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- Visor de imagen -->
     <v-dialog v-model="viewer.visible" max-width="720">
@@ -1217,6 +1394,10 @@
     <v-snackbar v-model="redatearSnack.show" :color="redatearSnack.color" timeout="3500" variant="tonal">
       {{ redatearSnack.text }}
     </v-snackbar>
+
+    <v-snackbar v-model="penalizacionesSnack.show" :color="penalizacionesSnack.color" timeout="4000" variant="tonal">
+      {{ penalizacionesSnack.text }}
+    </v-snackbar>
   </v-container>
 </template>
 <script setup lang="ts">
@@ -1231,6 +1412,12 @@ import { CaptacionDateosService } from '@/services/captacion_dateos_service'
 import { uploadImage } from '@/services/uploadsService'
 import ConfirmarDialogo from '@/components/UI/ConfirmarDialogo.vue'
 import { calcularReservaCountdown } from '@/composables/useReservaCountdown'
+import {
+  getSaldoPenalizaciones,
+  cobrarSaldoPenalizaciones,
+  type MovimientoPenalizacion,
+} from '@/services/ticketsService'
+import { getMetaComercialResumen } from '@/services/reportesAdminService'
 import {
   listMetasMensuales,
   type MetaMensualRow,
@@ -1335,7 +1522,7 @@ const pagos = ref<{ id: number; valor: number; fecha?: string }[]>([])
 
 const loading = ref(false)
 const globalError = ref<string | null>(null)
-const tab = ref<'prospectos' | 'convenios' | 'dateos' | 'new-dateos'>('prospectos')
+const tab = ref<'prospectos' | 'convenios' | 'dateos' | 'new-dateos' | 'penalizaciones'>('prospectos')
 
 /* ===== Countdown de exclusividad (solo lectura, ver DateosList.vue para el campo editable) ===== */
 const horasExclusividad = ref<number | null>(null)
@@ -1626,6 +1813,160 @@ const viewer = ref<{ visible: boolean; url: string | null }>({ visible: false, u
 
 function openViewer(url: string) {
   viewer.value = { visible: true, url }
+}
+
+/* ===== Penalizaciones ===== */
+const penalizacionesSnack = reactive({ show: false, text: '', color: 'success' as 'success' | 'error' })
+
+const puedeVerPenalizaciones = computed(() =>
+  authStore.hasAnyRole(['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'])
+)
+
+const penalizaciones = reactive<{
+  loading: boolean
+  saldoActual: number
+  movimientos: MovimientoPenalizacion[]
+}>({
+  loading: false,
+  saldoActual: 0,
+  movimientos: [],
+})
+
+async function cargarPenalizaciones() {
+  if (!puedeVerPenalizaciones.value || !asesorId.value) return
+  penalizaciones.loading = true
+  try {
+    const data = await getSaldoPenalizaciones(asesorId.value)
+    penalizaciones.saldoActual = data.saldoActual
+    penalizaciones.movimientos = data.movimientos
+  } catch (err) {
+    console.error('Error cargando saldo de penalizaciones:', err)
+  } finally {
+    penalizaciones.loading = false
+  }
+}
+
+function verTicketPenalizacion(ticketId: number) {
+  router.push({ name: 'TicketDetalle', params: { id: ticketId } }).catch(() => {})
+}
+
+const mesesItems = [
+  { title: 'Enero', value: 1 }, { title: 'Febrero', value: 2 }, { title: 'Marzo', value: 3 },
+  { title: 'Abril', value: 4 }, { title: 'Mayo', value: 5 }, { title: 'Junio', value: 6 },
+  { title: 'Julio', value: 7 }, { title: 'Agosto', value: 8 }, { title: 'Septiembre', value: 9 },
+  { title: 'Octubre', value: 10 }, { title: 'Noviembre', value: 11 }, { title: 'Diciembre', value: 12 },
+]
+
+const hoy = new Date()
+
+// null = todavía no se verificó. 'SIN_DATOS' es un estado DISTINTO de
+// 'NO_CUMPLIO': el asesor puede no aparecer en el resumen bulk (o aparecer
+// con pct_avance null porque no tiene meta_pesos configurada ese mes) sin
+// que eso signifique que incumplió — solo que esta vista previa no tiene
+// con qué evaluarlo. Mostrarlo como "no cumplió" (rojo) sugeriría un
+// resultado negativo que en realidad no se evaluó. El backend
+// (evaluarCumplioMeta) sigue siendo la fuente de verdad real al confirmar
+// el cobro y ya distingue cumplio:null explícitamente.
+type MetaStatus = 'CUMPLIO' | 'NO_CUMPLIO' | 'SIN_DATOS'
+
+const cobrarDialog = reactive<{
+  show: boolean
+  monto: number | null
+  origen: 'COMISION' | 'NOMINA'
+  mes: number
+  anio: number
+  observacion: string
+  verificando: boolean
+  metaStatus: MetaStatus | null
+  pctAvance: number | null
+  enviando: boolean
+}>({
+  show: false,
+  monto: null,
+  origen: 'NOMINA',
+  mes: hoy.getMonth() + 1,
+  anio: hoy.getFullYear(),
+  observacion: '',
+  verificando: false,
+  metaStatus: null,
+  pctAvance: null,
+  enviando: false,
+})
+
+function abrirCobrarSaldo() {
+  cobrarDialog.show = true
+  cobrarDialog.monto = null
+  cobrarDialog.origen = 'NOMINA'
+  cobrarDialog.observacion = ''
+  cobrarDialog.metaStatus = null
+  cobrarDialog.pctAvance = null
+}
+
+/** Reutiliza GET /reportes-admin/meta-comercial/resumen (mismos roles que
+ * /saldo-penalizaciones) para mostrar si el asesor cumplió meta ANTES de
+ * confirmar el cobro — sin endpoint nuevo. El backend igual vuelve a
+ * validarlo internamente al confirmar (cobrarSaldoPenalizaciones). */
+async function verificarCumplimientoMeta() {
+  cobrarDialog.verificando = true
+  cobrarDialog.metaStatus = null
+  cobrarDialog.pctAvance = null
+  try {
+    const resumen = await getMetaComercialResumen(cobrarDialog.mes, cobrarDialog.anio)
+    const fila = resumen.asesores.find((a) => a.asesor_id === asesorId.value)
+    const pct = fila?.pct_avance ?? null
+    cobrarDialog.pctAvance = pct
+    // fila ausente (no aparece en el bulk) o pct null (sin meta_pesos ese
+    // mes) → SIN_DATOS, nunca NO_CUMPLIO.
+    cobrarDialog.metaStatus = pct === null ? 'SIN_DATOS' : pct >= 100 ? 'CUMPLIO' : 'NO_CUMPLIO'
+  } catch (err) {
+    console.error('Error verificando meta comercial:', err)
+    cobrarDialog.metaStatus = 'SIN_DATOS'
+  } finally {
+    cobrarDialog.verificando = false
+  }
+}
+
+const cobrarDialogValido = computed(() => {
+  if (!cobrarDialog.monto || cobrarDialog.monto <= 0) return false
+  if (cobrarDialog.origen === 'COMISION') {
+    if (!cobrarDialog.mes || !cobrarDialog.anio) return false
+    // Exige haber verificado y que el resultado sea explícitamente CUMPLIO
+    // — ni "no verificado todavía", ni SIN_DATOS, ni NO_CUMPLIO habilitan el
+    // cobro por comisiones. El backend igual lo revalida al confirmar.
+    if (cobrarDialog.metaStatus !== 'CUMPLIO') return false
+  }
+  return true
+})
+
+async function confirmarCobro() {
+  if (!asesorId.value || !cobrarDialogValido.value || !cobrarDialog.monto) return
+  cobrarDialog.enviando = true
+  try {
+    const res = await cobrarSaldoPenalizaciones(asesorId.value, {
+      monto: cobrarDialog.monto,
+      origen: cobrarDialog.origen,
+      mes: cobrarDialog.origen === 'COMISION' ? cobrarDialog.mes : undefined,
+      anio: cobrarDialog.origen === 'COMISION' ? cobrarDialog.anio : undefined,
+      observacion: cobrarDialog.observacion.trim() || undefined,
+    })
+    cobrarDialog.show = false
+    if (res.montoCobrado > 0) {
+      penalizacionesSnack.text = `Se cobraron ${money(res.montoCobrado)}. Saldo restante: ${money(res.saldoActual)}.`
+      penalizacionesSnack.color = 'success'
+    } else {
+      penalizacionesSnack.text = res.mensaje || 'No se cobró nada (revisa el motivo).'
+      penalizacionesSnack.color = 'error'
+    }
+    penalizacionesSnack.show = true
+    await cargarPenalizaciones()
+  } catch (err) {
+    const data = err instanceof HttpError ? (err.data as { message?: string } | undefined) : undefined
+    penalizacionesSnack.text = data?.message || 'No se pudo cobrar el saldo.'
+    penalizacionesSnack.color = 'error'
+    penalizacionesSnack.show = true
+  } finally {
+    cobrarDialog.enviando = false
+  }
 }
 
 function getEstadoComisionColor(estado: string | null): string {
@@ -2425,6 +2766,7 @@ onMounted(async () => {
   }
   await loadAll()
   cargarHorasExclusividad()
+  cargarPenalizaciones()
 })
 
 onBeforeUnmount(() => {

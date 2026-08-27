@@ -42,6 +42,15 @@
         class="nav-item"
       />
 
+      <!-- Tickets internos — visible para todos los roles autenticados -->
+      <v-list-item
+        prepend-icon="mdi-ticket-confirmation-outline"
+        title="Tickets"
+        :to="{ name: 'TicketsList' }"
+        link
+        class="nav-item"
+      />
+
       <!-- Turnos -->
       <v-list-group
         v-if="can.verTurnos()"

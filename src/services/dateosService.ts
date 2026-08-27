@@ -68,6 +68,12 @@ export interface Dateo extends DateoImagenMeta {
   resultado?: ResultadoDateo
   consumido_turno_id?: number | null
   consumido_at?: string | null
+  /** 🆕 Solo viene si store() vinculó retroactivamente un turno walk-in sin dateo (ventana de 40 min). */
+  turno_vinculado_retroactivo?: {
+    turno_id: number
+    hora_ingreso: string
+    minutos_restantes_ventana: number
+  } | null
   updated_at?: string
   origen?: OrigenDateo
   turnoInfo?: TurnoInfo | null
