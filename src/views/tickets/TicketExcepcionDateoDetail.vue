@@ -61,7 +61,7 @@
             density="compact"
             class="mb-2"
           >
-            <strong>{{ detalle.dentroVentana ? 'Dentro de ventana — sin penalización' : 'Fuera de ventana — requiere penalización' }}</strong>
+            <strong>{{ detalle.dentroVentana ? 'Dentro de ventana — comisión completa' : 'Fuera de ventana — requiere decisión de gerencia' }}</strong>
           </v-alert>
 
           <v-divider class="my-3" />
