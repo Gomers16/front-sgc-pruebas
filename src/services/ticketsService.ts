@@ -74,7 +74,8 @@ export interface TicketDetalleExcepcionDateo {
   evidenciaGrupoWhatsappUrl: string
   evidenciaBloqueoUrl: string
   evidenciaCalamidadUrl: string | null
-  porcentajePenalizacion: string | null
+  /** Solo relevante fuera de ventana. Se llena al aprobar; null si dentroVentana. */
+  conComision: boolean | null
   aprobadoPorId: number | null
   aprobadoAt: string | null
   motivoRechazo: string | null
@@ -134,20 +135,19 @@ export interface AprobarTicketExcepcionDateoResponse {
   detalle: TicketDetalleExcepcionDateo
   dateoId: number
   comisionId: number | null
-  montoCargoPenalizacion: number
-  saldoActual: number | null
   dentroVentana: boolean
+  conComision: boolean | null
 }
 
 /**
- * porcentajePenalizacion se ignora en el backend cuando el ticket está
- * dentro de ventana (detalle.dentroVentana === true) — se puede omitir en
- * ese caso, ver TicketExcepcionDateoDetail.vue.
+ * conComision se ignora en el backend cuando el ticket está dentro de
+ * ventana (detalle.dentroVentana === true) — se puede omitir en ese caso,
+ * ver TicketExcepcionDateoDetail.vue.
  */
-export function aprobarTicketExcepcionDateo(id: number, porcentajePenalizacion?: number) {
-  return patch<AprobarTicketExcepcionDateoResponse, { porcentaje_penalizacion?: number }>(
+export function aprobarTicketExcepcionDateo(id: number, conComision?: boolean) {
+  return patch<AprobarTicketExcepcionDateoResponse, { con_comision?: boolean }>(
     `/api/tickets-excepcion-dateo/${id}/aprobar`,
-    porcentajePenalizacion === undefined ? {} : { porcentaje_penalizacion: porcentajePenalizacion }
+    conComision === undefined ? {} : { con_comision: conComision }
   )
 }
 
@@ -195,58 +195,3 @@ export function rechazarTicketExcepcionDateo(id: number, motivo: string) {
   )
 }
 
-/* ===================== Saldo de penalizaciones ===================== */
-
-export interface MovimientoPenalizacion {
-  id: number
-  asesorId: number
-  tipo: 'CARGO' | 'ABONO'
-  monto: string
-  ticketId: number | null
-  origenCobro: 'COMISION' | 'NOMINA' | null
-  comisionId: number | null
-  observacion: string | null
-  saldoResultante: string
-  creadoPorId: number
-  createdAt: string
-  ticket?: Ticket | null
-  creadoPor?: UsuarioLight | null
-}
-
-export interface SaldoPenalizacionesResponse {
-  asesorId: number
-  saldoActual: number
-  movimientos: MovimientoPenalizacion[]
-}
-
-export function getSaldoPenalizaciones(asesorId: number) {
-  return get<SaldoPenalizacionesResponse>(`/api/saldo-penalizaciones/${asesorId}`)
-}
-
-export type MotivoCobroSinEfecto = 'META_NO_CUMPLIDA' | 'SIN_BOLSA_DISPONIBLE' | 'SALDO_EN_CERO'
-
-export interface CobrarSaldoPayload {
-  monto: number
-  origen: 'COMISION' | 'NOMINA'
-  mes?: number
-  anio?: number
-  observacion?: string
-}
-
-export interface CobrarSaldoResponse {
-  montoSolicitado: number
-  montoCobrado: number
-  saldoActual: number
-  saldoPendiente?: number
-  bolsaDisponible?: number
-  motivo?: MotivoCobroSinEfecto
-  mensaje?: string
-  comisionesTocadas?: { comisionId: number; montoDescontado: number }[]
-}
-
-export function cobrarSaldoPenalizaciones(asesorId: number, payload: CobrarSaldoPayload) {
-  return post<CobrarSaldoResponse, CobrarSaldoPayload>(
-    `/api/saldo-penalizaciones/${asesorId}/cobrar`,
-    payload
-  )
-}

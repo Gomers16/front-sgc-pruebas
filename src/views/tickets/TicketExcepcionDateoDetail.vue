@@ -90,11 +90,14 @@
           <template v-if="ticket.estado === 'APROBADO'">
             <v-alert type="success" variant="tonal" density="compact">
               Aprobado por {{ nombreUsuario(detalle.aprobadoPor) }} el {{ formatDateTime(detalle.aprobadoAt) }}
-              <template v-if="detalle.porcentajePenalizacion !== null">
-                · Penalización aplicada: <strong>{{ detalle.porcentajePenalizacion }}%</strong>
+              <template v-if="detalle.conComision === false">
+                · Aprobado <strong>sin comisión</strong>
+              </template>
+              <template v-else-if="detalle.conComision === true">
+                · Aprobado <strong>con comisión</strong>
               </template>
               <template v-else>
-                · Sin penalización (dentro de ventana)
+                · Comisión completa (dentro de ventana)
               </template>
             </v-alert>
           </template>
@@ -109,35 +112,35 @@
           <template v-else-if="ticket.estado === 'PENDIENTE' && esResolutor">
             <div class="text-subtitle-2 font-weight-bold mb-2">Resolver ticket</div>
 
-            <v-text-field
-              v-if="!detalle.dentroVentana"
-              v-model.number="porcentaje"
-              label="% de penalización"
-              type="number"
-              min="0"
-              max="100"
-              variant="outlined"
-              density="compact"
-              style="max-width: 220px"
-              class="mb-3"
-            />
-            <div v-else class="text-caption text-medium-emphasis mb-3">
-              Este ticket está dentro de ventana — se aprueba sin penalización.
-            </div>
-
-            <div class="d-flex gap-2 flex-wrap">
-              <v-btn
-                color="success"
-                :loading="aprobando"
-                :disabled="!porcentajeValido"
-                @click="confirmarAprobar = true"
-              >
-                Aprobar
-              </v-btn>
-              <v-btn color="error" variant="tonal" :loading="rechazando" @click="mostrarRechazo = true">
-                Rechazar
-              </v-btn>
-            </div>
+            <template v-if="!detalle.dentroVentana">
+              <div class="text-caption text-medium-emphasis mb-3">
+                Este ticket está fuera de ventana — elige si el comercial cobra comisión o no.
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <v-btn color="success" :loading="aprobando" @click="confirmarAprobarConComision = true">
+                  Aprobar con comisión
+                </v-btn>
+                <v-btn color="warning" :loading="aprobando" @click="confirmarAprobarSinComision = true">
+                  Aprobar sin comisión
+                </v-btn>
+                <v-btn color="error" variant="tonal" :loading="rechazando" @click="mostrarRechazo = true">
+                  Rechazar
+                </v-btn>
+              </div>
+            </template>
+            <template v-else>
+              <div class="text-caption text-medium-emphasis mb-3">
+                Este ticket está dentro de ventana — se aprueba con comisión completa, automáticamente.
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <v-btn color="success" :loading="aprobando" @click="confirmarAprobar = true">
+                  Aprobar
+                </v-btn>
+                <v-btn color="error" variant="tonal" :loading="rechazando" @click="mostrarRechazo = true">
+                  Rechazar
+                </v-btn>
+              </div>
+            </template>
           </template>
           <template v-else-if="ticket.estado === 'PENDIENTE'">
             <v-alert type="info" variant="tonal" density="compact">
@@ -188,24 +191,48 @@
       No se pudo cargar el ticket.
     </v-alert>
 
-    <!-- Confirmar aprobar -->
+    <!-- Confirmar aprobar — dentro de ventana, comisión completa automática -->
     <v-dialog v-model="confirmarAprobar" max-width="420">
       <v-card>
         <v-card-title class="text-subtitle-1 font-weight-bold">Confirmar aprobación</v-card-title>
         <v-card-text>
-          <template v-if="detalle?.dentroVentana">
-            Esto crea/vincula el dateo y puede generar comisión — sin penalización, el ticket
-            quedó dentro de ventana. No se puede deshacer. ¿Continuar?
-          </template>
-          <template v-else>
-            Esto crea/vincula el dateo, puede generar comisión y registra un CARGO de
-            <strong>{{ porcentaje }}%</strong> en el saldo de penalizaciones del comercial. No se puede
-            deshacer. ¿Continuar?
-          </template>
+          Esto crea/vincula el dateo y genera comisión completa — el ticket quedó dentro de
+          ventana. No se puede deshacer. ¿Continuar?
         </v-card-text>
         <v-card-actions class="justify-end">
           <v-btn variant="text" @click="confirmarAprobar = false">Cancelar</v-btn>
-          <v-btn color="success" :loading="aprobando" @click="aprobar">Confirmar</v-btn>
+          <v-btn color="success" :loading="aprobando" @click="aprobar(undefined)">Confirmar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Confirmar aprobar con comisión — fuera de ventana -->
+    <v-dialog v-model="confirmarAprobarConComision" max-width="420">
+      <v-card>
+        <v-card-title class="text-subtitle-1 font-weight-bold">Confirmar aprobación con comisión</v-card-title>
+        <v-card-text>
+          Esto crea/vincula el dateo y genera la comisión completa normal para el comercial —
+          aunque el ticket quedó fuera de ventana. No se puede deshacer. ¿Continuar?
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="confirmarAprobarConComision = false">Cancelar</v-btn>
+          <v-btn color="success" :loading="aprobando" @click="aprobar(true)">Confirmar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Confirmar aprobar sin comisión — fuera de ventana -->
+    <v-dialog v-model="confirmarAprobarSinComision" max-width="420">
+      <v-card>
+        <v-card-title class="text-subtitle-1 font-weight-bold">Confirmar aprobación sin comisión</v-card-title>
+        <v-card-text>
+          Esto crea/vincula el dateo y genera la comisión, pero con el monto del comercial en
+          <strong>$0</strong> (si hay convenio, el convenio sí cobra su parte normal). No se puede
+          deshacer. ¿Continuar?
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="confirmarAprobarSinComision = false">Cancelar</v-btn>
+          <v-btn color="warning" :loading="aprobando" @click="aprobar(false)">Confirmar</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -263,10 +290,11 @@ const ticket = ref<Ticket | null>(null)
 const detalle = ref<TicketDetalleExcepcionDateo | null>(null)
 const loading = ref(false)
 
-const porcentaje = ref<number | null>(null)
 const aprobando = ref(false)
 const rechazando = ref(false)
 const confirmarAprobar = ref(false)
+const confirmarAprobarConComision = ref(false)
+const confirmarAprobarSinComision = ref(false)
 const mostrarRechazo = ref(false)
 const motivoRechazo = ref('')
 
@@ -316,11 +344,6 @@ const esResolutor = computed(() => {
   return auth.hasAnyRole(roles)
 })
 
-const porcentajeValido = computed(() => {
-  if (detalle.value?.dentroVentana) return true
-  return porcentaje.value !== null && porcentaje.value >= 0 && porcentaje.value <= 100
-})
-
 const evidenciasList = computed(() => {
   if (!detalle.value) return []
   const d = detalle.value
@@ -347,16 +370,14 @@ async function cargar() {
   }
 }
 
-async function aprobar() {
-  if (!ticket.value || !porcentajeValido.value) return
-  if (!detalle.value?.dentroVentana && porcentaje.value === null) return
+async function aprobar(conComision: boolean | undefined) {
+  if (!ticket.value) return
   aprobando.value = true
   try {
-    await aprobarTicketExcepcionDateo(
-      ticket.value.id,
-      detalle.value?.dentroVentana ? undefined : (porcentaje.value ?? undefined)
-    )
+    await aprobarTicketExcepcionDateo(ticket.value.id, conComision)
     confirmarAprobar.value = false
+    confirmarAprobarConComision.value = false
+    confirmarAprobarSinComision.value = false
     snackbar.value = { show: true, color: 'success', text: 'Ticket aprobado correctamente.' }
     await cargar()
   } catch (err) {
