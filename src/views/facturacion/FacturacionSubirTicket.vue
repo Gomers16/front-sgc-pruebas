@@ -2050,6 +2050,7 @@ async function loadDescuentosYUsuarios() {
       'DIRECCION DE CALIDAD Y AUDITORIA',
       'DIRECCION ADMINISTRATIVA Y COMERCIAL',
       'LIDER DE INFORMES',
+      'LIDER NACIONAL',
     ])
 
     usuariosItems.value = users
