@@ -376,6 +376,28 @@ class TurnosDelDiaService {
     )
   }
 
+  /* ===== Turnero (llamado a módulo) ===== */
+
+  /** Turnos ya certificados (finalizado) de hoy sin llamado registrado, + preferencia de módulo del usuario */
+  public static fetchTurnosPendientesLlamar(usuarioId: number) {
+    return get<{ turnos: Turno[]; ultimoModuloPreferido: string | null }>(
+      `${this.BASE}/pendientes-llamar`,
+      {
+        params: { usuarioId },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      }
+    )
+  }
+
+  /** Registra el llamado de un turno a un módulo y actualiza la preferencia del usuario */
+  public static llamarTurno(id: number, modulo: string, usuarioId: number) {
+    return post<{ message: string; llamadoId: number }, { modulo: string; usuarioId: number }>(
+      `${this.BASE}/${id}/llamar`,
+      { modulo, usuarioId },
+      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+    )
+  }
+
   /* ===== Exportar Excel ===== */
   public static async exportTurnosExcel(filters: ExportFilters) {
     const params: Record<string, string | number> = {}

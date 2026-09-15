@@ -43,6 +43,13 @@ export function usePermissions() {
         'OPERATIVO_TURNOS'
       ]),
 
+      // Llamar un turno certificado a un módulo (integración TurneroCDAPro)
+      verTurnosParaLlamar: () => auth.hasAnyRole([
+        'SUPER_ADMIN',
+        'GERENCIA',
+        'OPERATIVO_TURNOS'
+      ]),
+
       // ==================== TRÁMITES ====================
       verTramites: () => auth.hasAnyRole([
         'SUPER_ADMIN',

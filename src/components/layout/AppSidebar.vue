@@ -42,8 +42,11 @@
         class="nav-item"
       />
 
-      <!-- Tickets internos — visible para todos los roles autenticados -->
+      <!-- Tickets internos — visible para todos los roles autenticados,
+           salvo TURNERO (usuario de la pantalla del turnero, no debería
+           tener ningún acceso administrativo si llega a loguearse acá). -->
       <v-list-item
+        v-if="!auth.hasRole('TURNERO')"
         prepend-icon="mdi-ticket-confirmation-outline"
         title="Tickets"
         :to="{ name: 'TicketsList' }"
@@ -71,6 +74,12 @@
         />
         <v-list-item title="Turnos del día" :to="{ path: '/rtm/turnos-dia' }" link />
         <v-list-item title="Estado turno" :to="{ path: '/rtm/estado-turnos' }" link />
+        <v-list-item
+          v-if="can.verTurnosParaLlamar()"
+          title="Turnos para llamar"
+          :to="{ path: '/rtm/turnos-para-llamar' }"
+          link
+        />
       </v-list-group>
 
       <!-- Trámites -->

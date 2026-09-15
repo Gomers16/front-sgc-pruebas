@@ -88,6 +88,19 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: 'MainLayout', title: 'Certificación / Evidencia' },
   },
 
+  // ✅ Turnero: llamado a módulo (integración con TurneroCDAPro)
+  {
+    path: '/rtm/turnos-para-llamar',
+    name: 'TurnosParaLlamar',
+    component: () => import('@/views/rtm/TurnosParaLlamar.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Turnos para Llamar',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'OPERATIVO_TURNOS'],
+    },
+  },
+
   // TRÁMITES
   {
     path: '/tramites',
