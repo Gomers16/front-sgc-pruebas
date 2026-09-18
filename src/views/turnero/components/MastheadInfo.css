@@ -1,0 +1,38 @@
+.masthead-info {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--espacio-lg);
+  color: var(--marca-texto);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+}
+
+.masthead-info__ciudad {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-2xs);
+}
+
+/* Anula el tamaño fijo por defecto de v-icon para que el pin escale con la
+   misma unidad (vh) que el resto de la tipografía del módulo. */
+.masthead-info__icono.v-icon {
+  font-size: var(--texto-sm);
+  color: var(--marca-texto);
+}
+
+.masthead-info__fechahora {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-sm);
+}
+
+.masthead-info__separador {
+  width: 1px;
+  height: 1.8vh;
+  background: var(--marca-texto-tenue);
+}

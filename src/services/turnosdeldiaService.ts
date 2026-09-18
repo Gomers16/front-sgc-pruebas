@@ -197,6 +197,17 @@ export interface ExportFiltersMultiple {
   mediosSeleccionados?: MedioEnteroFinalDB[]
 }
 
+/* ===== Turnero (Entregar / No se presentó) ===== */
+export interface TurnoPendienteEntrega {
+  llamadoId: number
+  turnoId: number
+  placa: string
+  servicio: { codigoServicio: string; nombreServicio: string } | null
+  modulo: string
+  llamadoEn: string
+  noPresentado: boolean
+}
+
 /* ========== Payloads ========== */
 export interface CreateTurnoPayload {
   placa: string
@@ -394,6 +405,42 @@ class TurnosDelDiaService {
     return post<{ message: string; llamadoId: number }, { modulo: string; usuarioId: number }>(
       `${this.BASE}/${id}/llamar`,
       { modulo, usuarioId },
+      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+    )
+  }
+
+  /* ===== Turnero (Entregar / No se presentó) ===== */
+
+  /** Turnos ya llamados (en módulo) que todavía no tienen entregado_at */
+  public static fetchPendientesEntrega() {
+    return get<{ turnos: TurnoPendienteEntrega[] }>(`${this.BASE}/en-modulo-pendientes-entrega`, {
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    })
+  }
+
+  /** Marca entregado_at = ahora — el turno deja de aparecer en el turnero */
+  public static entregarTurno(id: number) {
+    return patch<{ message: string; llamadoId: number }>(
+      `${this.BASE}/${id}/entregar`,
+      undefined,
+      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+    )
+  }
+
+  /** Toggle de no_presentado — la misma llamada revierte el estado anterior */
+  public static marcarNoPresentado(id: number) {
+    return patch<{ message: string; noPresentado: boolean }>(
+      `${this.BASE}/${id}/no-presentado`,
+      undefined,
+      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+    )
+  }
+
+  /** Repite el llamado (llamado_at = ahora, mismo módulo) — sin límite de veces */
+  public static volverALlamarTurno(id: number) {
+    return patch<{ message: string; llamadoId: number }>(
+      `${this.BASE}/${id}/volver-a-llamar`,
+      undefined,
       { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
     )
   }

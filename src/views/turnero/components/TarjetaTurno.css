@@ -1,0 +1,73 @@
+/*
+  container-type: size convierte cada fila en su propia unidad de medida: los
+  tamaños en cqh de aquí adentro son un porcentaje de LA ALTURA DE ESTA FILA,
+  no del viewport. Esto es lo que hace que el layout aguante 1 o varios
+  turnos en un grupo sin que el texto se desborde — cuando hay más filas,
+  cada una es más baja, y el texto (medido en cqh) se achica exactamente en
+  la misma proporción. El valor en vh que precede a cada cqh es el respaldo
+  para un navegador sin soporte de container queries: se ignora en cualquier
+  navegador moderno.
+
+  cqh por sí solo no basta: con pocas filas (mucha altura cada una) el texto
+  puede volverse más ANCHO que la columna antes de agotar el alto disponible
+  — la placa, monoespaciada, es la más sensible a esto. Por eso su tamaño va
+  como min(cqh, cqw): nunca crece más allá de lo que el ancho fijo permite.
+
+  Proporciones más chicas que antes (22cqh en vez de 27cqh, etc.): con el
+  agrupamiento por estado de ColaSeguimiento.vue puede haber varios grupos
+  visibles a la vez, cada uno con varias filas — tarjetas más compactas
+  dejan que quepan más turnos de un vistazo sin sacrificar legibilidad a
+  distancia de sala de espera.
+
+  Ahora que ColaSeguimiento.vue organiza las tarjetas en una cuadrícula de 2
+  columnas (no una lista de 1 sola columna), el ANCHO de cada tarjeta
+  también se reduce a la mitad — por eso min(cqh, cqw) importa más que antes:
+  cqw es la restricción real la mayoría del tiempo, no solo un respaldo para
+  casos raros. min-width/min-height en 0 son necesarios para que el ítem de
+  grid pueda encogerse por debajo de su tamaño de contenido — igual que ya
+  hacía falta min-height en flexbox antes de este cambio.
+*/
+.tarjeta-turno.v-card {
+  container-type: size;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: var(--espacio-sm);
+  border-left: 4px solid var(--color-estado);
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.tarjeta-turno__identidad {
+  display: flex;
+  flex-direction: column;
+  gap: 1cqh;
+}
+
+.tarjeta-turno__placa {
+  font-family: var(--fuente-placa);
+  font-size: var(--texto-placa);
+  font-size: min(22cqh, 21cqw);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--marca-texto);
+  line-height: 1;
+}
+
+.tarjeta-turno__detalle {
+  font-size: var(--texto-sm);
+  font-size: min(9cqh, 10cqw);
+  color: var(--marca-texto-tenue);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.tarjeta-turno__detalle :deep(.etiqueta-canal) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

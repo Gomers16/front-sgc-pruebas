@@ -1,0 +1,70 @@
+/*
+  Variables CSS del módulo Turnero: colores, tipografía, espaciado.
+  Scoped al selector .turnero-pantalla para no afectar el resto del sistema.
+
+  Esta pantalla es señalética de espacio público (tablero de aeropuerto, panel
+  de sala de espera), no un dashboard: el azul de marca se usa como fondo
+  dominante, no como acento tímido. La columna "Entrega" es la excepción a
+  propósito — ver PanelEntrega.css — para que gane por contraste de luminosidad,
+  no solo por tamaño.
+*/
+
+.turnero-pantalla {
+  /* Paleta CDA */
+  --azul-primario: #0D6EFD;
+  --azul-profundo: #0A3D91;
+  --azul-noche: #082B69; /* fondo del modal y color de texto sobre los chips de canal */
+  --verde: #22C55E;
+  --amarillo: #F5A800;
+  --rojo: #EF4444;
+  --gris-azulado: #A8B8C8;
+  --blanco: #FFFFFF;
+
+  /* Colores de canal (ver config/canales.ts) — deben leerse igual sobre fondo
+     claro (columna Entrega) y sobre fondo azul (Seguimiento), por eso son
+     colores saturados y no dependen del texto que los rodea. */
+  --canal-rtm: #4FA3FF;
+  --canal-soat: var(--amarillo);
+  --canal-preventiva: #4ADE80;
+  --canal-peri: #A78BFA;
+
+  /* Superficies "de marca": fondo azul intenso, texto claro. */
+  --marca-fondo: var(--azul-profundo);
+  --marca-texto: var(--blanco);
+  --marca-texto-tenue: rgba(255, 255, 255, 0.7);
+  --marca-linea: rgba(255, 255, 255, 0.16);
+
+  /* Superficie "de entrega": la excepción clara y de máximo contraste. */
+  --entrega-fondo: var(--blanco);
+  --entrega-texto: #0A1B33;
+  --entrega-texto-tenue: rgba(10, 27, 51, 0.6);
+  --entrega-linea: rgba(10, 27, 51, 0.1);
+  --entrega-tarjeta-fondo: #F6F8FC;
+
+  --texto-sobre-acento-tenue: rgba(255, 255, 255, 0.75);
+  --marca-agua: rgba(255, 255, 255, 0.06);
+
+  --fondo: var(--marca-fondo);
+
+  --fuente-base: 'Segoe UI', system-ui, -apple-system, 'Inter', Roboto, Helvetica, Arial, sans-serif;
+  --fuente-placa: 'Consolas', 'SF Mono', 'Cascadia Mono', 'Roboto Mono', monospace;
+
+  --texto-2xs: 1.6vh;
+  --texto-xs: 2vh;
+  --texto-sm: 2.5vh;
+  --texto-md: 3.1vh;
+  --texto-lg: 4.2vh;
+  --texto-xl: 5vh;
+  --texto-placa: 8.5vh;
+  --texto-placa-entrega: 11vh;
+  --texto-placa-modal: 21vh;
+
+  --espacio-2xs: 0.6vh;
+  --espacio-xs: 1.2vh;
+  --espacio-sm: 2vh;
+  --espacio-md: 3vh;
+  --espacio-lg: 4.5vh;
+  --espacio-xl: 7vh;
+
+  --radio-borde: 1.2vh;
+}

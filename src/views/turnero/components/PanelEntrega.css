@@ -1,0 +1,143 @@
+/*
+  Esta es la columna que domina la pantalla: gana por tamaño (mayor fracción
+  del grid, ver layout.css) y sobre todo por contraste de luminosidad — es la
+  única superficie clara en una pantalla mayormente azul, así que el ojo la
+  encuentra primero sin necesidad de leer nada.
+*/
+
+.panel-entrega {
+  height: 100%;
+  padding: var(--espacio-lg) var(--espacio-lg) 0;
+  background: var(--entrega-fondo);
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-entrega__titulo {
+  font-size: var(--texto-md);
+  font-weight: 700;
+  color: var(--entrega-texto);
+  margin-bottom: var(--espacio-md);
+  flex-shrink: 0;
+}
+
+.panel-entrega__lista {
+  flex: 1;
+  min-height: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0 0 var(--espacio-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-sm);
+  overflow: hidden;
+  position: relative;
+}
+
+/* El primero (el más reciente) domina; el resto es historial subordinado. */
+.panel-entrega__lista > .tarjeta-entrega.es-dominante {
+  flex: 5 1 0;
+}
+
+.panel-entrega__lista > .tarjeta-entrega:not(.es-dominante) {
+  flex: 1 1 0;
+}
+
+.panel-entrega__reposo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espacio-md);
+  color: var(--entrega-texto-tenue);
+  text-align: center;
+  font-size: var(--texto-md);
+}
+
+.panel-entrega__marca {
+  width: 9vh;
+  height: 9vh;
+  border-radius: 50%;
+  border: 2px solid var(--entrega-linea);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--texto-sm);
+  letter-spacing: 0.04em;
+  color: var(--entrega-texto);
+}
+
+/*
+  Un llamado nuevo empuja al que era protagonista hacia el historial: la
+  posición de cada tarjeta cambia y eso sí merece movimiento. `move` anima el
+  desplazamiento (incluida la tarjeta que baja de rango); enter/leave cubren
+  la entrada del nuevo llamado y la salida del que cae fuera de las 5.
+*/
+.tarjeta-entrega-transicion-move {
+  transition: transform 0.45s ease;
+}
+
+.tarjeta-entrega-transicion-enter-active {
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.tarjeta-entrega-transicion-enter-from {
+  opacity: 0;
+  transform: translateY(-2vh);
+}
+
+.tarjeta-entrega-transicion-leave-active {
+  transition: opacity 0.3s ease;
+  position: absolute;
+  inset-inline: 0;
+}
+
+.tarjeta-entrega-transicion-leave-to {
+  opacity: 0;
+}
+
+/*
+  Cinta de mensajes: franja fija al fondo de la columna, no se lleva parte
+  del espacio flexible de la lista/reposo salvo su propia altura. `overflow:
+  hidden` recorta la pista, que mide el DOBLE del ancho visible (dos copias
+  idénticas del texto una al lado de la otra) — animar exactamente -50% del
+  ancho de esa pista deja el contenido visualmente idéntico al frame
+  inicial, así el loop no tiene salto ni pausa perceptible en la costura.
+*/
+.panel-entrega__ticker {
+  flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  margin: var(--espacio-sm) calc(var(--espacio-lg) * -1) 0;
+  padding: var(--espacio-xs) 0;
+  border-top: 1px solid var(--entrega-linea);
+  background: var(--entrega-tarjeta-fondo);
+}
+
+.panel-entrega__ticker-pista {
+  display: inline-flex;
+  width: max-content;
+  animation-name: panel-entrega-ticker-desplazamiento;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.panel-entrega__ticker-texto {
+  display: inline-block;
+  padding-left: var(--espacio-lg);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  color: var(--entrega-texto-tenue);
+  white-space: nowrap;
+}
+
+@keyframes panel-entrega-ticker-desplazamiento {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}

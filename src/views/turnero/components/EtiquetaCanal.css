@@ -1,0 +1,43 @@
+/*
+  Chip sólido de color, no un punto: a la distancia de lectura de un TV, un
+  punto de 0.5em no cumple su función de filtro visual por color. Un bloque
+  de fondo sólido sí se distingue de un vistazo. El texto es siempre azul
+  noche, que da buen contraste sobre los tres colores de canal elegidos.
+
+  Se anulan los estilos por defecto de v-chip (padding, altura, radio,
+  tipografía) para que el resultado sea idéntico al <span> original.
+*/
+.etiqueta-canal.v-chip {
+  height: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-weight: 700;
+  font-size: inherit;
+  white-space: nowrap;
+  background: var(--color-etiqueta) !important;
+  color: var(--azul-noche) !important;
+  padding: 0.3em 0.85em;
+  border-radius: 999px;
+  line-height: 1.3;
+}
+
+.etiqueta-canal.v-chip :deep(.v-chip__content) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0;
+}
+
+.etiqueta-canal__separador {
+  width: 2px;
+  height: 0.9em;
+  background: currentColor;
+  opacity: 0.4;
+  border-radius: 1px;
+}
+
+.etiqueta-canal__turno {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}

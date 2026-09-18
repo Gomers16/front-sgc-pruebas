@@ -101,6 +101,35 @@ const routes: RouteRecordRaw[] = [
     },
   },
 
+  // ✅ Turnero: pantalla de exhibición (3 columnas + modal de llamado), a
+  // pantalla completa, sin sidebar. Vive dentro de front-sgc-pruebas como
+  // vista del módulo RTM — ver src/views/turnero/.
+  {
+    path: '/turnero',
+    name: 'Turnero',
+    component: () => import('@/views/turnero/TurneroDisplayView.vue'),
+    meta: {
+      layout: 'BlankLayout',
+      title: 'Turnero',
+      requiresAuth: true,
+      roles: ['TURNERO', 'SUPER_ADMIN', 'GERENCIA'],
+    },
+  },
+
+  // ✅ Configuración del Turnero: multimedia del panel central + mensajes
+  // de la cinta. Solo administración, con sidebar normal (MainLayout).
+  {
+    path: '/rtm/configuracion-turnero',
+    name: 'ConfiguracionTurnero',
+    component: () => import('@/views/rtm/ConfiguracionTurnero.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Configuración del Turnero',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA'],
+    },
+  },
+
   // TRÁMITES
   {
     path: '/tramites',

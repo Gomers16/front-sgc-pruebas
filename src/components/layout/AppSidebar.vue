@@ -80,6 +80,18 @@
           :to="{ path: '/rtm/turnos-para-llamar' }"
           link
         />
+        <v-list-item
+          v-if="can.verTurnero()"
+          title="Pantalla del Turnero"
+          :to="{ path: '/turnero' }"
+          link
+        />
+        <v-list-item
+          v-if="can.verConfiguracionTurnero()"
+          title="Configuración del Turnero"
+          :to="{ path: '/rtm/configuracion-turnero' }"
+          link
+        />
       </v-list-group>
 
       <!-- Trámites -->

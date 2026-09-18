@@ -1,0 +1,63 @@
+.modal-llamado.v-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--azul-noche);
+}
+
+.modal-llamado__contenido {
+  text-align: center;
+  color: var(--marca-texto);
+}
+
+.modal-llamado__placa {
+  font-family: var(--fuente-placa);
+  font-size: var(--texto-placa-modal);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.modal-llamado__canal {
+  margin-top: var(--espacio-lg);
+  font-size: var(--texto-xl);
+  display: flex;
+  justify-content: center;
+}
+
+.modal-llamado__modulo {
+  margin-top: var(--espacio-md);
+  font-size: var(--texto-xl);
+  font-weight: 700;
+  color: var(--amarillo);
+}
+
+/* Única animación de entrada/salida de la pantalla: reemplaza el grito del
+   operario, así que el cambio debe sentirse, no aparecer de golpe. */
+.modal-llamado-enter-active {
+  transition: opacity 0.25s ease-out;
+}
+
+.modal-llamado-enter-active .modal-llamado__contenido {
+  transition: transform 0.3s ease-out;
+}
+
+.modal-llamado-enter-from {
+  opacity: 0;
+}
+
+.modal-llamado-enter-from .modal-llamado__contenido {
+  transform: scale(0.94);
+}
+
+.modal-llamado-leave-active {
+  transition: opacity 0.2s ease-in;
+}
+
+.modal-llamado-leave-to {
+  opacity: 0;
+}

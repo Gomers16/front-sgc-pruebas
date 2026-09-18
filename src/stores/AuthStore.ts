@@ -189,6 +189,10 @@ export const useAuthStore = defineStore('auth', {
               router.push({ name: 'FacturacionHistorico' })
               break
 
+            case 'TURNERO':
+              router.push({ name: 'Turnero' })
+              break
+
             default:
               router.push('/dashboard')
           }

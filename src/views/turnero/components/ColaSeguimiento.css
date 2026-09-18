@@ -1,0 +1,95 @@
+.cola-seguimiento {
+  height: 100%;
+  padding: var(--espacio-lg) var(--espacio-lg) 0;
+  background: var(--marca-fondo);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cola-seguimiento__titulo {
+  font-size: var(--texto-md);
+  font-weight: 700;
+  color: var(--marca-texto);
+  margin-bottom: var(--espacio-md);
+  flex-shrink: 0;
+}
+
+/*
+  Cada grupo (Listo para entregar / Certificación RUNT / En proceso) reparte
+  el alto disponible de la columna con flex-grow proporcional a cuántas FILAS
+  ocupa, no a cuántas tarjetas tiene — con 2 columnas, un grupo de 8 turnos
+  ocupa 4 filas (la cuenta real vive en ColaSeguimiento.vue::gruposVisibles,
+  acá solo se consume ese número). Mismo truco que ya usa PanelEntrega.css
+  para dominante vs. historial (flex: N 1 0): así una fila individual mide
+  aproximadamente lo mismo sin importar en qué grupo esté, en vez de
+  repartir el espacio en tercios fijos.
+*/
+.cola-seguimiento__grupo {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cola-seguimiento__grupo-titulo {
+  flex-shrink: 0;
+  font-size: var(--texto-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-grupo);
+  margin-bottom: var(--espacio-2xs);
+}
+
+/*
+  Cuadrícula de 2 columnas: TODOS los turnos del grupo se muestran siempre,
+  nunca rotan. grid-auto-rows: 1fr reparte el alto disponible en partes
+  iguales entre las filas que hagan falta — con eso, TarjetaTurno.css hace
+  el resto (container queries: la fila más baja que resulta de tener más
+  turnos produce un cqh más chico, sin que nada acá decida "cuándo" achicar).
+*/
+.cola-seguimiento__grupo-cuadricula {
+  flex: 1;
+  min-height: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: var(--espacio-2xs) var(--espacio-md);
+  overflow: hidden;
+}
+
+/* Última tarjeta de un grupo con cantidad impar: ocupa el ancho completo en
+   vez de dejar un hueco vacío al lado (un grupo de 1 turno se ve exactamente
+   igual que antes de la cuadrícula: a ancho completo). */
+.cola-seguimiento__grupo-cuadricula > .tarjeta-turno.v-card:last-child:nth-child(odd) {
+  grid-column: span 2;
+}
+
+.cola-seguimiento__reposo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espacio-md);
+  color: var(--marca-texto-tenue);
+  text-align: center;
+  font-size: var(--texto-md);
+}
+
+.cola-seguimiento__marca {
+  width: 9vh;
+  height: 9vh;
+  border-radius: 50%;
+  border: 2px solid var(--marca-texto-tenue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--texto-sm);
+  letter-spacing: 0.04em;
+  color: var(--marca-texto);
+}

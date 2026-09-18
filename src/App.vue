@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import MainLayout from '@/layouts/MainLayout.vue'
+import BlankLayout from '@/layouts/BlankLayout.vue'
 
 import { computed, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
 
-type LayoutKey = 'AuthLayout' | 'MainLayout'
+type LayoutKey = 'AuthLayout' | 'MainLayout' | 'BlankLayout'
 const layouts: Record<LayoutKey, Component> = {
   AuthLayout,
   MainLayout,
+  BlankLayout,
 }
 
 const layout = computed(() => {

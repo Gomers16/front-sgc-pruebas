@@ -39,6 +39,16 @@ router.beforeEach((to, _from, next) => {
     next('/login')
     return
   }
+
+  // El rol TURNERO queda encerrado en /turnero: sin sidebar, sin acceso a
+  // ninguna otra vista aunque la escriba directo en la URL (la mayoría de
+  // rutas no declara `roles`, así que el chequeo genérico de abajo no
+  // alcanza para bloquearlo).
+  if (auth.isAuthenticated && auth.userRole === 'TURNERO' && to.name !== 'Turnero') {
+    next({ name: 'Turnero' })
+    return
+  }
+
   const roles = to.meta.roles
   if (roles?.length && !auth.hasAnyRole(roles)) {
     next('/dashboard')

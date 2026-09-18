@@ -1,0 +1,67 @@
+/*
+  Grilla de 3 columnas fijas, pantalla completa, horizontal. Sin scroll.
+  La columna de Entrega recibe la mayor fracción: es el punto de mayor peso
+  visual de la pantalla, tanto por tamaño como por el contraste de fondo
+  claro que define en PanelEntrega.css.
+
+  Una franja superior (el "masthead") atraviesa las tres columnas sin
+  interrumpirse: es lo que hace que la pantalla se lea como una sola
+  composición y no como tres paneles pegados uno junto al otro.
+*/
+
+.turnero-pantalla {
+  display: grid;
+  grid-template-columns: 0.85fr 1fr 1.65fr;
+  grid-template-rows: 5vh 1fr;
+  height: 100dvh;
+  width: 100dvw;
+  font-family: var(--fuente-base);
+  color: var(--marca-texto);
+  background: var(--fondo);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+.turnero-pantalla > * {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.turnero-pantalla__masthead {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: linear-gradient(90deg, var(--canal-rtm), var(--canal-soat) 50%, var(--canal-preventiva));
+}
+
+/*
+  Scrim oscuro sobre el degradado: el tramo amarillo (--canal-soat) a la
+  mitad no da contraste suficiente para texto blanco encima. El degradado de
+  3 colores sigue siendo el fondo real, solo se atenúa — mismo criterio que
+  el fondo difuminado de PanelPublicidad.css.
+*/
+.turnero-pantalla__masthead::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 20, 45, 0.55);
+}
+
+/* Reset mínimo, scoped a la pantalla del turnero (no toca el resto del sistema) */
+.turnero-pantalla h1,
+.turnero-pantalla h2,
+.turnero-pantalla h3,
+.turnero-pantalla p {
+  margin: 0;
+}
+
+.turnero-pantalla *,
+.turnero-pantalla *::before,
+.turnero-pantalla *::after {
+  box-sizing: border-box;
+}

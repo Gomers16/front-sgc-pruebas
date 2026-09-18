@@ -1,0 +1,112 @@
+.panel-publicidad {
+  position: relative;
+  height: 100%;
+  background: var(--marca-fondo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/*
+  Fondo difuminado: espejo en canvas del mismo video (ver PanelPublicidad.vue),
+  agrandado tipo "cover" a mano y con blur fuerte. El scale(1.1) es a propósito:
+  el blur muestrea también el borde del canvas, y sin agrandarlo se ve un
+  filo más claro/transparente ahí — se compensa dejando que el blur "sangre"
+  fuera del área visible.
+*/
+.panel-publicidad__fondo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  filter: blur(4vh);
+  transform: scale(1.1);
+}
+
+/* Capa oscura para que el fondo difuminado no compita con el video nítido. */
+.panel-publicidad__fondo-oscurecedor {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 20, 45, 0.55);
+}
+
+/*
+  Video nítido, siempre completo (contain): las franjas que deja libres a los
+  lados o arriba/abajo son transparentes por defecto en un <video> — por eso
+  se ve el fondo difuminado detrás en vez de barras negras planas. Funciona
+  igual para un archivo vertical que uno horizontal, sin lógica de orientación.
+*/
+.panel-publicidad__video {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.panel-publicidad__reposo.v-sheet {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Marca de agua tipográfica de fondo: una composición que se sostiene sola
+   mientras no hay video cargado, en vez de un ícono de placeholder genérico. */
+.panel-publicidad__marca-agua {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fuente-placa);
+  font-weight: 700;
+  font-size: 46vh;
+  letter-spacing: 0.03em;
+  color: var(--marca-agua);
+  line-height: 1;
+  user-select: none;
+}
+
+.panel-publicidad__contenido {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--espacio-lg);
+}
+
+.panel-publicidad__nombre {
+  font-size: var(--texto-xl);
+  font-weight: 700;
+  color: var(--marca-texto);
+  text-align: center;
+  line-height: 1.25;
+}
+
+.panel-publicidad__acento {
+  display: flex;
+  gap: var(--espacio-xs);
+}
+
+.panel-publicidad__acento span {
+  width: 5vh;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.panel-publicidad__acento span:nth-child(1) {
+  background: var(--canal-rtm);
+}
+
+.panel-publicidad__acento span:nth-child(2) {
+  background: var(--canal-soat);
+}
+
+.panel-publicidad__acento span:nth-child(3) {
+  background: var(--canal-preventiva);
+}

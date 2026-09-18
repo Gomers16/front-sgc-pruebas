@@ -50,6 +50,22 @@ export function usePermissions() {
         'OPERATIVO_TURNOS'
       ]),
 
+      // Pantalla de exhibición del Turnero (/turnero). Distinto de
+      // verTurnosParaLlamar: OPERATIVO_TURNOS llama turnos a un módulo pero
+      // no necesita ver la pantalla de sala de espera — el router (roles en
+      // router/index.ts) solo admite TURNERO, SUPER_ADMIN y GERENCIA.
+      verTurnero: () => auth.hasAnyRole([
+        'SUPER_ADMIN',
+        'GERENCIA'
+      ]),
+
+      // Configuración del Turnero: multimedia del panel central + mensajes
+      // de la cinta (ConfiguracionTurnero.vue). Mismo alcance que verTurnero.
+      verConfiguracionTurnero: () => auth.hasAnyRole([
+        'SUPER_ADMIN',
+        'GERENCIA'
+      ]),
+
       // ==================== TRÁMITES ====================
       verTramites: () => auth.hasAnyRole([
         'SUPER_ADMIN',
