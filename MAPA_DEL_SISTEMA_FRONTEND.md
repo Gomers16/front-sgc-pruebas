@@ -14,6 +14,7 @@ Este documento es una referencia completa del frontend, organizada por **módulo
 > **CORRECCIÓN 2026-08-27 (misma sesión de backend, ver `MAPA_DEL_SISTEMA_BACKEND.md`):** la entrada de arriba ya quedó desactualizada por un cambio de backend posterior el mismo día — se corrige en sitio en la sección 9 en vez de agregar otra nota que conviva con la vieja. El modal `VENTANA_DATEO_VENCIDA` de `DateoCreate.vue` **ya no existe**: fue reemplazado por `REQUIERE_TICKET_DATEO`, que dispara siempre (sin ventana fija que deje pasar el dateo normal) y solo cambia de tono según `dentroVentana`, con un único botón que siempre lleva a crear el ticket. La "ventana de 40 minutos" ahora es configurable (global + override por asesor) desde una sección nueva en `TicketsList.vue`, gateada por el permiso `configurarVentanaTicket()` — ver sección 9 para el detalle completo y verificado contra el código real.
 > **CORRECCIÓN 2026-08-28 (sistema de saldo/% de penalización eliminado por completo, ver `MAPA_DEL_SISTEMA_BACKEND.md`):** de nuevo la sección 9 quedó desactualizada por un cambio de backend — corregida en sitio otra vez, mismo criterio que la corrección de arriba. `TicketExcepcionDateoDetail.vue` ya no tiene campo "% de penalización": fuera de ventana ahora son 3 botones (**Aprobar con comisión** / **Aprobar sin comisión** / **Rechazar**), dentro de ventana sigue siendo un único botón sin elegir nada. La pestaña "Penalizaciones" de `FichaComercialAsesor.vue` (saldo, movimientos, modal "Cobrar saldo") **fue eliminada por completo** — el KPI "Saldo" que sigue en la cabecera de la ficha es otra cosa, no se tocó. `ticketsService.ts` perdió `getSaldoPenalizaciones`/`cobrarSaldoPenalizaciones` y ganó `con_comision` en `aprobarTicketExcepcionDateo()`. Ver sección 9 para el detalle completo, verificado contra el código real.
 > Actualizado: 2026-09-08 (`FacturacionSubirTicket.vue`, sección 3 — Facturación: el Set `CARGOS_AUTORIZADORES` agrega `'LIDER NACIONAL'` junto a `GERENCIA`/`LIDER DE SEDE`/`DIRECCION DE CALIDAD Y AUDITORÍA`(/`AUDITORIA`)/`DIRECCION ADMINISTRATIVA Y COMERCIAL`/`LIDER DE INFORMES` — este cargo ahora puede aparecer como opción de "Autorizado por" al aplicar/cambiar manualmente un descuento en caja. Cambio de frontend puro (una línea), sin lógica nueva — el filtro sigue siendo `CARGOS_AUTORIZADORES.has(cargo) || rol === 'GERENCIA'`. Complementa el cargo nuevo del catálogo `cargos` del backend — ver `MAPA_DEL_SISTEMA_BACKEND.md`. Sincronizado a producción local — ver commits `a39762d` (pruebas) / `9bb38e8` (producción local)).
+> Actualizado: 2026-09-18 (**módulo Turnero completo, nuevo — pantalla de exhibición de sala de espera.** Rol `TURNERO` nuevo, encerrado en `/turnero` sin sidebar (`BlankLayout.vue` nuevo + guard en `main.ts`). Vistas nuevas: `TurnosParaLlamar.vue` (admin, llama turnos a un módulo — select de 6 opciones fijas en vez de texto libre — y gestiona Entregar/No se presentó/Volver a llamar), `ConfiguracionTurnero.vue` (admin de multimedia+ticker), `views/turnero/` completo (pantalla de exhibición: `TurneroDisplayView.vue` + 8 componentes + 4 composables con test + config). Ver sección nueva `Turnero` para el detalle completo. **Corrección importante a la sección "Guard de rutas" (10.9 más abajo):** ya no es cierto que "no existe `router.beforeEach`" — esta sesión agregó uno real en `src/main.ts` (no en `router/index.ts`) que sí lee `to.meta.roles`/`requiresAuth` y bloquea navegación, corregido en sitio. Sincronizado a producción local — ver commits `bc10526`+`d8be611`/`4388eb6`+`f9bdcb6` (`MAPA_DEL_SISTEMA_BACKEND.md`)).
 
 ## Índice
 
@@ -26,10 +27,11 @@ Este documento es una referencia completa del frontend, organizada por **módulo
 7. [Dashboard](#7-dashboard)
 8. [Autenticación / Login](#8-autenticación--login)
 9. [Tickets Internos](#9-tickets-internos)
-10. [Archivos sin usar / fuera del router](#archivos-sin-usar--fuera-del-router)
-11. [Patrones establecidos del proyecto](#10-patrones-establecidos-del-proyecto)
+10. [Turnero (Pantalla de Exhibición)](#turnero-pantalla-de-exhibición)
+11. [Archivos sin usar / fuera del router](#archivos-sin-usar--fuera-del-router)
+12. [Patrones establecidos del proyecto](#10-patrones-establecidos-del-proyecto)
 
-Roles del sistema (ver `src/stores/AuthStore.ts` y `src/composables/usePermissions.ts`): `SUPER_ADMIN`, `GERENCIA`, `OPERATIVO_TURNOS`, `TRAMITADOR`, `CONTABILIDAD`, `COMERCIAL`, `TALENTO_HUMANO`.
+Roles del sistema (ver `src/stores/AuthStore.ts` y `src/composables/usePermissions.ts`): `SUPER_ADMIN`, `GERENCIA`, `OPERATIVO_TURNOS`, `TRAMITADOR`, `CONTABILIDAD`, `COMERCIAL`, `TALENTO_HUMANO`, **`TURNERO`** (🆕 — sin acceso a ningún otro módulo, ver sección `Turnero`).
 
 ---
 
@@ -226,7 +228,7 @@ Genera un comprobante consolidado de pago a un asesor o convenio, agrupando vari
 
 **Vistas:** `views/comercial/comprobantes/ComprobantesPago.vue` — `/comercial/comprobantes` (route `ComercialComprobantes`); `ComprobanteDetalle.vue` — `/comercial/comprobantes/:id` (route `ComercialComprobanteDetalle`).
 
-**Servicio:** `comprobantesService.ts` — `createComprobantes` → `POST /api/comprobantes-pago` (crea uno por cada grupo de beneficiario, recibe `comision_ids` y totales por moto/vehículo/dateo/incentivo); `listComprobantes/getComprobante` → `GET`; `subirEvidencia/eliminarEvidencia` → `PATCH/DELETE /:id/evidencia`; `uploadImagen` → `POST /api/uploads/images`.
+**Servicio:** `comprobantesService.ts` — `createComprobantes` → `POST /api/comprobantes-pago` (crea uno por cada grupo de beneficiario, recibe `comision_ids` y totales por moto/vehículo/dateo/incentivo); `listComprobantes/getComprobante` → `GET`; `subirEvidencia/eliminarEvidencia` → `PATCH/DELETE /:id/evidencia`; `uploadImagen` → `POST /api/uploads/images`. **🆕 Ruta rota, confirmada durante la revisión de seguridad del Turnero (2026-09-18):** `/api/uploads/images` **no existe** en el backend (`start/routes.ts` solo tiene `POST /api/media/upload`, `GET /api/uploads/*`, `DELETE /api/uploads/*` — ver Utilidades Transversales en `MAPA_DEL_SISTEMA_BACKEND.md`). Esta función (usada por `ComprobanteDetalle.vue`) devuelve 404 siempre, independiente de cualquier cambio de autenticación — pre-existente a esta sesión, no arreglado, fuera de alcance de quien lo encontró. El patrón correcto es el de `uploadsService.ts::uploadImage()` (sección 1, Servicios de RTM/Turnos), que sí apunta a `/api/media/upload` y es el que usan Dateos y Turnero.
 
 ### 4.8 Descuentos
 
@@ -373,6 +375,51 @@ Bandeja general de tickets internos, abierta a todos los roles autenticados (el 
 
 ---
 
+## Turnero (Pantalla de Exhibición)
+
+Pantalla de kiosko para la sala de espera del CDA que anuncia a qué módulo debe dirigirse cada cliente cuyo turno ya fue certificado, más la pantalla admin donde un funcionario elige el módulo y dispara el llamado. Ver `MAPA_DEL_SISTEMA_BACKEND.md` → sección "Turnero" para el detalle completo del flujo de estados y los endpoints — acá solo lo específico del frontend.
+
+### Vistas principales
+
+- **`views/rtm/TurnosParaLlamar.vue`** — `/rtm/turnos-para-llamar` (route `TurnosParaLlamar`, `meta.roles: SUPER_ADMIN, GERENCIA, OPERATIVO_TURNOS`, `requiresAuth: true`) — pantalla admin con 2 tablas: "Turnos para Llamar" (turnos certificados sin llamar, con un `<v-select>` de módulo — las 6 opciones fijas de `MODULOS_TURNERO`, ver abajo, ya no texto libre — precargado con la última preferencia del usuario, y botón "Llamar" con confirmación) y "En módulo, pendientes de entrega" (turnos ya llamados: botones Entregar / Volver a llamar / No se presentó↔Marcar como presente).
+- **`views/rtm/ConfiguracionTurnero.vue`** — `/rtm/configuracion-turnero` (route `ConfiguracionTurnero`, `meta.roles: SUPER_ADMIN, GERENCIA`, `requiresAuth: true`) — administración de la multimedia del panel central (subir imagen/video, activar/desactivar, reordenar, duración por imagen) y de los mensajes de la cinta deslizante (texto, orden, activo).
+- **`views/turnero/TurneroDisplayView.vue`** — `/turnero` (route `Turnero`, `meta.roles: TURNERO, SUPER_ADMIN, GERENCIA`, `requiresAuth: true`, **layout `BlankLayout`** — sin sidebar ni navbar, pantalla completa) — la pantalla de exhibición en sí. Orquesta 3 componentes: `ColaSeguimiento.vue` ("Siguientes por llamar", 3 columnas por estado — `en_proceso`/`certificacion`/`por_llamar` —, con achicamiento progresivo de tarjetas si hay muchas en un grupo), `PanelEntrega.vue` (columna derecha: últimos llamados + cinta de mensajes del ticker) y `PanelPublicidad.vue` (panel central: rota imágenes/video, con un canvas de fondo desenfocado tipo "cover" detrás del contenido nítido, sincronizado frame a frame con `requestVideoFrameCallback` cuando el navegador lo soporta). `ModalLlamado.vue` se superpone sobre todo cuando entra un llamado nuevo (o un "Volver a llamar"), con pitido (`useAlarma.ts`) + locución de voz (`useVozTurno.ts`) inmediatamente después — mismo patrón que una cartelera digital real.
+
+### Composables (`src/views/turnero/composables/`)
+
+- **`useTurnos.ts`** — hace polling de `GET /turnero/cola` cada `INTERVALO_POLL_MS` (8s) y expone `colaSeguimiento`/`ultimosLlamados` reactivos.
+- **`useColaModales.ts`** (con test unitario, `__tests__/useColaModales.spec.ts`) — decide QUÉ llamados nuevos anunciar y en qué orden: compara cada poll contra el anterior por `(id, llamadoEn)` — no solo `id` — para que "Volver a llamar" también dispare un anuncio nuevo aunque ese turno ya se hubiera anunciado antes (el backend le sube `llamado_at`, ver mapa de backend); encola y muestra un modal a la vez, con pausa entre uno y el siguiente (`PAUSA_ENTRE_MODALES_MS`).
+- **`useAlarma.ts`** — reproduce el pitido corto (`assets/sonidos/llamado.wav`) al abrir cada modal.
+- **`useVozTurno.ts`** — anuncia por voz "Turno con placa {placa}, diríjase al {módulo}." con `SpeechSynthesisUtterance` (Web Speech API del navegador, sin audio grabado). Prueba variantes de idioma en orden (`PREFERENCIA_IDIOMA_VOZ`: es-CO, es-419, es-MX, es-US) hasta encontrar una voz instalada — si el navegador no tiene ninguna en español, avisa por consola y deja que el sistema use su propio criterio con `lang="es-CO"` puesto en el utterance. El texto usa el módulo **completo** tal como se guardó (ej. "Módulo 1 - Caja SOAT"), nunca abreviado — decisión explícita para no duplicar información entre lo que se ve en pantalla y lo que se anuncia, y porque los 6 nombres son cortos y se entienden bien leídos completos (`"Módulo 4 - Entrega"` comunica algo que un simple "Módulo 4" no).
+
+### Servicios
+
+- **`turnosdeldiaService.ts`** (ver también sección 1, mismo archivo) — sección Turnero: `fetchTurnosPendientesLlamar(usuarioId)` → `GET /turnos-rtm/pendientes-llamar`; `llamarTurno(id, modulo, usuarioId)` → `POST /turnos-rtm/:id/llamar`; `fetchPendientesEntrega()` → `GET /turnos-rtm/en-modulo-pendientes-entrega`; `entregarTurno(id)` → `PATCH /turnos-rtm/:id/entregar`; `marcarNoPresentado(id)` → `PATCH /turnos-rtm/:id/no-presentado`; `volverALlamarTurno(id)` → `PATCH /turnos-rtm/:id/volver-a-llamar`.
+- **`turneroMultimediaService.ts`**: CRUD → `GET/POST/PATCH/DELETE /turnero/multimedia[/:id]`.
+- **`turneroTickerService.ts`**: CRUD → `GET/POST/PATCH/DELETE /turnero/ticker[/:id]`.
+
+### Config (`src/views/turnero/config/`)
+
+- **`constantes.ts`** — todos los tiempos/cantidades configurables del Turnero en un solo lugar, nunca hardcodeados en componentes: `CANTIDAD_ULTIMOS_LLAMADOS`, `DURACION_MODAL_MS`, `PAUSA_ENTRE_MODALES_MS`, `INTERVALO_POLL_MS`, `INTERVALO_POLL_MULTIMEDIA_MS`/`_TICKER_MS`, `TICKER_CARACTERES_POR_SEGUNDO`, `CIUDAD_TURNERO`, `ZONA_HORARIA_TURNERO`, `PREFERENCIA_IDIOMA_VOZ`, y **`MODULOS_TURNERO`** — la lista fija de 6 módulos (`"Módulo 1 - Caja SOAT"`, `"Módulo 2 - Caja SOAT"`, `"Módulo 3 - Caja SOAT"`, `"Módulo 4 - Entrega"`, `"Módulo 5 - Caja RTM"`, `"Módulo 6 - Caja RTM"`, texto completo exacto) que alimenta el `<v-select>` de `TurnosParaLlamar.vue`, más `MODULO_TURNERO_DEFECTO` (la primera opción, usado como fallback si la preferencia guardada del usuario no coincide con ninguna de las 6 — datos viejos de antes de este fix). **Duplicada a propósito en el backend** (`turno_llamados_controller.ts`, repos separados sin paquete compartido entre los dos) — si se renombra un módulo hay que cambiar las dos listas, ver `MAPA_DEL_SISTEMA_BACKEND.md`.
+- **`estados.ts`** / **`canales.ts`** — mapeos de estado→etiqueta/color y de canal→etiqueta, consumidos por `EtiquetaCanal.vue` y `ColaSeguimiento.vue`.
+
+### El rol `TURNERO` y su "encierro" a `/turnero`
+
+Rol nuevo, sin acceso a ningún otro módulo del sistema. Tres piezas trabajan juntas para garantizarlo — confirmado leyendo el código real, no solo el propósito de diseño:
+1. **`src/main.ts`, `router.beforeEach`** — el guard global de rutas (ver corrección a la sección "Guard de rutas" más abajo): si el usuario autenticado tiene `auth.userRole === 'TURNERO'` y la ruta destino no es `Turnero`, redirige a `Turnero` sin importar qué URL se haya escrito directamente — este chequeo corre para **cualquier** ruta, incluidas las que no declaran `meta.roles` propio (la mayoría del proyecto).
+2. **`src/stores/AuthStore.ts`** — el redirect post-login para `TURNERO` va directo a la ruta `Turnero` (mismo `switch` que ya redirige `COMERCIAL`→su ficha, `TALENTO_HUMANO`→Contratos, `CONTABILIDAD`→Facturación histórico).
+3. **Layout `BlankLayout.vue`** (nuevo, `src/layouts/BlankLayout.vue`) — la ruta `/turnero` usa este layout en vez de `MainLayout`: sin `AppSidebar`, sin navbar, pantalla completa. Aunque el guard fallara por algún motivo, este usuario nunca tendría sidebar que mostrarle, porque la única ruta a la que puede llegar no lo renderiza en absoluto.
+
+`usePermissions.ts` gana `verTurnero()`/`verConfiguracionTurnero()` (ambos `SUPER_ADMIN, GERENCIA` — el rol `TURNERO` nunca los necesita, ya está encerrado) para los 2 links nuevos del sidebar en `AppSidebar.vue`.
+
+### Roles
+
+- `verTurnero` → `SUPER_ADMIN, GERENCIA` (gate del link del sidebar; el rol `TURNERO` llega a `/turnero` solo por login/guard, nunca ve el link porque nunca ve sidebar).
+- `verConfiguracionTurnero` → `SUPER_ADMIN, GERENCIA`.
+- Las 3 rutas de este módulo (`/turnero`, `/rtm/turnos-para-llamar`, `/rtm/configuracion-turnero`) declaran `meta.roles` **y** `meta.requiresAuth: true` — a diferencia de la mayoría de rutas del proyecto (RTM, Comercial, Dashboard), y gracias al guard nuevo de `main.ts`, están efectivamente protegidas contra navegación directa por URL, no solo contra el ocultamiento visual del sidebar.
+
+---
+
 ## Archivos sin usar / fuera del router
 
 - **`views/Vistadesarrollo.vue`** — pantalla genérica "🚧 ¡Estamos Mejorando! 🚧" (placeholder de módulo en construcción, con botón "Volver"). **No está registrada en `src/router/index.ts`** ni referenciada desde ningún otro archivo (`grep` de `Vistadesarrollo` no arroja resultados fuera de sí misma) — parece un componente huérfano de una funcionalidad retirada o pendiente de enlazar. No borrar sin confirmar con el equipo si estaba pensado para algo específico.
@@ -434,9 +481,24 @@ Dropzone + paste (Ctrl+V) + zoom/rotación es un patrón exacto repetido en 3 lu
 
 ### 10.9 Guard de rutas
 
-**No existe** `router.beforeEach` en `src/router/index.ts`. El control de acceso es:
-1. Visual: `v-if="can.xxx()"` en `AppSidebar.vue` oculta el link si el rol no aplica, pero la URL sigue siendo navegable directamente si se conoce.
-2. Declarativo parcial: rutas nuevas (Trámites, Reportes Admin, Tarifas Servicios) sí declaran `meta.roles: string[]` — pero **nada en el router actual lee ese meta** para bloquear la navegación (no hay guard); solo queda como metadato disponible para quien quiera implementar el guard después.
-3. El redirect post-login por rol vive en `AuthStore.checkAuth()`, no en el router.
+**🆕 CORRECCIÓN (2026-09-18, agregado con la integración del Turnero):** ya no es cierto que no exista un guard — **sí existe uno real**, verificado leyendo el código. Vive en **`src/main.ts`** (no en `src/router/index.ts`, que sigue sin `beforeEach` propio):
 
-Si se necesita proteger de verdad por URL, sería necesario agregar un `router.beforeEach` que lea `to.meta.roles` y compare contra `authStore.hasAnyRole()` — hoy no existe.
+```ts
+router.beforeEach((to, _from, next) => {
+  const auth = useAuthStore()
+  if (to.meta.requiresAuth && !auth.isAuthenticated) { next('/login'); return }
+  if (auth.isAuthenticated && auth.userRole === 'TURNERO' && to.name !== 'Turnero') {
+    next({ name: 'Turnero' }); return
+  }
+  const roles = to.meta.roles
+  if (roles?.length && !auth.hasAnyRole(roles)) { next('/dashboard'); return }
+  next()
+})
+```
+
+Efecto real, confirmado contra `router/index.ts` (21 de 59 rutas declaran `requiresAuth: true`; 18 declaran `meta.roles`):
+1. **Rutas con `requiresAuth: true`** (el módulo Turnero completo, y las que ya lo tuvieran) — si no hay sesión, rebota a `/login` antes de renderizar nada.
+2. **Rol `TURNERO`** — encerrado en la ruta `Turnero` sin importar a qué URL navegue, chequeo que corre para **cualquier** ruta (tenga o no `meta.roles`/`requiresAuth` propio). Ver sección `Turnero` arriba.
+3. **Rutas con `meta.roles`** (Trámites, Reportes Admin, Tarifas Servicios, y ahora el módulo Turnero) — el chequeo de rol **sí bloquea de verdad la navegación** ahora (antes de esta sesión, la nota #2 de esta sección decía que ninguna ruta lo hacía) — un usuario sin el rol requerido es redirigido a `/dashboard`, incluso si escribe la URL directo. La inconsistencia documentada en la sección 2 (Trámites) sobre `usePermissions.ts::verTramites()` vs. `meta.roles` sigue vigente — el guard ahora sí se activa, así que esa discrepancia importa más que antes.
+
+**Lo que sigue igual que antes:** la mayoría de rutas del proyecto (RTM, Comercial, Gestión Documental, Dashboard) **no** declaran `requiresAuth` ni `roles` — para esas, el guard no hace nada (las 3 condiciones no aplican, cae directo a `next()`) y el único control sigue siendo el ocultamiento visual del link en `AppSidebar.vue` (`v-if="can.xxx()"`). El redirect post-login por rol sigue viviendo en `AuthStore.checkAuth()`, sin cambios.
