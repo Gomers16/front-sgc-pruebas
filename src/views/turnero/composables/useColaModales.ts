@@ -1,6 +1,7 @@
 // Responsabilidad: encolar y temporizar el modal de llamado a partir de
-// `ultimosLlamados`. Devuelve `{ turnoEnModal }` — el turno que debe
-// mostrarse ahora mismo, o `null` si no hay ninguno.
+// `ultimosLlamados`. Devuelve `{ turnoEnModal, hablando }` — el turno que
+// debe mostrarse ahora mismo (o `null` si no hay ninguno), y si en este
+// momento useVozTurno.ts está pronunciando su locución (ver más abajo).
 //
 // `ultimosLlamados` puede recibir varios turnos nuevos casi al mismo tiempo
 // (por ejemplo, si el back agrupa actualizaciones); este composable
@@ -47,7 +48,12 @@ export function useColaModales(ultimosLlamados: Ref<TurnoLlamado[]>, listo: Ref<
   let baseCapturada = false
 
   const { reproducir } = useAlarma()
-  const { anunciar } = useVozTurno()
+  // `hablando` se re-expone tal cual hacia TurneroDisplayView.vue → panel
+  // derecho: useVozTurno() se instancia UNA sola vez acá (fire de la
+  // locución también sale de acá, en mostrarSiguiente), así que este es el
+  // único lugar donde existe ese estado — no se crea una segunda instancia
+  // del composable en otro componente, que quedaría desincronizada.
+  const { anunciar, hablando } = useVozTurno()
 
   function capturarBase(listaActual: TurnoLlamado[]) {
     listaActual.forEach((turno) => ultimoLlamadoEnAnunciado.set(turno.id, turno.llamadoEn))
@@ -111,5 +117,5 @@ export function useColaModales(ultimosLlamados: Ref<TurnoLlamado[]>, listo: Ref<
   // `baseCapturada` sea true.
   watch(ultimosLlamados, (lista) => encolarNuevos(lista), { deep: true })
 
-  return { turnoEnModal }
+  return { turnoEnModal, hablando }
 }

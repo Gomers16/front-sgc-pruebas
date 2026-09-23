@@ -15,57 +15,55 @@
   flex-shrink: 0;
 }
 
-/*
-  Cada grupo (Listo para entregar / Certificación RUNT / En proceso) reparte
-  el alto disponible de la columna con flex-grow proporcional a cuántas FILAS
-  ocupa, no a cuántas tarjetas tiene — con 2 columnas, un grupo de 8 turnos
-  ocupa 4 filas (la cuenta real vive en ColaSeguimiento.vue::gruposVisibles,
-  acá solo se consume ese número). Mismo truco que ya usa PanelEntrega.css
-  para dominante vs. historial (flex: N 1 0): así una fila individual mide
-  aproximadamente lo mismo sin importar en qué grupo esté, en vez de
-  repartir el espacio en tercios fijos.
-*/
-.cola-seguimiento__grupo {
+.cola-seguimiento__tabla {
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.cola-seguimiento__grupo-titulo {
+.cola-seguimiento__encabezado {
   flex-shrink: 0;
+  display: grid;
+  /* Mismo reparto que .fila-turno en TarjetaTurno.css — Estado con más
+     proporción que Turno/Placa, para que quepan sus textos largos. */
+  grid-template-columns: 1fr 0.7fr 1.5fr;
+  column-gap: var(--espacio-md);
+  padding: 0 var(--espacio-sm) var(--espacio-2xs);
+  border-bottom: 1px solid var(--marca-linea);
   font-size: var(--texto-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-grupo);
-  margin-bottom: var(--espacio-2xs);
+  color: var(--marca-texto-tenue);
+}
+
+/* Líneas verticales entre columnas del encabezado — mismo token de línea
+   sutil que ya separa las filas horizontalmente (--marca-linea). Continúan
+   visualmente con las de .fila-turno de abajo porque ambos usan el mismo
+   grid-template-columns, column-gap y padding horizontal. */
+.cola-seguimiento__encabezado > [role='columnheader']:not(:last-child) {
+  border-right: 1px solid var(--marca-linea);
 }
 
 /*
-  Cuadrícula de 2 columnas: TODOS los turnos del grupo se muestran siempre,
-  nunca rotan. grid-auto-rows: 1fr reparte el alto disponible en partes
-  iguales entre las filas que hagan falta — con eso, TarjetaTurno.css hace
-  el resto (container queries: la fila más baja que resulta de tener más
-  turnos produce un cqh más chico, sin que nada acá decida "cuándo" achicar).
+  Todos los turnos se muestran siempre, nunca rotan (mismo criterio que
+  tenía la cuadrícula agrupada) — sin scroll: cada fila reparte el alto
+  disponible por igual (flex: 1 1 0), y TarjetaTurno.css hace el resto vía
+  container queries: a más filas, menos alto cada una, y el texto (medido en
+  cqh) se achica en la misma proporción sin desbordar.
 */
-.cola-seguimiento__grupo-cuadricula {
+.cola-seguimiento__filas {
   flex: 1;
   min-height: 0;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-auto-rows: 1fr;
-  gap: var(--espacio-2xs) var(--espacio-md);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
-/* Última tarjeta de un grupo con cantidad impar: ocupa el ancho completo en
-   vez de dejar un hueco vacío al lado (un grupo de 1 turno se ve exactamente
-   igual que antes de la cuadrícula: a ancho completo). */
-.cola-seguimiento__grupo-cuadricula > .tarjeta-turno.v-card:last-child:nth-child(odd) {
-  grid-column: span 2;
+.cola-seguimiento__filas > .fila-turno {
+  flex: 1 1 0;
 }
 
 .cola-seguimiento__reposo {

@@ -1,0 +1,53 @@
+/*
+  Franja propia a todo el ancho de la pantalla (ver layout.css:
+  .turnero-pantalla__ticker, grid-column: 1 / -1), ya no vive dentro de la
+  columna de Entrega — por eso usa los tokens "de marca" (fondo azul, texto
+  claro), los mismos que ya usan Cola/Publicidad y el masthead, en vez de
+  los tokens "de entrega" (superficie clara) que tenía cuando vivía ahí
+  dentro. Sin el truco de margen negativo que usaba antes para sangrar
+  hasta el borde del panel — ahora es su propia celda de grid, ya ocupa
+  todo el ancho por definición.
+*/
+.cinta-mensajes {
+  height: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--espacio-lg);
+  border-top: 1px solid var(--marca-linea);
+  background: var(--marca-fondo);
+}
+
+/*
+  `overflow: hidden` en .cinta-mensajes recorta la pista, que mide el DOBLE
+  del ancho visible (dos copias idénticas del texto una al lado de la otra)
+  — animar exactamente -50% del ancho de esa pista deja el contenido
+  visualmente idéntico al frame inicial, así el loop no tiene salto ni
+  pausa perceptible en la costura.
+*/
+.cinta-mensajes__pista {
+  display: inline-flex;
+  width: max-content;
+  animation-name: cinta-mensajes-desplazamiento;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.cinta-mensajes__texto {
+  display: inline-block;
+  padding-left: var(--espacio-lg);
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  color: var(--marca-texto-tenue);
+  white-space: nowrap;
+}
+
+@keyframes cinta-mensajes-desplazamiento {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}

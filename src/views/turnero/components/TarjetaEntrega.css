@@ -1,135 +1,70 @@
 /*
-  container-type: size hace que cada tarjeta mida sus propios hijos en cqh/cqw
-  (porcentaje de SU propia caja, no del viewport). Es lo que permite que la
-  dominante y las de historial cambien de tamaño según cuántas haya —de 1 a
-  5— sin que ningún texto se desborde ni se recorte.
-
-  Ojo: cqh solo mira el alto. Cuando hay pocas tarjetas cada una es muy alta,
-  y un tamaño puramente en cqh crece tanto que el texto se vuelve más ANCHO
-  que la caja (la placa, monoespaciada, es la más sensible a esto). Por eso
-  cada tamaño va como min(Xcqh, Ycqw): crece con el alto disponible, pero
-  nunca más allá de lo que el ancho fijo de la columna permite.
+  Misma técnica de container queries que TarjetaTurno.css: cada fila mide su
+  propio contenido en cqh/cqw, así que con más historial (más filas) cada una
+  reparte menos alto y el texto se achica en la misma proporción, sin scroll.
 */
-.tarjeta-entrega.v-card {
+.fila-entrega {
   container-type: size;
+  min-width: 0;
   min-height: 0;
+  display: grid;
+  /* Mismo reparto que .panel-entrega__encabezado — ver ese archivo. */
+  grid-template-columns: 1fr 0.8fr 1.8fr;
+  align-items: center;
+  column-gap: var(--espacio-md);
+  padding: 0 var(--espacio-sm);
+  border-bottom: 1px solid var(--entrega-linea);
+}
+
+.fila-entrega__celda {
+  min-width: 0;
   overflow: hidden;
-  border-radius: var(--radio-borde);
-  background: var(--entrega-tarjeta-fondo);
-  box-shadow: none;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-/* ---- Dominante: el llamado activo, el elemento más importante de la pantalla ---- */
-
-.tarjeta-entrega.v-card.es-dominante {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-evenly;
-  padding: var(--espacio-md);
-  padding: 3cqh 4cqw;
+.fila-entrega__celda--turno :deep(.etiqueta-canal) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: min(26cqh, 7cqw);
 }
 
-.tarjeta-entrega__placa {
+.fila-entrega__celda--placa {
   font-family: var(--fuente-placa);
-  font-size: var(--texto-placa-entrega);
-  font-size: min(30cqh, 24cqw);
+  font-size: min(28cqh, 8cqw);
   font-weight: 700;
-  letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
   color: var(--entrega-texto);
   line-height: 1;
 }
 
-.tarjeta-entrega__canal {
-  font-size: var(--texto-lg);
-  font-size: min(11cqh, 11cqw);
-}
-
-/* El módulo es la instrucción que reemplaza el grito del operario: se pinta
-   como un aviso propio, con fondo sólido, no como texto de enlace. */
-.tarjeta-entrega__aviso {
-  padding: var(--espacio-sm) var(--espacio-md);
-  padding: 2cqh 3cqw;
-  border-radius: var(--radio-borde);
-  background: var(--azul-primario);
-  max-width: 100%;
-}
-
-.tarjeta-entrega__instruccion {
-  font-size: var(--texto-2xs);
-  font-size: min(5cqh, 5cqw);
+/* Sin truncar con "...": mismo respaldo que .fila-turno__chip-estado en
+   TarjetaTurno.css — si "Módulo N - Caja SOAT" no entra en una línea, pasa
+   a 2 en vez de cortarse (por eso no hereda el nowrap/ellipsis de
+   .fila-entrega__celda, y su overflow vuelve a visible). */
+.fila-entrega__celda--modulo {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  /* Subida moderada (6cqw → 7.5cqw), no el salto agresivo del módulo del
+     hero de arriba (.panel-entrega__hero-modulo, una pieza distinta) — acá
+     ya existe el wrap a 2 líneas como respaldo (ver arriba), así que
+     "Módulo 2/3 - Caja SOAT" sigue leyéndose completo aunque quede algo
+     más ajustado. */
+  font-size: min(20cqh, 7.5cqw);
   font-weight: 600;
-  color: var(--texto-sobre-acento-tenue);
+  color: var(--entrega-texto-tenue);
 }
 
-.tarjeta-entrega__modulo {
-  font-size: var(--texto-xl);
-  font-size: min(13cqh, 9cqw);
-  font-weight: 700;
-  color: var(--blanco);
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.fila-entrega__icono-no-presentado {
+  color: var(--entrega-texto-tenue);
+  margin-right: 0.3em;
+  vertical-align: middle;
 }
 
-/*
-  No se presentó: el turno NUNCA desaparece solo (decisión explícita, ver
-  PanelEntrega.vue) — solo se atenúa para dar a entender "sigue esperando
-  volver" sin competir visualmente con los llamados activos. Un solo `opacity`
-  cubre dominante e historial por igual; el aviso/ícono es lo único que
-  cambia entre las dos variantes.
-*/
-.tarjeta-entrega.es-no-presentado {
+/* No se presentó: el turno NUNCA desaparece solo (ver PanelEntrega.vue) —
+   solo se atenúa toda la fila para indicar "sigue esperando volver". */
+.fila-entrega.es-no-presentado {
   opacity: 0.55;
-}
-
-.tarjeta-entrega__aviso-no-presentado {
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-  font-size: min(6cqh, 6cqw);
-  font-weight: 600;
-  color: var(--entrega-texto-tenue);
-}
-
-.tarjeta-entrega__icono-no-presentado {
-  flex: 0 0 auto;
-  color: var(--entrega-texto-tenue);
-}
-
-/* ---- Historial: subordinado, compacto, una fila cada uno ---- */
-
-.tarjeta-entrega.v-card:not(.es-dominante) {
-  display: flex;
-  align-items: center;
-  gap: 3cqw;
-  padding: 0 4cqw;
-}
-
-.tarjeta-entrega__placa-historial {
-  font-family: var(--fuente-placa);
-  font-size: min(40cqh, 11cqw);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--entrega-texto-tenue);
-  line-height: 1;
-  flex: 0 0 auto;
-}
-
-.tarjeta-entrega__canal-historial {
-  font-size: min(16cqh, 5cqw);
-  flex: 0 0 auto;
-}
-
-.tarjeta-entrega__modulo-historial {
-  font-size: min(16cqh, 8cqw);
-  font-weight: 600;
-  color: var(--entrega-texto-tenue);
-  margin-left: auto;
-  text-align: right;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
 }

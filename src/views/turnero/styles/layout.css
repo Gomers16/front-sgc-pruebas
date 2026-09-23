@@ -1,18 +1,43 @@
 /*
   Grilla de 3 columnas fijas, pantalla completa, horizontal. Sin scroll.
-  La columna de Entrega recibe la mayor fracción: es el punto de mayor peso
-  visual de la pantalla, tanto por tamaño como por el contraste de fondo
-  claro que define en PanelEntrega.css.
+  Orden: Cola (izquierda) | Publicidad (centro) | Llamando ahora (derecha)
+  — decisión de diseño, ver el orden de los componentes en
+  TurneroDisplayView.vue (grid-template-columns se asigna por posición en
+  el DOM, ningún panel tiene grid-column explícito). Llamando ahora gana en
+  peso visual sobre todo por contraste de luminosidad, no por tamaño: es la
+  única superficie clara en una pantalla mayormente azul (ver el fondo
+  claro que define PanelEntrega.css).
 
   Una franja superior (el "masthead") atraviesa las tres columnas sin
   interrumpirse: es lo que hace que la pantalla se lea como una sola
-  composición y no como tres paneles pegados uno junto al otro.
+  composición y no como tres paneles pegados uno junto al otro. Una franja
+  inferior (la cinta de mensajes, CintaMensajes.vue) hace lo mismo abajo —
+  antes vivía dentro de la columna de Entrega y no llegaba a Publicidad.
 */
 
 .turnero-pantalla {
   display: grid;
-  grid-template-columns: 0.85fr 1fr 1.65fr;
-  grid-template-rows: 5vh 1fr;
+  /*
+    1.2fr Cola / 1.1fr Publicidad / 1.2fr Llamando ahora — el valor de cada
+    fracción quedó fijo desde que se ajustaron las proporciones (Cola
+    necesitaba más ancho real para no truncar "Certificación RUNT" / "Listo
+    para entregar", y Llamando ahora le devolvió a Publicidad el ancho que
+    le sobraba, ver TarjetaEntrega.css/PanelEntrega.css para el reparto
+    interno de su tabla histórico). El ORDEN de las columnas se reordenó más
+    de una vez después de eso (ver el orden real en TurneroDisplayView.vue)
+    sin tocar estos números — por eso acá se identifican por nombre de
+    panel, no por posición ("la del medio"/"la derecha"), que cambia.
+  */
+  grid-template-columns: 1.2fr 1.1fr 1.2fr;
+  /*
+    6vh reservados para la cinta de mensajes (ver .turnero-pantalla__ticker
+    y CintaMensajes.css) — alto real medido de la cinta cuando vivía dentro
+    de PanelEntrega.vue (borde + padding + línea de texto a --texto-sm ≈
+    5.5vh), con un colchón chico. La fila de las 3 columnas es `1fr`: no
+    hace falta descontarle nada a mano, absorbe automáticamente lo que
+    quede (100dvh − 5vh − 6vh) sin overflow ni scroll.
+  */
+  grid-template-rows: 5vh 1fr 6vh;
   height: 100dvh;
   width: 100dvw;
   font-family: var(--fuente-base);
@@ -50,6 +75,14 @@
   position: absolute;
   inset: 0;
   background: rgba(8, 20, 45, 0.55);
+}
+
+/* Mismo patrón que el masthead: ocupa las 3 columnas sin interrumpirse.
+   El estilo propio de la cinta (fondo, borde, animación) vive en
+   CintaMensajes.css — acá solo se resuelve su lugar en la grilla. */
+.turnero-pantalla__ticker {
+  grid-column: 1 / -1;
+  grid-row: 3;
 }
 
 /* Reset mínimo, scoped a la pantalla del turnero (no toca el resto del sistema) */

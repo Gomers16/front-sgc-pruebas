@@ -1,73 +1,97 @@
 /*
-  container-type: size convierte cada fila en su propia unidad de medida: los
-  tamaños en cqh de aquí adentro son un porcentaje de LA ALTURA DE ESTA FILA,
-  no del viewport. Esto es lo que hace que el layout aguante 1 o varios
-  turnos en un grupo sin que el texto se desborde — cuando hay más filas,
-  cada una es más baja, y el texto (medido en cqh) se achica exactamente en
-  la misma proporción. El valor en vh que precede a cada cqh es el respaldo
-  para un navegador sin soporte de container queries: se ignora en cualquier
-  navegador moderno.
-
-  cqh por sí solo no basta: con pocas filas (mucha altura cada una) el texto
-  puede volverse más ANCHO que la columna antes de agotar el alto disponible
-  — la placa, monoespaciada, es la más sensible a esto. Por eso su tamaño va
-  como min(cqh, cqw): nunca crece más allá de lo que el ancho fijo permite.
-
-  Proporciones más chicas que antes (22cqh en vez de 27cqh, etc.): con el
-  agrupamiento por estado de ColaSeguimiento.vue puede haber varios grupos
-  visibles a la vez, cada uno con varias filas — tarjetas más compactas
-  dejan que quepan más turnos de un vistazo sin sacrificar legibilidad a
-  distancia de sala de espera.
-
-  Ahora que ColaSeguimiento.vue organiza las tarjetas en una cuadrícula de 2
-  columnas (no una lista de 1 sola columna), el ANCHO de cada tarjeta
-  también se reduce a la mitad — por eso min(cqh, cqw) importa más que antes:
-  cqw es la restricción real la mayoría del tiempo, no solo un respaldo para
-  casos raros. min-width/min-height en 0 son necesarios para que el ítem de
-  grid pueda encogerse por debajo de su tamaño de contenido — igual que ya
-  hacía falta min-height en flexbox antes de este cambio.
+  container-type: size hace que cada fila mida sus propios hijos en cqh/cqw
+  (porcentaje de LA ALTURA/ANCHO DE ESTA FILA, no del viewport) — mismo truco
+  que ya usaba la tarjeta agrupada: con más turnos en la lista, cada fila
+  reparte menos alto (ver ColaSeguimiento.css, flex: 1 1 0 sobre
+  .cola-seguimiento__filas), y el texto medido en cqh se achica en la misma
+  proporción, sin necesitar scroll. min(Xcqh, Ycqw) sigue haciendo falta por
+  el mismo motivo de antes: con pocas filas (mucha altura cada una) el texto
+  monoespaciado de la placa puede volverse más ANCHO que su celda antes de
+  agotar el alto disponible.
 */
-.tarjeta-turno.v-card {
+.fila-turno {
   container-type: size;
   min-width: 0;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding-left: var(--espacio-sm);
-  border-left: 4px solid var(--color-estado);
-  background: transparent;
-  box-shadow: none;
-  border-radius: 0;
+  display: grid;
+  /* Mismo reparto que .cola-seguimiento__encabezado — ver ese archivo. */
+  grid-template-columns: 1fr 0.7fr 1.5fr;
+  /* stretch (el default) en vez de center: cada celda ocupa el alto
+     completo de la fila, no solo el de su contenido — si no, la línea
+     vertical entre celdas (ver .fila-turno__celda de abajo) solo cubriría
+     el alto del texto y no se leería como una celda real. El centrado
+     vertical del contenido se mueve a cada celda individualmente. */
+  column-gap: var(--espacio-md);
+  padding: 0 var(--espacio-sm);
+  /*
+    Acento de color por estado como box-shadow inset, no border-left: un
+    border SÍ suma al ancho de la caja y desplazaría el contenido 4px a la
+    derecha respecto al encabezado (que no tiene ese borde) — descuadraría
+    las líneas verticales de celda con las del encabezado. inset no afecta
+    el box model, así el grid arranca exactamente en el mismo punto en
+    ambos.
+  */
+  box-shadow: inset 4px 0 0 0 var(--color-estado);
+  border-bottom: 1px solid var(--marca-linea);
 }
 
-.tarjeta-turno__identidad {
+.fila-turno__celda {
+  min-width: 0;
+  overflow: hidden;
   display: flex;
-  flex-direction: column;
-  gap: 1cqh;
+  align-items: center;
 }
 
-.tarjeta-turno__placa {
+/* Líneas verticales entre celdas — continúan las del encabezado (mismo
+   grid-template-columns/column-gap/padding en ambos). */
+.fila-turno__celda:not(:last-child) {
+  border-right: 1px solid var(--marca-linea);
+}
+
+/* El chip de Estado puede necesitar 2 líneas para los textos largos de
+   estados.ts ("Certificación RUNT", "Listo para entregar") — la celda no
+   debe recortarlas verticalmente si eso pasa (ver .fila-turno__chip-estado
+   más abajo, que ya no trunca con "...", solo hace wrap). */
+.fila-turno__celda--estado {
+  overflow: visible;
+}
+
+.fila-turno__celda--turno :deep(.etiqueta-canal) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: min(28cqh, 8cqw);
+}
+
+.fila-turno__celda--placa {
   font-family: var(--fuente-placa);
-  font-size: var(--texto-placa);
-  font-size: min(22cqh, 21cqw);
+  font-size: min(30cqh, 9cqw);
   font-weight: 700;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--marca-texto);
   line-height: 1;
-}
-
-.tarjeta-turno__detalle {
-  font-size: var(--texto-sm);
-  font-size: min(9cqh, 10cqw);
-  color: var(--marca-texto-tenue);
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.tarjeta-turno__detalle :deep(.etiqueta-canal) {
-  max-width: 100%;
-  overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/*
+  Sin truncar con "...": si el ancho ganado en Cambio 1 (layout.css +
+  reparto interno de arriba) no alcanza para que el texto entre en una
+  línea, se pasa a 2 en vez de cortarlo — "Certificación RUNT" / "Listo
+  para entregar" (los textos largos de estados.ts) siempre se leen
+  completos, nunca recortados.
+*/
+.fila-turno__chip-estado {
+  display: inline-block;
+  max-width: 100%;
+  text-align: center;
+  white-space: normal;
+  font-size: min(20cqh, 7cqw);
+  font-weight: 700;
+  color: var(--azul-noche);
+  background: var(--color-estado);
+  padding: 0.3em 0.85em;
+  border-radius: 999px;
+  line-height: 1.25;
 }

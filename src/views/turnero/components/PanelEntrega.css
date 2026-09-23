@@ -21,26 +21,142 @@
   flex-shrink: 0;
 }
 
-.panel-entrega__lista {
-  flex: 1;
+/* ==================== hero: llamado más reciente ==================== */
+
+.panel-entrega__hero {
+  flex: 5 1 0;
   min-height: 0;
-  list-style: none;
-  margin: 0;
-  padding: 0 0 var(--espacio-lg);
+  display: flex;
+  border-radius: var(--radio-borde);
+  /* Antes usaba --entrega-tarjeta-fondo (#F6F8FC, un blanco con gris-azulado
+     a propósito) — como el hero domina casi toda el área visible del panel,
+     ese tono se leía como "el fondo del panel", no como blanco puro. Mismo
+     token que ya usa .panel-entrega (--entrega-fondo = --blanco). */
+  background: var(--entrega-fondo);
+  overflow: hidden;
+}
+
+.panel-entrega__hero-contenido {
+  container-type: size;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--espacio-sm);
-  overflow: hidden;
-  position: relative;
+  align-items: center;
+  justify-content: space-evenly;
+  padding: 3cqh 4cqw;
+  text-align: center;
 }
 
-/* El primero (el más reciente) domina; el resto es historial subordinado. */
-.panel-entrega__lista > .tarjeta-entrega.es-dominante {
-  flex: 5 1 0;
+.panel-entrega__hero-placa {
+  font-family: var(--fuente-placa);
+  /* El min() está resuelto por cqw, no por cqh (la columna es angosta) —
+     por eso subir el número real que mueve el tamaño es el término cqw.
+     32cqw es el techo real calculado contra el ancho disponible del hero
+     (≈466px a 1920px de referencia) antes de que "RNU629" empiece a
+     desbordar — a diferencia del módulo, acá no hay wrap de respaldo que
+     tolere pasarse. El cqh queda bien arriba para no ser el término que
+     manda. */
+  font-size: min(50cqh, 32cqw);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--entrega-texto);
+  line-height: 1;
 }
 
-.panel-entrega__lista > .tarjeta-entrega:not(.es-dominante) {
-  flex: 1 1 0;
+/* El módulo es la instrucción que reemplaza el grito del operario: se pinta
+   como un aviso propio, con fondo sólido, no como texto de enlace. */
+.panel-entrega__hero-aviso {
+  padding: 2cqh 4cqw;
+  border-radius: var(--radio-borde);
+  background: var(--azul-primario);
+  max-width: 100%;
+}
+
+.panel-entrega__hero-instruccion {
+  font-size: min(9cqh, 9cqw);
+  font-weight: 600;
+  color: var(--texto-sobre-acento-tenue);
+}
+
+/*
+  Sin truncar con "...": mismo respaldo que .fila-turno__chip-estado en
+  TarjetaTurno.css — si "Módulo N - Caja SOAT" (el texto más largo de
+  MODULOS_TURNERO) no entra en una línea, pasa a 2 en vez de cortarse.
+
+  Subida agresiva a propósito (8.5cqw → 12cqw): acá SÍ se prioriza el
+  tamaño por sobre evitar el wrap — "Módulo 2/3 - Caja SOAT" muy
+  probablemente pase a 2 líneas a este tamaño, y está aceptado: se sigue
+  leyendo completo (el respaldo de arriba sigue vigente), solo que en 2
+  líneas en vez de 1.
+*/
+.panel-entrega__hero-modulo {
+  font-size: min(18cqh, 12cqw);
+  font-weight: 700;
+  color: var(--blanco);
+  line-height: 1.15;
+  white-space: normal;
+  max-width: 100%;
+}
+
+/*
+  Indicador de "hablando ahora": 3 barras que pulsan en cascada mientras
+  useVozTurno.ts está pronunciando la locución. El contenedor siempre ocupa
+  su espacio (evita que el resto del hero salte de posición cuando empieza o
+  termina de hablar); lo que cambia es la opacidad y la animación de cada
+  barra.
+*/
+.panel-entrega__hero-pulso {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.6cqw;
+  height: 6cqh;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.panel-entrega__hero-pulso.esta-hablando {
+  opacity: 1;
+}
+
+.panel-entrega__hero-pulso span {
+  display: block;
+  width: 1.2cqw;
+  min-width: 3px;
+  height: 30%;
+  border-radius: 999px;
+  background: var(--azul-primario);
+  animation: panel-entrega-pulso 0.9s ease-in-out infinite;
+}
+
+.panel-entrega__hero-pulso span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.panel-entrega__hero-pulso span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes panel-entrega-pulso {
+  0%,
+  100% {
+    height: 30%;
+  }
+  50% {
+    height: 100%;
+  }
+}
+
+.hero-transicion-enter-active,
+.hero-transicion-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.hero-transicion-enter-from,
+.hero-transicion-leave-to {
+  opacity: 0;
 }
 
 .panel-entrega__reposo {
@@ -69,11 +185,56 @@
   color: var(--entrega-texto);
 }
 
+/* ==================== tabla: histórico de llamados ==================== */
+/* Arranca en el segundo más reciente — el primero ya se muestra en el hero
+   de arriba, ver PanelEntrega.vue::historial. */
+
+.panel-entrega__tabla {
+  flex: 4 1 0;
+  min-height: 0;
+  margin-top: var(--espacio-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-entrega__encabezado {
+  flex-shrink: 0;
+  display: grid;
+  /* Mismo reparto que .fila-entrega en TarjetaEntrega.css — Módulo con más
+     proporción que Turno/Placa, para que "Módulo N - Caja SOAT" (el texto
+     más largo de MODULOS_TURNERO) no pierda el ancho real que ya tenía
+     pese a que el panel completo se achicó (ver layout.css). */
+  grid-template-columns: 1fr 0.8fr 1.8fr;
+  column-gap: var(--espacio-md);
+  padding: 0 var(--espacio-sm) var(--espacio-2xs);
+  border-bottom: 1px solid var(--entrega-linea);
+  font-size: var(--texto-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--entrega-texto-tenue);
+}
+
+.panel-entrega__filas {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.panel-entrega__filas > .fila-entrega {
+  flex: 1 1 0;
+}
+
 /*
-  Un llamado nuevo empuja al que era protagonista hacia el historial: la
-  posición de cada tarjeta cambia y eso sí merece movimiento. `move` anima el
-  desplazamiento (incluida la tarjeta que baja de rango); enter/leave cubren
-  la entrada del nuevo llamado y la salida del que cae fuera de las 5.
+  Un llamado nuevo empuja al resto del histórico un puesto hacia abajo: la
+  posición de cada fila cambia y eso sí merece movimiento. `move` anima el
+  desplazamiento; enter/leave cubren la fila que entra al histórico (el
+  hero anterior, que bajó de rango) y la que sale por quedar fuera de las
+  CANTIDAD_ULTIMOS_LLAMADOS visibles.
 */
 .tarjeta-entrega-transicion-move {
   transition: transform 0.45s ease;
@@ -96,48 +257,4 @@
 
 .tarjeta-entrega-transicion-leave-to {
   opacity: 0;
-}
-
-/*
-  Cinta de mensajes: franja fija al fondo de la columna, no se lleva parte
-  del espacio flexible de la lista/reposo salvo su propia altura. `overflow:
-  hidden` recorta la pista, que mide el DOBLE del ancho visible (dos copias
-  idénticas del texto una al lado de la otra) — animar exactamente -50% del
-  ancho de esa pista deja el contenido visualmente idéntico al frame
-  inicial, así el loop no tiene salto ni pausa perceptible en la costura.
-*/
-.panel-entrega__ticker {
-  flex-shrink: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  margin: var(--espacio-sm) calc(var(--espacio-lg) * -1) 0;
-  padding: var(--espacio-xs) 0;
-  border-top: 1px solid var(--entrega-linea);
-  background: var(--entrega-tarjeta-fondo);
-}
-
-.panel-entrega__ticker-pista {
-  display: inline-flex;
-  width: max-content;
-  animation-name: panel-entrega-ticker-desplazamiento;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-
-.panel-entrega__ticker-texto {
-  display: inline-block;
-  padding-left: var(--espacio-lg);
-  font-size: var(--texto-sm);
-  font-weight: 600;
-  color: var(--entrega-texto-tenue);
-  white-space: nowrap;
-}
-
-@keyframes panel-entrega-ticker-desplazamiento {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
 }

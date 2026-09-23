@@ -1,12 +1,15 @@
 <template>
-  <v-card class="tarjeta-turno" flat tile :style="{ '--color-estado': estadoInfo.color }" tag="li">
-    <div class="tarjeta-turno__identidad">
-      <p class="tarjeta-turno__placa">{{ turno.placa }}</p>
-      <p class="tarjeta-turno__detalle">
-        <EtiquetaCanal :canal="turno.canal" :turno="turno.turno" />
-      </p>
+  <div class="fila-turno" role="row" :style="{ '--color-estado': estadoInfo.color }">
+    <div class="fila-turno__celda fila-turno__celda--turno" role="cell">
+      <EtiquetaCanal :canal="turno.canal" :turno="turno.turno" />
     </div>
-  </v-card>
+    <div class="fila-turno__celda fila-turno__celda--placa" role="cell">
+      {{ turno.placa }}
+    </div>
+    <div class="fila-turno__celda fila-turno__celda--estado" role="cell">
+      <span class="fila-turno__chip-estado">{{ estadoInfo.etiqueta }}</span>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -20,9 +23,9 @@ const props = defineProps<{
   turno: TurnoEnCola
 }>()
 
-// El texto del estado ya no se repite por tarjeta: ColaSeguimiento.vue ahora
-// agrupa las tarjetas bajo un encabezado por estado, así que el texto sería
-// redundante. El color del borde (--color-estado) se mantiene como acento
-// rápido de a cuál grupo pertenece cada tarjeta.
+// El chip de Estado reusa el mismo catálogo etiqueta/color que antes
+// distinguía las 3 columnas agrupadas — al pasar a tabla de una sola lista,
+// esta es la única señal visual que queda para saber a qué grupo pertenece
+// cada fila (ver ColaSeguimiento.vue, que ya no agrupa).
 const estadoInfo = computed(() => obtenerEstado(props.turno.estado))
 </script>

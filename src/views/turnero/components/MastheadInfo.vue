@@ -41,7 +41,15 @@ const formateadorHora = new Intl.DateTimeFormat(LOCALE_FECHA_HORA_TURNERO, {
   hour12: true,
 })
 
-const fechaFormateada = computed(() => formateadorFecha.format(ahora.value))
+// Intl.DateTimeFormat con weekday:'long' en es-CO devuelve el día en
+// minúscula por convención del locale ("miércoles, 23 de septiembre") —
+// se capitaliza solo la primera letra a mano; el resto del string queda
+// en minúscula, que es el estándar en español.
+function capitalizarPrimeraLetra(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
+const fechaFormateada = computed(() => capitalizarPrimeraLetra(formateadorFecha.format(ahora.value)))
 const horaFormateada = computed(() => formateadorHora.format(ahora.value))
 
 let intervalo: ReturnType<typeof setInterval> | null = null

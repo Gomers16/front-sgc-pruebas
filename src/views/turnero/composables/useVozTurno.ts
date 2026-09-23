@@ -23,6 +23,12 @@ import { PREFERENCIA_IDIOMA_VOZ } from '../config/constantes'
 
 export function useVozTurno() {
   const vozBloqueada = ref(false)
+  // true exactamente mientras el motor de voz está pronunciando la locución
+  // actual (entre onstart y onend del utterance) — no cubre el pitido de
+  // useAlarma.ts, que termina antes de que esto se prenda. Lo consume el
+  // panel derecho de TurneroDisplayView.vue para el indicador visual de
+  // "hablando ahora" (ver useColaModales.ts, que lo re-expone hacia arriba).
+  const hablando = ref(false)
 
   let vozPreferida: SpeechSynthesisVoice | null = null
   let vocesResueltas = false
@@ -79,8 +85,16 @@ export function useVozTurno() {
     utterance.lang = 'es-CO'
     if (vozPreferida) utterance.voice = vozPreferida
 
+    utterance.onstart = () => {
+      hablando.value = true
+    }
+    utterance.onend = () => {
+      hablando.value = false
+    }
+
     utterance.onerror = (evento) => {
       vozBloqueada.value = true
+      hablando.value = false
       console.warn(
         '[useVozTurno] El navegador rechazó o falló la síntesis de voz (falta de interacción ' +
           'previa del usuario, política de autoplay, o error interno del motor de voz). El ' +
@@ -93,9 +107,10 @@ export function useVozTurno() {
       window.speechSynthesis.speak(utterance)
     } catch (error) {
       vozBloqueada.value = true
+      hablando.value = false
       console.warn('[useVozTurno] Excepción al invocar speechSynthesis.speak():', error)
     }
   }
 
-  return { anunciar, vozBloqueada }
+  return { anunciar, vozBloqueada, hablando }
 }

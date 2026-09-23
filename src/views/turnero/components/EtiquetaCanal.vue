@@ -7,10 +7,7 @@
     label
   >
     <span class="etiqueta-canal__nombre">{{ canalInfo.etiqueta }}</span>
-    <template v-if="turno">
-      <span class="etiqueta-canal__separador" aria-hidden="true"></span>
-      <span class="etiqueta-canal__turno">{{ turno }}</span>
-    </template>
+    <span v-if="turno" class="etiqueta-canal__turno">{{ turno }}</span>
   </v-chip>
 </template>
 
@@ -22,8 +19,8 @@ import './EtiquetaCanal.css'
 const props = defineProps<{
   canal: string
   // Número de turno opcional. Cuando se pasa, se pinta junto al canal
-  // separados por una marca propia (ver .etiqueta-canal__separador), en vez
-  // del carácter "·" — así el espaciado es simétrico en ambos lados siempre.
+  // separado solo por el gap del chip (ver .etiqueta-canal.v-chip) — sin
+  // separador visual entre nombre y número.
   turno?: string | null
 }>()
 
