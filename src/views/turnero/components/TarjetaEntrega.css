@@ -8,9 +8,15 @@
   min-width: 0;
   min-height: 0;
   display: grid;
-  /* Mismo reparto que .panel-entrega__encabezado — ver ese archivo. */
-  grid-template-columns: 1fr 0.8fr 1.8fr;
-  align-items: center;
+  /* Mismo reparto que .panel-entrega__encabezado — ver ese archivo. Sin la
+     píldora, EN ("SOAT 12") necesita menos ancho que antes y se lo cede a
+     Placa, la columna que manda en tamaño. */
+  grid-template-columns: 0.85fr 1fr 1.4fr;
+  /* stretch (el default) en vez de center, mismo criterio que .fila-turno
+     en TarjetaTurno.css: cada celda ocupa el alto completo de la fila para
+     que la línea vertical entre celdas (ver abajo) se lea como una celda
+     real y no solo del alto del texto. El centrado vertical pasa a cada
+     celda. */
   column-gap: var(--espacio-md);
   padding: 0 var(--espacio-sm);
   border-bottom: 1px solid var(--entrega-linea);
@@ -19,20 +25,43 @@
 .fila-entrega__celda {
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  align-items: center;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.fila-entrega__celda--turno :deep(.etiqueta-canal) {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: min(26cqh, 7cqw);
+/* Líneas verticales entre celdas — mismo tratamiento que la cola de la
+   izquierda, con el token de línea de este panel (--entrega-linea, el que
+   ya separa las filas) en vez de --marca-linea. Continúan las del
+   encabezado (mismo grid-template-columns/column-gap/padding en ambos). */
+.fila-entrega__celda:not(:last-child) {
+  border-right: 1px solid var(--entrega-linea);
 }
 
+/*
+  Medidas de referencia a 1920×1080: la fila mide ≈560px de ancho (panel
+  1.2fr de layout.css menos su padding) y ≈85px de alto con las 4 filas del
+  histórico. De ahí: 5cqw ≈ 28px, 6.8cqw ≈ 38px. El tope en cqh solo manda
+  si las filas quedan más bajas que eso (pantalla más ancha que 16:9).
+*/
+
+/* Texto plano con código corto (ver textoTurnoCorto en canales.ts), mismo
+   formato que la cola de la izquierda. ~28px: "SOAT 12" entra en una línea
+   en la columna de 0.85fr (≈118px). */
+.fila-entrega__celda--turno {
+  font-size: min(40cqh, 5cqw);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--entrega-texto);
+  line-height: 1.15;
+}
+
+/* ~38px, no 40: a 40px las 6 letras monoespaciadas (~3.6em) pasan el
+   ancho de la columna de 1fr (≈139px). */
 .fila-entrega__celda--placa {
   font-family: var(--fuente-placa);
-  font-size: min(28cqh, 8cqw);
+  font-size: min(50cqh, 6.8cqw);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--entrega-texto);
@@ -47,14 +76,15 @@
   overflow: visible;
   white-space: normal;
   text-overflow: clip;
-  /* Subida moderada (6cqw → 7.5cqw), no el salto agresivo del módulo del
-     hero de arriba (.panel-entrega__hero-modulo, una pieza distinta) — acá
-     ya existe el wrap a 2 líneas como respaldo (ver arriba), así que
-     "Módulo 2/3 - Caja SOAT" sigue leyéndose completo aunque quede algo
-     más ajustado. */
-  font-size: min(20cqh, 7.5cqw);
+  /* ~28px, igual que EN. "Módulo N - Caja SOAT" pasa a 2 líneas (2 ×
+     1.1em ≈ 62px, cabe en los ≈85px de la fila); "Módulo 4 - Entrega" y
+     similares pueden quedar en una. */
+  font-size: min(33cqh, 5cqw);
   font-weight: 600;
-  color: var(--entrega-texto-tenue);
+  line-height: 1.1;
+  /* Mismo color que EN y Placa: "no presentado" se distingue porque
+     atenúa toda la fila (.es-no-presentado), no por esta celda. */
+  color: var(--entrega-texto);
 }
 
 .fila-entrega__icono-no-presentado {

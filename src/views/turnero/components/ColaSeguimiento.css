@@ -26,13 +26,13 @@
 .cola-seguimiento__encabezado {
   flex-shrink: 0;
   display: grid;
-  /* Mismo reparto que .fila-turno en TarjetaTurno.css — Estado con más
-     proporción que Turno/Placa, para que quepan sus textos largos. */
-  grid-template-columns: 1fr 0.7fr 1.5fr;
-  column-gap: var(--espacio-md);
+  /* Mismo reparto y column-gap que .fila-turno en TarjetaTurno.css — ver
+     ahí por qué Placa es la columna más ancha de las dos primeras. */
+  grid-template-columns: 0.8fr 1fr 1.1fr;
+  column-gap: var(--espacio-sm);
   padding: 0 var(--espacio-sm) var(--espacio-2xs);
   border-bottom: 1px solid var(--marca-linea);
-  font-size: var(--texto-2xs);
+  font-size: var(--texto-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;

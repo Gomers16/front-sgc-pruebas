@@ -32,8 +32,9 @@ const props = defineProps<{
   // Ya viene ordenado del backend (por_llamar > certificacion > en_proceso,
   // y dentro de cada uno por turno_numero) — ver colaTurnero(). Este
   // componente pinta la lista TAL COMO viene, en una sola tabla: ya no
-  // agrupa por estado en columnas, el estado ahora es una celda más (con su
-  // chip de color, ver TarjetaTurno.vue) para no perder esa señal visual.
+  // agrupa por estado en columnas, el estado ahora es una celda más (y un
+  // acento de color en el borde izquierdo de la fila, ver TarjetaTurno.vue)
+  // para no perder esa señal visual.
   turnos: TurnoEnCola[]
 }>()
 

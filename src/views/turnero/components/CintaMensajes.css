@@ -6,7 +6,8 @@
   los tokens "de entrega" (superficie clara) que tenía cuando vivía ahí
   dentro. Sin el truco de margen negativo que usaba antes para sangrar
   hasta el borde del panel — ahora es su propia celda de grid, ya ocupa
-  todo el ancho por definición.
+  todo el ancho por definición. Sin padding lateral: la pista recorre de
+  borde a borde de la pantalla.
 */
 .cinta-mensajes {
   height: 100%;
@@ -14,17 +15,17 @@
   white-space: nowrap;
   display: flex;
   align-items: center;
-  padding: 0 var(--espacio-lg);
   border-top: 1px solid var(--marca-linea);
   background: var(--marca-fondo);
 }
 
 /*
-  `overflow: hidden` en .cinta-mensajes recorta la pista, que mide el DOBLE
-  del ancho visible (dos copias idénticas del texto una al lado de la otra)
-  — animar exactamente -50% del ancho de esa pista deja el contenido
-  visualmente idéntico al frame inicial, así el loop no tiene salto ni
-  pausa perceptible en la costura.
+  `overflow: hidden` en .cinta-mensajes recorta la pista: dos copias
+  idénticas del texto una al lado de la otra — animar exactamente -50% del
+  ancho de esa pista deja el contenido visualmente idéntico al frame
+  inicial, así el loop no tiene salto ni pausa perceptible en la costura.
+  El truco solo funciona si cada copia es al menos tan ancha como la cinta
+  visible (ver .cinta-mensajes__copia).
 */
 .cinta-mensajes__pista {
   display: inline-flex;
@@ -34,9 +35,24 @@
   animation-iteration-count: infinite;
 }
 
+/*
+  min-width: 100vw — la cinta ocupa todo el ancho de la pantalla (fila
+  completa del grid). Con un mensaje corto, cada copia medía menos que la
+  pantalla y la segunda aparecía a la mitad en vez de entrar por el borde
+  derecho (en la columna de Entrega, ≈560px, no pasaba). El espacio que
+  sobra queda a la derecha del texto, dentro de la copia. La duración de la
+  animación se calcula en CintaMensajes.vue a partir de este ancho real.
+*/
+.cinta-mensajes__copia {
+  display: inline-block;
+  min-width: 100vw;
+  padding-left: var(--espacio-lg);
+}
+
+/* Sin padding propio: CintaMensajes.vue mide su ancho para sacar el ancho
+   medio de un carácter. */
 .cinta-mensajes__texto {
   display: inline-block;
-  padding-left: var(--espacio-lg);
   font-size: var(--texto-sm);
   font-weight: 600;
   color: var(--marca-texto-tenue);

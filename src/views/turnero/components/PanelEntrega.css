@@ -201,19 +201,27 @@
 .panel-entrega__encabezado {
   flex-shrink: 0;
   display: grid;
-  /* Mismo reparto que .fila-entrega en TarjetaEntrega.css — Módulo con más
-     proporción que Turno/Placa, para que "Módulo N - Caja SOAT" (el texto
-     más largo de MODULOS_TURNERO) no pierda el ancho real que ya tenía
-     pese a que el panel completo se achicó (ver layout.css). */
-  grid-template-columns: 1fr 0.8fr 1.8fr;
+  /* Mismo reparto que .fila-entrega en TarjetaEntrega.css — Módulo sigue
+     siendo la columna más ancha ("Módulo N - Caja SOAT", el texto más largo
+     de MODULOS_TURNERO), pero Placa ganó ancho desde que EN es texto plano
+     sin píldora. */
+  grid-template-columns: 0.85fr 1fr 1.4fr;
   column-gap: var(--espacio-md);
   padding: 0 var(--espacio-sm) var(--espacio-2xs);
   border-bottom: 1px solid var(--entrega-linea);
-  font-size: var(--texto-2xs);
+  /* 2vh directo, no --texto-2xs (1.6vh): ese token lo comparten otras
+     piezas que no cambian. */
+  font-size: 2vh;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--entrega-texto-tenue);
+}
+
+/* Líneas verticales entre columnas del encabezado — continúan las de
+   .fila-entrega (TarjetaEntrega.css), mismo token --entrega-linea. */
+.panel-entrega__encabezado > [role='columnheader']:not(:last-child) {
+  border-right: 1px solid var(--entrega-linea);
 }
 
 .panel-entrega__filas {
