@@ -38,11 +38,15 @@ export const INTERVALO_POLL_TICKER_MS = 30000
 // de ConfiguracionTurnero.vue, pero es el respaldo si igual ocurre).
 export const DURACION_IMAGEN_DEFECTO_SEGUNDOS = 8
 
-// Velocidad de lectura de la cinta de mensajes (ver PanelEntrega.vue): la
-// duración de la animación se calcula a partir del largo del texto unido
+// Velocidad de lectura de la cinta de mensajes (ver CintaMensajes.vue), en
+// caracteres por segundo: la duración de la animación se deriva de ella
 // para que la velocidad se sienta constante sin importar cuántos mensajes
 // estén activos, en vez de una duración fija que haría un mensaje corto
-// pasar volando y uno largo arrastrarse.
+// pasar volando y uno largo arrastrarse. CintaMensajes.vue la convierte a
+// px/s con el ancho real medido del texto (cada copia de la cinta mide al
+// menos el ancho de la pantalla); useMensajesTicker.ts calcula además una
+// duración solo por caracteres, que queda como respaldo hasta tener esa
+// medición. MIN/MAX acotan la duración de una vuelta en ambos casos.
 export const TICKER_CARACTERES_POR_SEGUNDO = 12
 export const TICKER_DURACION_MIN_S = 10
 export const TICKER_DURACION_MAX_S = 90
