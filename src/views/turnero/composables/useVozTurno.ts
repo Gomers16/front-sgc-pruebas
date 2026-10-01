@@ -20,6 +20,17 @@
 
 import { ref } from 'vue'
 import { PREFERENCIA_IDIOMA_VOZ } from '../config/constantes'
+import type { TurnoLlamado } from './useTurnos'
+
+// Texto de la locución — función pura, exportada para testearla sin la Web
+// Speech API (ver __tests__/useVozTurno.spec.ts). Siempre con el módulo real;
+// solo cambia la instrucción (ver INSTRUCCION_LLAMADO_PREGUNTA):
+//  - Llamado a módulo: "Turno con placa X, diríjase al Módulo N - …."
+//  - Pregunta:         "Turno con placa X, por favor acérquese al Módulo N - …."
+export function textoAnuncio(turno: Pick<TurnoLlamado, 'placa' | 'modulo' | 'tipoLlamado'>): string {
+  const instruccion = turno.tipoLlamado === 'pregunta' ? 'por favor acérquese al' : 'diríjase al'
+  return `Turno con placa ${turno.placa}, ${instruccion} ${turno.modulo}.`
+}
 
 export function useVozTurno() {
   const vozBloqueada = ref(false)
@@ -70,7 +81,7 @@ export function useVozTurno() {
     window.speechSynthesis.onvoiceschanged = elegirVoz
   }
 
-  function anunciar(placa: string, modulo: string) {
+  function anunciar(turno: Pick<TurnoLlamado, 'placa' | 'modulo' | 'tipoLlamado'>) {
     if (!disponible) {
       vozBloqueada.value = true
       console.warn('[useVozTurno] Este navegador no soporta la Web Speech API (speechSynthesis).')
@@ -79,9 +90,7 @@ export function useVozTurno() {
 
     if (!vocesResueltas) elegirVoz() // último intento por si 'voiceschanged' nunca disparó
 
-    const utterance = new SpeechSynthesisUtterance(
-      `Turno con placa ${placa}, diríjase al ${modulo}.`
-    )
+    const utterance = new SpeechSynthesisUtterance(textoAnuncio(turno))
     utterance.lang = 'es-CO'
     if (vozPreferida) utterance.voice = vozPreferida
 

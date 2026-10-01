@@ -34,10 +34,19 @@ export interface TurnoLlamado {
   canal: string
   modulo: string
   llamadoEn: string
-  // Se llamó pero el cliente no estaba — sigue en la lista (nunca desaparece
-  // solo), PanelEntrega.vue lo pinta atenuado. Se apaga cuando alguien
-  // presiona "Entregar" en TurnosParaLlamar.vue (ahí sí sale de la lista).
-  noPresentado?: boolean
+  // Tipo del último anuncio: 'modulo' ("Diríjase a {modulo}") o 'pregunta'
+  // ("Por favor acérquese a {modulo}", ver INSTRUCCION_LLAMADO_PREGUNTA) —
+  // el módulo es siempre el real.
+  tipoLlamado: 'modulo' | 'pregunta'
+  // true  → llamado real a un módulo: se pinta en "Llamando ahora" (hero +
+  //         histórico).
+  // false → "Preguntar" sobre un turno que todavía no se llamó: viaja acá
+  //         SOLO para que useColaModales.ts lo detecte y dispare modal +
+  //         pitido + voz; PanelEntrega.vue lo filtra (el turno se sigue
+  //         viendo una sola vez, en la cola). Un turno "No se presentó" sin
+  //         pregunta de hoy no llega acá: el back lo devuelve a
+  //         colaSeguimiento como 'por_llamar'.
+  enModulo: boolean
 }
 
 interface ColaTurneroResponse {

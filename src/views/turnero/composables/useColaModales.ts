@@ -91,7 +91,9 @@ export function useColaModales(ultimosLlamados: Ref<TurnoLlamado[]>, listo: Ref<
     // Pitido corto de atención, y apenas termina (evento 'ended' dentro de
     // useAlarma.ts, o de inmediato si el navegador lo bloqueó) sigue la
     // locución de voz — mismo patrón que una cartelera digital real.
-    reproducir(() => anunciar(siguiente.placa, siguiente.modulo))
+    // El texto de la locución depende de siguiente.tipoLlamado (módulo o
+    // pregunta) — lo decide useVozTurno.ts; la cola y el pitido son iguales.
+    reproducir(() => anunciar(siguiente))
 
     setTimeout(() => {
       turnoEnModal.value = null

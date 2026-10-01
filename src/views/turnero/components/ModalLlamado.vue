@@ -12,6 +12,12 @@
         <p class="modal-llamado__canal">
           <EtiquetaCanal :canal="turno.canal" :turno="turno.turno" />
         </p>
+        <!-- Pregunta: misma línea de instrucción que el hero, sobre el
+             módulo real (ver INSTRUCCION_LLAMADO_PREGUNTA). Un llamado a
+             módulo sigue mostrando solo el módulo, como siempre. -->
+        <p v-if="turno.tipoLlamado === 'pregunta'" class="modal-llamado__instruccion">
+          {{ INSTRUCCION_LLAMADO_PREGUNTA }}
+        </p>
         <p class="modal-llamado__modulo">{{ turno.modulo }}</p>
       </div>
     </v-sheet>
@@ -20,6 +26,7 @@
 
 <script setup lang="ts">
 import EtiquetaCanal from './EtiquetaCanal.vue'
+import { INSTRUCCION_LLAMADO_PREGUNTA } from '../config/constantes'
 import type { TurnoLlamado } from '../composables/useTurnos'
 import './ModalLlamado.css'
 

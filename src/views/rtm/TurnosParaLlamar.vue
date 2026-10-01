@@ -9,7 +9,7 @@
           <div class="title-group">
             <h2 class="title text-h6 text-sm-h5">Turnos para Llamar</h2>
             <p class="subtitle d-none d-sm-block">
-              Turnos certificados hoy, todavía sin llamar a un módulo
+              Turnos certificados hoy, todavía sin llamar a un módulo (o que no se presentaron)
             </p>
           </div>
         </div>
@@ -28,6 +28,20 @@
           item-value="id"
           no-data-text="No hay turnos certificados pendientes de llamar."
         >
+          <!-- "No se presentó": ya se le llamó una vez y volvió a esta lista
+               para llamarlo de nuevo (eligiendo módulo otra vez).
+               "Pregunta enviada": se le hizo "Preguntar" pero todavía no
+               tuvo un LLAMAR real — sigue acá hasta entonces. -->
+          <template #item.placa="{ item }">
+            {{ item.placa }}
+            <v-chip v-if="item.noPresentadoPrevio" color="warning" size="small" variant="tonal" class="ml-2">
+              No se presentó
+            </v-chip>
+            <v-chip v-if="item.preguntaEnviada" color="info" size="small" variant="tonal" class="ml-2">
+              Pregunta enviada
+            </v-chip>
+          </template>
+
           <template #item.servicio="{ item }">
             {{ item.servicio?.codigoServicio ?? '—' }}
           </template>
@@ -52,11 +66,24 @@
             <v-btn
               color="primary"
               size="small"
+              class="mr-2"
               :disabled="!modulosPorTurno[item.id]?.trim()"
               :loading="llamando === item.id"
               @click="abrirConfirmacion(item)"
             >
               Llamar
+            </v-btn>
+            <!-- Usa el mismo módulo seleccionado que "Llamar", pero el turno
+                 NO sale de esta tabla (ver preguntarDesdeArriba()). -->
+            <v-btn
+              color="primary"
+              variant="outlined"
+              size="small"
+              :disabled="!modulosPorTurno[item.id]?.trim()"
+              :loading="preguntando === item.id"
+              @click="preguntarDesdeArriba(item)"
+            >
+              Preguntar
             </v-btn>
           </template>
         </v-data-table>
@@ -101,12 +128,6 @@
             {{ item.servicio?.codigoServicio ?? '—' }}
           </template>
 
-          <template #item.noPresentado="{ item }">
-            <v-chip v-if="item.noPresentado" color="warning" size="small" variant="tonal">
-              No se presentó
-            </v-chip>
-          </template>
-
           <template #item.acciones="{ item }">
             <v-btn
               color="success"
@@ -128,13 +149,23 @@
               Volver a llamar
             </v-btn>
             <v-btn
-              :color="item.noPresentado ? 'primary' : 'warning'"
+              color="primary"
+              variant="outlined"
+              size="small"
+              class="mr-2"
+              :loading="llamandoPregunta === item.turnoId"
+              @click="llamarParaPregunta(item)"
+            >
+              Preguntar
+            </v-btn>
+            <v-btn
+              color="warning"
               variant="outlined"
               size="small"
               :loading="marcandoNoPresentado === item.turnoId"
-              @click="toggleNoPresentado(item)"
+              @click="abrirConfirmacionNoPresentado(item)"
             >
-              {{ item.noPresentado ? 'Marcar como presente' : 'No se presentó' }}
+              No se presentó
             </v-btn>
           </template>
         </v-data-table>
@@ -148,6 +179,17 @@
       confirm-text="Llamar"
       confirm-color="primary"
       @confirm="confirmarLlamado"
+    />
+
+    <!-- "No se presentó" ya no se puede revertir con el mismo botón: saca el
+         turno de esta tabla y de "Llamando ahora" — por eso se confirma. -->
+    <ConfirmarDialogo
+      v-model="showConfirmNoPresentado"
+      title="Confirmar no presentado"
+      :message="mensajeConfirmacionNoPresentado"
+      confirm-text="No se presentó"
+      confirm-color="warning"
+      @confirm="confirmarNoPresentado"
     />
 
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="snackbar.timeout" location="top right">
@@ -179,6 +221,10 @@ interface TurnoPendiente {
   placa: string
   horaSalida: string | null
   servicio?: ServicioLite | null
+  // Ya se le llamó una vez y no se presentó (volvió a esta lista)
+  noPresentadoPrevio?: boolean
+  // Se le hizo "Preguntar" sin llamarlo todavía (sigue en esta lista)
+  preguntaEnviada?: boolean
 }
 
 const authStore = authSetStore()
@@ -195,6 +241,7 @@ const turnos = ref<TurnoPendiente[]>([])
 const modulosPorTurno = ref<Record<number, string>>({})
 const cargando = ref(false)
 const llamando = ref<number | null>(null)
+const preguntando = ref<number | null>(null)
 
 const showConfirm = ref(false)
 const turnoSeleccionado = ref<TurnoPendiente | null>(null)
@@ -269,13 +316,34 @@ async function confirmarLlamado() {
   }
 }
 
+// "Preguntar" desde esta tabla: la pantalla anuncia "…por favor acérquese
+// al {módulo seleccionado}", pero el turno sigue acá (con el chip "Pregunta
+// enviada") y en la cola hasta que alguien presione "Llamar". Sin
+// confirmación, igual que "Volver a llamar": no mueve el turno de lugar.
+async function preguntarDesdeArriba(turno: TurnoPendiente) {
+  const modulo = modulosPorTurno.value[turno.id]?.trim()
+  if (!modulo) return
+
+  preguntando.value = turno.id
+  try {
+    await TurnosDelDiaService.preguntarTurno(turno.id, modulo, usuarioId())
+    showSnackbar(`✅ Pregunta enviada a ${turno.placa} (${modulo}).`, 'success')
+    cargarTurnos()
+  } catch (err) {
+    console.error('Error al preguntar:', err)
+    const message = err instanceof Error ? err.message : 'Error al enviar la pregunta.'
+    showSnackbar(`❌ ${message}`, 'error')
+  } finally {
+    preguntando.value = null
+  }
+}
+
 /* ==================== En módulo, pendientes de entrega ==================== */
 
 const headersEntrega = [
   { title: 'Placa', key: 'placa' },
   { title: 'Servicio', key: 'servicio' },
   { title: 'Módulo', key: 'modulo' },
-  { title: 'Estado', key: 'noPresentado', sortable: false },
   { title: '', key: 'acciones', sortable: false },
 ]
 
@@ -284,6 +352,11 @@ const cargandoEntrega = ref(false)
 const entregando = ref<number | null>(null)
 const marcandoNoPresentado = ref<number | null>(null)
 const volviendoALlamar = ref<number | null>(null)
+const llamandoPregunta = ref<number | null>(null)
+
+const showConfirmNoPresentado = ref(false)
+const turnoNoPresentado = ref<TurnoPendienteEntrega | null>(null)
+const mensajeConfirmacionNoPresentado = ref('')
 
 async function cargarPendientesEntrega() {
   cargandoEntrega.value = true
@@ -318,9 +391,8 @@ async function volverALlamar(turno: TurnoPendienteEntrega) {
   try {
     await TurnosDelDiaService.volverALlamarTurno(turno.turnoId)
     showSnackbar(`✅ Turno ${turno.placa} llamado de nuevo.`, 'success')
-    // llamado_at cambió (y no_presentado se resetea del lado del back) — se
-    // recarga la lista completa en vez de mutar a mano, así el orden
-    // (llamado_at asc) y el estado quedan consistentes con la base real.
+    // llamado_at cambió — se recarga la lista completa en vez de mutar a
+    // mano, así el orden (llamado_at asc) queda consistente con la base real.
     cargarPendientesEntrega()
   } catch (err) {
     console.error('Error al volver a llamar:', err)
@@ -331,18 +403,52 @@ async function volverALlamar(turno: TurnoPendienteEntrega) {
   }
 }
 
-async function toggleNoPresentado(turno: TurnoPendienteEntrega) {
+// "Preguntar" desde esta tabla (turno ya llamado): mismo mecanismo que
+// "Volver a llamar" (la pantalla lo anuncia con modal + pitido + voz), con
+// "…por favor acérquese al {módulo}" y el módulo que ya tenía.
+async function llamarParaPregunta(turno: TurnoPendienteEntrega) {
+  llamandoPregunta.value = turno.turnoId
+  try {
+    await TurnosDelDiaService.llamarParaPregunta(turno.turnoId)
+    showSnackbar(`✅ Pregunta enviada a ${turno.placa} (${turno.modulo}).`, 'success')
+    cargarPendientesEntrega()
+  } catch (err) {
+    console.error('Error al llamar para pregunta:', err)
+    const message = err instanceof Error ? err.message : 'Error al llamar el turno para pregunta.'
+    showSnackbar(`❌ ${message}`, 'error')
+  } finally {
+    llamandoPregunta.value = null
+  }
+}
+
+function abrirConfirmacionNoPresentado(turno: TurnoPendienteEntrega) {
+  turnoNoPresentado.value = turno
+  mensajeConfirmacionNoPresentado.value =
+    `¿Marcar la placa ${turno.placa} como no presentada? Sale de "Llamando ahora" ` +
+    'y vuelve a "Turnos para Llamar" para llamarla de nuevo.'
+  showConfirmNoPresentado.value = true
+}
+
+// Una sola vía (ya no es toggle): el turno sale de esta tabla y de
+// "Llamando ahora", y vuelve a "Turnos para Llamar" (con el chip "No se
+// presentó") — por eso se recargan las dos listas.
+async function confirmarNoPresentado() {
+  const turno = turnoNoPresentado.value
+  if (!turno) return
+
   marcandoNoPresentado.value = turno.turnoId
   try {
-    const resp = await TurnosDelDiaService.marcarNoPresentado(turno.turnoId)
-    const item = turnosEntrega.value.find((t) => t.turnoId === turno.turnoId)
-    if (item) item.noPresentado = resp.noPresentado
+    await TurnosDelDiaService.marcarNoPresentado(turno.turnoId)
+    showSnackbar(`Turno ${turno.placa} marcado como no presentado. Volvió a "Turnos para Llamar".`, 'warning')
+    turnosEntrega.value = turnosEntrega.value.filter((t) => t.turnoId !== turno.turnoId)
+    cargarTurnos()
   } catch (err) {
-    console.error('Error al cambiar estado de presentación:', err)
-    const message = err instanceof Error ? err.message : 'Error al actualizar el estado.'
+    console.error('Error al marcar no presentado:', err)
+    const message = err instanceof Error ? err.message : 'Error al marcar el turno como no presentado.'
     showSnackbar(`❌ ${message}`, 'error')
   } finally {
     marcandoNoPresentado.value = null
+    turnoNoPresentado.value = null
   }
 }
 

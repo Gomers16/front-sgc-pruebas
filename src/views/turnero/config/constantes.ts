@@ -98,3 +98,15 @@ export type ModuloTurnero = (typeof MODULOS_TURNERO)[number]
 // texto libre tipo "Caja 2") — cae acá en vez de romper el select o mostrar
 // un valor inválido. Ver TurnosParaLlamar.vue::cargarTurnos().
 export const MODULO_TURNERO_DEFECTO: ModuloTurnero = MODULOS_TURNERO[0]
+
+// Llamado de pregunta (tipoLlamado === 'pregunta', botón "Preguntar" en
+// TurnosParaLlamar.vue): siempre con el módulo REAL — solo cambia la
+// instrucción, para distinguirlo a simple vista de un llamado a módulo
+// ("Diríjase a"). En pantalla no se repite "Turno con placa …" porque la
+// placa ya se ve en grande al lado; la voz sí dice la frase completa (ver
+// useVozTurno.ts): "Turno con placa {placa}, por favor acérquese al {módulo}."
+//  - Hero (PanelEntrega.vue) y modal (ModalLlamado.vue): esta instrucción +
+//    el módulo debajo.
+//  - Histórico (TarjetaEntrega.vue): "{PREFIJO} · {módulo}".
+export const INSTRUCCION_LLAMADO_PREGUNTA = 'Por favor acérquese a'
+export const PREFIJO_HISTORICO_PREGUNTA = 'Pregunta'

@@ -6,8 +6,13 @@
       <Transition name="hero-transicion" mode="out-in">
         <div v-if="heroTurno" :key="`${heroTurno.id}-${heroTurno.llamadoEn}`" class="panel-entrega__hero-contenido">
           <p class="panel-entrega__hero-placa">{{ heroTurno.placa }}</p>
+          <!-- Mismo módulo real en los dos casos; solo cambia la instrucción
+               para distinguir una pregunta de un llamado a módulo (ver
+               INSTRUCCION_LLAMADO_PREGUNTA). -->
           <div class="panel-entrega__hero-aviso">
-            <p class="panel-entrega__hero-instruccion">Diríjase a</p>
+            <p class="panel-entrega__hero-instruccion">
+              {{ heroTurno.tipoLlamado === 'pregunta' ? INSTRUCCION_LLAMADO_PREGUNTA : 'Diríjase a' }}
+            </p>
             <p class="panel-entrega__hero-modulo">{{ heroTurno.modulo }}</p>
           </div>
           <!-- Se reserva el espacio siempre; solo se anima/hace visible
@@ -49,7 +54,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import TarjetaEntrega from './TarjetaEntrega.vue'
-import { CANTIDAD_ULTIMOS_LLAMADOS } from '../config/constantes'
+import { CANTIDAD_ULTIMOS_LLAMADOS, INSTRUCCION_LLAMADO_PREGUNTA } from '../config/constantes'
 import type { TurnoLlamado } from '../composables/useTurnos'
 import './PanelEntrega.css'
 
@@ -61,9 +66,14 @@ const props = defineProps<{
   hablando: boolean
 }>()
 
-// Mismo recorte de siempre: los primeros N tal como vienen, ni se ordena ni
-// se decide cuál es "el más reciente" acá.
-const visibles = computed(() => props.turnos.slice(0, CANTIDAD_ULTIMOS_LLAMADOS))
+// Solo llamados reales a un módulo (enModulo): una pregunta sobre un turno
+// todavía sin llamar viaja en `turnos` únicamente para disparar modal + voz
+// (useColaModales.ts) — ese turno sigue en la cola de la izquierda y no se
+// duplica acá. Después, mismo recorte de siempre: los primeros N tal como
+// vienen, ni se ordena ni se decide cuál es "el más reciente" acá.
+const visibles = computed(() =>
+  props.turnos.filter((t) => t.enModulo).slice(0, CANTIDAD_ULTIMOS_LLAMADOS)
+)
 
 // El más reciente ya no es una tarjeta más de la lista: es el hero fijo de
 // arriba, con la placa en grande y el indicador de voz. El histórico de

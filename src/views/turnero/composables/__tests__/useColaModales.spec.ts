@@ -31,8 +31,22 @@ async function esperarMicrotareasYReactividad() {
   await nextTick()
 }
 
-function llamado(id: string, llamadoEn: string): TurnoLlamado {
-  return { id, placa: `PLC${id}`, turno: null, canal: 'RTM', modulo: `Módulo ${id}`, llamadoEn }
+function llamado(
+  id: string,
+  llamadoEn: string,
+  tipoLlamado: TurnoLlamado['tipoLlamado'] = 'modulo',
+  enModulo = true
+): TurnoLlamado {
+  return {
+    id,
+    placa: `PLC${id}`,
+    turno: null,
+    canal: 'RTM',
+    modulo: `Módulo ${id}`,
+    llamadoEn,
+    tipoLlamado,
+    enModulo,
+  }
 }
 
 function montarPantalla() {
@@ -157,6 +171,85 @@ describe('useColaModales + useTurnos — carga inicial', () => {
       expect((wrapper.vm.turnoEnModal as unknown as TurnoLlamado).llamadoEn).toBe(
         '2026-01-01T12:00:00.000-05:00'
       )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('SÍ dispara el modal para "Preguntar" sobre un turno ya llamado — mismo id, llamadoEn más nuevo, tipo pregunta', async () => {
+    vi.useFakeTimers()
+    try {
+      const { get } = await import('@/services/http')
+      const primerFetch = deferido<{ colaSeguimiento: []; ultimosLlamados: TurnoLlamado[] }>()
+      const segundoFetch = deferido<{ colaSeguimiento: []; ultimosLlamados: TurnoLlamado[] }>()
+      vi.mocked(get)
+        .mockReturnValueOnce(primerFetch.promise as Promise<unknown>)
+        .mockReturnValueOnce(segundoFetch.promise as Promise<unknown>)
+
+      const wrapper = montarPantalla()
+
+      primerFetch.resolve({
+        colaSeguimiento: [],
+        ultimosLlamados: [llamado('1', '2026-01-01T10:00:00.000-05:00')],
+      })
+      await vi.advanceTimersByTimeAsync(0)
+      await nextTick()
+      expect(wrapper.vm.turnoEnModal).toBeNull()
+
+      // Mismo mecanismo que "Volver a llamar" (el back sube llamado_at), pero
+      // el turno llega con tipoLlamado 'pregunta' — el modal lo recibe tal
+      // cual para mostrar el texto genérico en vez del módulo.
+      segundoFetch.resolve({
+        colaSeguimiento: [],
+        ultimosLlamados: [llamado('1', '2026-01-01T12:00:00.000-05:00', 'pregunta')],
+      })
+      await vi.advanceTimersByTimeAsync(INTERVALO_POLL_MS + 100)
+      await nextTick()
+
+      expect(wrapper.vm.turnoEnModal).not.toBeNull()
+      expect((wrapper.vm.turnoEnModal as unknown as TurnoLlamado).tipoLlamado).toBe('pregunta')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('SÍ dispara el modal para "Preguntar" sobre un turno sin llamar (enModulo=false)', async () => {
+    vi.useFakeTimers()
+    try {
+      const { get } = await import('@/services/http')
+      const primerFetch = deferido<{ colaSeguimiento: []; ultimosLlamados: TurnoLlamado[] }>()
+      const segundoFetch = deferido<{ colaSeguimiento: []; ultimosLlamados: TurnoLlamado[] }>()
+      vi.mocked(get)
+        .mockReturnValueOnce(primerFetch.promise as Promise<unknown>)
+        .mockReturnValueOnce(segundoFetch.promise as Promise<unknown>)
+
+      const wrapper = montarPantalla()
+
+      primerFetch.resolve({
+        colaSeguimiento: [],
+        ultimosLlamados: [llamado('1', '2026-01-01T10:00:00.000-05:00')],
+      })
+      await vi.advanceTimersByTimeAsync(0)
+      await nextTick()
+      expect(wrapper.vm.turnoEnModal).toBeNull()
+
+      // El turno '7' nunca se llamó a módulo: llega solo por la pregunta,
+      // con enModulo=false. PanelEntrega lo filtra, pero el anuncio (modal +
+      // voz) tiene que dispararse igual — es lo único que ve el cliente.
+      segundoFetch.resolve({
+        colaSeguimiento: [],
+        ultimosLlamados: [
+          llamado('7', '2026-01-01T11:00:00.000-05:00', 'pregunta', false),
+          llamado('1', '2026-01-01T10:00:00.000-05:00'),
+        ],
+      })
+      await vi.advanceTimersByTimeAsync(INTERVALO_POLL_MS + 100)
+      await nextTick()
+
+      const enModal = wrapper.vm.turnoEnModal as unknown as TurnoLlamado
+      expect(enModal).not.toBeNull()
+      expect(enModal.id).toBe('7')
+      expect(enModal.enModulo).toBe(false)
     } finally {
       vi.useRealTimers()
     }

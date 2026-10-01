@@ -29,6 +29,19 @@
   justify-content: center;
 }
 
+/* Solo en preguntas ("Por favor acérquese a"), justo encima del módulo —
+   más chica y tenue que el módulo, que sigue siendo el dato principal. */
+.modal-llamado__instruccion {
+  margin-top: var(--espacio-md);
+  font-size: var(--texto-lg);
+  font-weight: 600;
+  color: var(--marca-texto-tenue);
+}
+
+.modal-llamado__instruccion + .modal-llamado__modulo {
+  margin-top: var(--espacio-xs);
+}
+
 .modal-llamado__modulo {
   margin-top: var(--espacio-md);
   font-size: var(--texto-xl);

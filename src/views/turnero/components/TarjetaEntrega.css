@@ -82,19 +82,6 @@
   font-size: min(33cqh, 5cqw);
   font-weight: 600;
   line-height: 1.1;
-  /* Mismo color que EN y Placa: "no presentado" se distingue porque
-     atenúa toda la fila (.es-no-presentado), no por esta celda. */
+  /* Mismo color que EN y Placa. */
   color: var(--entrega-texto);
-}
-
-.fila-entrega__icono-no-presentado {
-  color: var(--entrega-texto-tenue);
-  margin-right: 0.3em;
-  vertical-align: middle;
-}
-
-/* No se presentó: el turno NUNCA desaparece solo (ver PanelEntrega.vue) —
-   solo se atenúa toda la fila para indicar "sigue esperando volver". */
-.fila-entrega.es-no-presentado {
-  opacity: 0.55;
 }

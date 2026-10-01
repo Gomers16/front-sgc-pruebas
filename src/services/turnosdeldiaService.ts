@@ -205,7 +205,8 @@ export interface TurnoPendienteEntrega {
   servicio: { codigoServicio: string; nombreServicio: string } | null
   modulo: string
   llamadoEn: string
-  noPresentado: boolean
+  // Tipo del último anuncio: llamado a módulo, o llamado genérico de pregunta
+  tipoLlamado: 'modulo' | 'pregunta'
 }
 
 /* ========== Payloads ========== */
@@ -389,9 +390,17 @@ class TurnosDelDiaService {
 
   /* ===== Turnero (llamado a módulo) ===== */
 
-  /** Turnos ya certificados (finalizado) de hoy sin llamado registrado, + preferencia de módulo del usuario */
+  /**
+   * Turnos ya certificados (finalizado) de hoy sin llamado activo — nunca
+   * llamados, llamados que no se presentaron (noPresentadoPrevio=true), o
+   * con solo un "Preguntar" (preguntaEnviada=true) —, + preferencia de
+   * módulo del usuario
+   */
   public static fetchTurnosPendientesLlamar(usuarioId: number) {
-    return get<{ turnos: Turno[]; ultimoModuloPreferido: string | null }>(
+    return get<{
+      turnos: (Turno & { noPresentadoPrevio: boolean; preguntaEnviada: boolean })[]
+      ultimoModuloPreferido: string | null
+    }>(
       `${this.BASE}/pendientes-llamar`,
       {
         params: { usuarioId },
@@ -400,7 +409,10 @@ class TurnosDelDiaService {
     )
   }
 
-  /** Registra el llamado de un turno a un módulo y actualiza la preferencia del usuario */
+  /**
+   * Registra el llamado de un turno a un módulo y actualiza la preferencia del
+   * usuario. Si el turno no se había presentado, el back reutiliza su llamado.
+   */
   public static llamarTurno(id: number, modulo: string, usuarioId: number) {
     return post<{ message: string; llamadoId: number }, { modulo: string; usuarioId: number }>(
       `${this.BASE}/${id}/llamar`,
@@ -427,9 +439,12 @@ class TurnosDelDiaService {
     )
   }
 
-  /** Toggle de no_presentado — la misma llamada revierte el estado anterior */
+  /**
+   * Marca no_presentado (una sola vía, ya no es toggle): el turno sale de
+   * "Llamando ahora" y vuelve a la cola / a "Turnos para Llamar"
+   */
   public static marcarNoPresentado(id: number) {
-    return patch<{ message: string; noPresentado: boolean }>(
+    return patch<{ message: string; noPresentado: true }>(
       `${this.BASE}/${id}/no-presentado`,
       undefined,
       { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
@@ -441,6 +456,32 @@ class TurnosDelDiaService {
     return patch<{ message: string; llamadoId: number }>(
       `${this.BASE}/${id}/volver-a-llamar`,
       undefined,
+      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+    )
+  }
+
+  /**
+   * "Preguntar" sobre un turno YA llamado (pendientes de entrega): sube
+   * llamado_at con tipo 'pregunta', mismo módulo — la pantalla anuncia
+   * "…por favor acérquese al {módulo}"
+   */
+  public static llamarParaPregunta(id: number) {
+    return patch<{ message: string; llamadoId: number }>(
+      `${this.BASE}/${id}/llamar-pregunta`,
+      undefined,
+      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+    )
+  }
+
+  /**
+   * "Preguntar" sobre un turno todavía SIN llamar ("Turnos para Llamar"),
+   * con el módulo seleccionado en ese momento: la pantalla lo anuncia, pero
+   * el turno sigue en "Turnos para Llamar" y en la cola hasta un LLAMAR real
+   */
+  public static preguntarTurno(id: number, modulo: string, usuarioId: number) {
+    return post<{ message: string; llamadoId: number }, { modulo: string; usuarioId: number }>(
+      `${this.BASE}/${id}/preguntar`,
+      { modulo, usuarioId },
       { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
     )
   }
