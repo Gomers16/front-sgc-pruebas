@@ -469,6 +469,8 @@ interface Turno {
   servicioCodigo?: ServicioCodigo | string
   canalAtribucion?: 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES' | string
   agenteCaptacion?: AgenteCaptacionLite | null
+  /** Segunda vez gratuita (TINYINT: puede llegar 0/1). */
+  esSegundaVez?: boolean | number | null
   createdAt: string
   updatedAt: string
 }
@@ -713,6 +715,9 @@ const calculateReportData = () => {
   const serviciosCount: Record<string, number> = {}
 
   for (const t of turnos.value) {
+    // Una segunda vez (reinspección gratuita) no es captación: no suma ni por
+    // medio ni por servicio (sigue visible en Turnos del día con "2ª vez").
+    if (t.esSegundaVez) continue
     if (t.medioEntero && t.medioEntero in mediosCount) {
       mediosCount[t.medioEntero]++
     }
@@ -767,11 +772,13 @@ const showDetailsModal = (type: 'medioEntero' | 'servicio', value?: string) => {
   currentDetailValue.value = value
   filteredDetailTurnos.value = []
 
+  // Mismo criterio que calculateReportData(): sin segundas veces.
+  const captados = turnos.value.filter(t => !t.esSegundaVez)
   if (type === 'medioEntero' && value) {
-    filteredDetailTurnos.value = turnos.value.filter(t => t.medioEntero === (value as MedioEnteroFinalDB))
+    filteredDetailTurnos.value = captados.filter(t => t.medioEntero === (value as MedioEnteroFinalDB))
     currentDetailValueText.value = String(value)
   } else if (type === 'servicio' && value) {
-    filteredDetailTurnos.value = turnos.value.filter(t => getServicioCodigo(t) === value)
+    filteredDetailTurnos.value = captados.filter(t => getServicioCodigo(t) === value)
     currentDetailValueText.value = value
   }
 
