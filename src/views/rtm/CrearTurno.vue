@@ -1105,14 +1105,20 @@ async function refreshAlertaVentanaServicio() {
       placa: placaActual,
       servicioId: form.value.servicioId,
       estado: 'finalizado',
-      perPage: 5,
+      // El backend sube cualquier perPage < 10 a 10. Pedimos 20 explícito
+      // para que, saltando los RECHAZADOS de abajo, quede margen de sobra.
+      perPage: 20,
       page: 1,
     })
     // El filtro de placa del backend es LIKE (substring) — nos aseguramos acá
     // de quedarnos solo con coincidencias exactas antes de tomar la primera
     // (ya vienen ordenadas por fecha desc, turno_numero desc).
+    // Un turno certificado RECHAZADO no da vigencia (mismo criterio que
+    // whereTurnoDaVigencia en el backend): se salta.
     const lastFinalizado = (turnos ?? []).find(
-      (t) => (t.placa || '').trim().toUpperCase() === placaActual
+      (t) =>
+        (t.placa || '').trim().toUpperCase() === placaActual &&
+        t.resultadoCertificacion !== 'RECHAZADA'
     )
     if (!lastFinalizado?.fecha) return
 

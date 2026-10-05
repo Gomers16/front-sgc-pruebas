@@ -290,6 +290,37 @@
               </span>
             </v-alert>
 
+            <!-- Resultado de la certificación (solo RTM / PREV) -->
+            <div v-if="requiereResultado && !certificacionExistente" class="mb-3 mb-sm-4">
+              <div class="label mb-1">Resultado de la certificación *</div>
+              <v-btn-toggle
+                v-model="resultado"
+                divided
+                variant="outlined"
+                :density="$vuetify.display.xs ? 'compact' : 'comfortable'"
+                class="w-100"
+              >
+                <v-btn value="APROBADA" color="success" class="flex-grow-1" prepend-icon="mdi-check-circle">
+                  Aprobada
+                </v-btn>
+                <v-btn value="RECHAZADA" color="error" class="flex-grow-1" prepend-icon="mdi-close-circle">
+                  Rechazada
+                </v-btn>
+              </v-btn-toggle>
+
+              <v-alert
+                v-if="resultado === 'RECHAZADA'"
+                type="warning"
+                variant="tonal"
+                class="mt-3"
+                :density="$vuetify.display.xs ? 'compact' : 'comfortable'"
+              >
+                <span class="text-caption text-sm-body-2">
+                  Se abrirá una ventana de 15 días para segunda vez gratuita.
+                </span>
+              </v-alert>
+            </div>
+
             <div class="d-flex align-center justify-end flex-wrap" style="gap:8px">
               <v-btn
                 variant="text"
@@ -363,6 +394,13 @@
               <div class="value mb-2">
                 {{ nota || '—' }}
               </div>
+
+              <template v-if="requiereResultado">
+                <div class="label">Resultado</div>
+                <div class="value mb-2">
+                  {{ resultado === 'APROBADA' ? 'Aprobada' : resultado === 'RECHAZADA' ? 'Rechazada' : '—' }}
+                </div>
+              </template>
             </v-col>
           </v-row>
         </v-card-text>
@@ -400,7 +438,11 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { DateTime } from 'luxon'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
-import { CertificacionService } from '@/services/certificacion_service'
+import {
+  CertificacionService,
+  SERVICIOS_CON_RESULTADO,
+  type ResultadoCertificacion,
+} from '@/services/certificacion_service'
 
 /* ===== Router ===== */
 const route = useRoute()
@@ -491,8 +533,19 @@ function getTurnoId(): number | null {
 }
 
 /* ===== UI computeds ===== */
+/* Resultado (Segunda vez): obligatorio solo si el servicio es RTM o PREV */
+const resultado = ref<ResultadoCertificacion | null>(null)
+const requiereResultado = computed(() =>
+  !!turno.value &&
+  SERVICIOS_CON_RESULTADO.includes(getServicioCodigo(turno.value).toUpperCase())
+)
+
 const puedeConfirmar = computed(
-  () => !!turno.value && !!previewBlob.value && !saving.value
+  () =>
+    !!turno.value &&
+    !!previewBlob.value &&
+    !saving.value &&
+    (!requiereResultado.value || !!resultado.value)
 )
 
 const estadoTexto = computed(() => {
@@ -632,7 +685,9 @@ function goBack() {
 /* ===== Dialog ===== */
 function openConfirm() {
   if (!puedeConfirmar.value) {
-    snack.text = 'Selecciona una imagen de evidencia antes de confirmar.'
+    snack.text = previewBlob.value
+      ? 'Selecciona el resultado de la certificación (Aprobada o Rechazada).'
+      : 'Selecciona una imagen de evidencia antes de confirmar.'
     snack.show = true
     return
   }
@@ -642,6 +697,7 @@ function openConfirm() {
 /* ===== Guardar / finalizar ===== */
 async function confirmarYGuardar() {
   if (!turno.value || !previewBlob.value) return
+  if (requiereResultado.value && !resultado.value) return
 
   saving.value = true
   try {
@@ -650,7 +706,8 @@ async function confirmarYGuardar() {
     await CertificacionService.subirEvidencia(
       turnoId,
       previewBlob.value,
-      nota.value || null
+      nota.value || null,
+      requiereResultado.value ? resultado.value : null
     )
 
     snack.text = '✅ Certificación registrada y turno finalizado.'

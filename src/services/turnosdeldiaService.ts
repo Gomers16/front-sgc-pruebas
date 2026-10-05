@@ -164,6 +164,10 @@ export interface Turno {
 
   reasignadoDeTurnoId?: number | null
 
+  // 👇 Segunda vez: resultado de la certificación (solo RTM/PREV).
+  // NULL = sin resultado (histórico / SOAT / PERI) → cuenta como aprobado.
+  resultadoCertificacion?: 'APROBADA' | 'RECHAZADA' | null
+
   // 👇 NUEVO: semáforo de etapas, calculado en backend (turno_etapas_service)
   // única fuente de verdad — no recalcular esto en el frontend.
   etapasRequeridas?: number
