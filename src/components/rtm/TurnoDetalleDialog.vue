@@ -428,6 +428,8 @@ export interface Turno {
 
   visitaVehiculoNumero?: number | null
   visitaVehiculoTexto?: string | null
+  /** Segunda vez gratuita (TINYINT: puede llegar 0/1). */
+  esSegundaVez?: boolean | number | null
   visitaVehiculoUltimasFechas?: string[]
   visitasVehiculoDetalle?: HistVisit[]
 
@@ -547,7 +549,11 @@ const getEtapas = (turno: Turno): Etapa[] => {
         ? `${turno.usuario.nombres} ${turno.usuario.apellidos}`
         : null,
     },
-    {
+  ]
+
+  // Segunda vez (0/1 → Boolean): sin Facturación.
+  if (!Boolean(turno.esSegundaVez)) {
+    etapas.push({
       key: `facturacion-${turno.id}`,
       name: 'Facturación',
       completed: !!turno.tieneFacturacion,
@@ -555,8 +561,8 @@ const getEtapas = (turno: Turno): Etapa[] => {
       funcionario: turno.facturacionFuncionario
         ? `${turno.facturacionFuncionario.nombres} ${turno.facturacionFuncionario.apellidos}`
         : null,
-    },
-  ]
+    })
+  }
 
   if (!esSOAT) {
     etapas.push({

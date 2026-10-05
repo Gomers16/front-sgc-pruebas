@@ -158,8 +158,10 @@
             <v-col cols="12" sm="4">
               <v-select
                 v-model="form.estado"
-                :items="['activo','inactivo','cancelado','finalizado']"
+                :items="estadoItems"
                 label="Estado del Turno"
+                :hint="finalizarSoloPorCertificacion ? 'RTM/PREV se finaliza desde Certificación (con resultado).' : undefined"
+                :persistent-hint="finalizarSoloPorCertificacion"
                 variant="outlined"
                 required
                 :density="$vuetify.display.xs ? 'compact' : 'comfortable'"
@@ -803,6 +805,20 @@ const servicioCodigoActual = computed(() => {
   const id = form.value.servicioId
   return id ? serviciosMapById.value[id]?.codigo : form.value.servicioCodigo || null
 })
+
+// RTM/PREV solo se finalizan desde Certificación (resultado Aprobada/Rechazada):
+// el backend responde 409 FINALIZAR_REQUIERE_CERTIFICACION si se intenta aquí.
+const finalizarSoloPorCertificacion = computed(() => {
+  const cod = String(servicioCodigoActual.value || '').toUpperCase()
+  return ['RTM', 'PREV'].includes(cod) && originalRaw.value?.estado !== 'finalizado'
+})
+const estadoItems = computed(() =>
+  ['activo', 'inactivo', 'cancelado', 'finalizado'].map((e) => ({
+    title: e,
+    value: e,
+    props: { disabled: e === 'finalizado' && finalizarSoloPorCertificacion.value },
+  }))
+)
 
 const usuarioNombre = computed(() => {
   const u = originalRaw.value?.usuario

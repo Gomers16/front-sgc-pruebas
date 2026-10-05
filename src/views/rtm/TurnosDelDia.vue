@@ -297,6 +297,17 @@
               >
                 {{ estadoChipLabel(turno) }}
               </v-chip>
+              <v-chip
+                v-if="Boolean(turno.esSegundaVez)"
+                class="mb-2 mb-sm-3 ml-1"
+                :size="$vuetify.display.xs ? 'x-small' : 'small'"
+                color="deep-purple-accent-2"
+                variant="elevated"
+                label
+                prepend-icon="mdi-autorenew"
+              >
+                2ª vez
+              </v-chip>
 
               <p class="text-caption text-sm-subtitle-1 text-on-primary-text mb-1">
                 🛠 Servicio:
@@ -1033,6 +1044,9 @@ interface Turno {
   etapasRequeridas?: number
   etapasCompletadas?: number
   estadoVisual?: EstadoVisual
+  // Lista de etapas que aplican (backend) y segunda vez (0/1 → usar Boolean()).
+  etapasRequeridasLista?: Array<'puerta' | 'facturacion' | 'certificacion'>
+  esSegundaVez?: boolean | number | null
 }
 
 interface Etapa {
@@ -1477,10 +1491,10 @@ const loadTurnosHoy = async () => {
 watch(fechaSeleccionada, () => loadTurnosHoy())
 
 const getEtapas = (turno: Turno): Etapa[] => {
-  // Fuente de verdad de cuántas etapas requiere el turno: turno.etapasRequeridas
-  // (calculado en backend por turno_etapas_service). Si no llegara, se asume
-  // 3 (Puerta+Facturación+Certificación) como caso general.
-  const esSOAT = (turno.etapasRequeridas ?? 3) < 3
+  // Fuente de verdad: turno.etapasRequeridasLista (backend,
+  // turno_etapas_service). SOAT no tiene Certificación y una segunda vez no
+  // tiene Facturación. Si la lista no llegara, se asume el caso general.
+  const lista = turno.etapasRequeridasLista ?? ['puerta', 'facturacion', 'certificacion']
 
   const etapas: Etapa[] = [
     {
@@ -1492,7 +1506,10 @@ const getEtapas = (turno: Turno): Etapa[] => {
         ? `${turno.usuario.nombres} ${turno.usuario.apellidos}`
         : null
     },
-    {
+  ]
+
+  if (lista.includes('facturacion')) {
+    etapas.push({
       key: `facturacion-${turno.id}`,
       name: 'Facturación',
       completed: !!turno.tieneFacturacion,
@@ -1500,11 +1517,10 @@ const getEtapas = (turno: Turno): Etapa[] => {
       funcionario: turno.facturacionFuncionario
         ? `${turno.facturacionFuncionario.nombres} ${turno.facturacionFuncionario.apellidos}`
         : null
-    },
-  ]
+    })
+  }
 
-  // Solo agregar certificación si NO es SOAT
-  if (!esSOAT) {
+  if (lista.includes('certificacion')) {
     etapas.push({
       key: `certificacion-${turno.id}`,
       name: 'Certificación',
