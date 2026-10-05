@@ -1555,3 +1555,70 @@ export async function getMetaComercialIngresoRealDateo(
     { query: { mes, anio, asesor_id: asesorId } }
   )
 }
+
+/* ======================= Segunda vez (Entrega C2, solo conteos) ======================= */
+
+export type EstadoVentanaSegundaVez = 'ABIERTA' | 'USADA' | 'VENCIDA' | 'SUPERADA' | 'ANULADA'
+
+export interface FiltrosReporteSegundaVez {
+  fecha_inicio: string
+  fecha_fin: string
+  servicio?: 'RTM' | 'PREV' | null
+  sede_id?: number | null
+  placa?: string | null
+  estado?: EstadoVentanaSegundaVez | null
+}
+
+export interface FilaReporteSegundaVez {
+  turno_origen_id: number
+  placa: string
+  servicio: string
+  sede: string | null
+  turno_origen_codigo: string
+  turno_origen_fecha: string | null
+  rechazado_at: string | null
+  certificado_por: string | null
+  resultado_actual: 'APROBADA' | 'RECHAZADA' | null
+  rechazo_corregido: boolean
+  ventana_hasta: string | null
+  estado: EstadoVentanaSegundaVez | 'NO_APLICA'
+  segunda_vez_codigo: string | null
+  segunda_vez_resultado: 'APROBADA' | 'RECHAZADA' | 'PENDIENTE' | null
+  horas_transcurridas: number | null
+  regreso_tras_vencer_pagando: boolean
+  turno_posterior_codigo: string | null
+}
+
+export interface ReporteSegundaVezResponse {
+  fecha_inicio: string
+  fecha_fin: string
+  generado_at: string
+  aviso: string | null
+  indicadores: {
+    rechazos: number
+    abiertas: number
+    usadas: number
+    vencidas: number
+    superadas: number
+    anuladas: number
+    tasa_regreso_pct: number | null
+    segundas_veces: { aprobadas: number; rechazadas: number; pendientes: number }
+    horas_promedio_hasta_regreso: number | null
+    regresaron_tras_vencer_pagando: number
+  }
+  detalle: FilaReporteSegundaVez[]
+}
+
+export async function getReporteSegundaVez(
+  filtros: FiltrosReporteSegundaVez
+): Promise<ReporteSegundaVezResponse> {
+  return apiFetch<ReporteSegundaVezResponse>('/reportes-admin/segunda-vez', {
+    query: { ...filtros },
+  })
+}
+
+export async function descargarReporteSegundaVezExcel(
+  filtros: FiltrosReporteSegundaVez
+): Promise<Blob> {
+  return apiFetchBlob('/reportes-admin/segunda-vez/excel', { ...filtros })
+}

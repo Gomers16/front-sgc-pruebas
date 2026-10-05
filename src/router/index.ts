@@ -462,6 +462,17 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/reportes-admin/segunda-vez',
+    name: 'ReporteSegundaVez',
+    component: () => import('@/views/reportes/ReporteSegundaVez.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Segunda vez',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'CONTABILIDAD'],
+    },
+  },
+  {
     path: '/reportes-admin/meta-mensual',
     name: 'ReporteMetaMensual',
     component: () => import('@/views/reportes/ReporteMetaMensual.vue'),

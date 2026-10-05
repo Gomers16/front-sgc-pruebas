@@ -389,6 +389,13 @@
             class="nav-item-child"
           />
           <v-list-item
+            prepend-icon="mdi-autorenew"
+            title="Segunda vez"
+            :to="{ name: 'ReporteSegundaVez' }"
+            link
+            class="nav-item-child"
+          />
+          <v-list-item
             prepend-icon="mdi-target"
             title="Meta Mensual"
             :to="{ name: 'ReporteMetaMensual' }"
