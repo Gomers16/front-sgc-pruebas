@@ -6,6 +6,9 @@ import type { Turno } from './turnosdeldiaService'
 export interface DashboardData {
   turnosEnProceso: number
   turnosFinalizados: number
+  /** De los anteriores, cuántos son segunda vez gratuita (se incluyen, con marca "2ª vez"). */
+  turnosEnProcesoSegundaVez: number
+  turnosFinalizadosSegundaVez: number
   siguienteTurno: number
   /** En proceso del día, por servicio */
   turnosEnProcesoPorServicio: {
@@ -93,9 +96,13 @@ export async function fetchDashboard(usuarioId: number): Promise<DashboardData> 
   const turnos = await fetchTurnosDelDia(todayISO)
 
   const turnosEnProceso = turnos.filter(isEnProceso).length
-  const turnosFinalizados = turnos.filter(
-    (t) => t.estado === 'finalizado' || (t.estado === 'activo' && t.horaSalida)
-  ).length
+  const esFinalizado = (t: Turno) =>
+    t.estado === 'finalizado' || (t.estado === 'activo' && !!t.horaSalida)
+  const turnosFinalizados = turnos.filter(esFinalizado).length
+  // Operativo: las segundas veces se incluyen en los conteos del día; solo se
+  // informa cuántas son (es_segunda_vez llega 0/1 → Boolean()).
+  const turnosEnProcesoSegundaVez = turnos.filter((t) => isEnProceso(t) && Boolean(t.esSegundaVez)).length
+  const turnosFinalizadosSegundaVez = turnos.filter((t) => esFinalizado(t) && Boolean(t.esSegundaVez)).length
 
   const nextFromBackend = await fetchNextTurnNumberSafe(usuarioId)
   const minExpected = computeMinExpectedNext(turnos)
@@ -126,6 +133,8 @@ export async function fetchDashboard(usuarioId: number): Promise<DashboardData> 
   return {
     turnosEnProceso,
     turnosFinalizados,
+    turnosEnProcesoSegundaVez,
+    turnosFinalizadosSegundaVez,
     siguienteTurno,
     turnosEnProcesoPorServicio: {
       rtm: rtmProc,

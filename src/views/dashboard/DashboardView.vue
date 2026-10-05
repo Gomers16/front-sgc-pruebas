@@ -50,7 +50,7 @@
           <DashboardIndicador
             icon="mdi-car-multiple"
             :valor="turnosEnProceso"
-            titulo="Turnos en proceso"
+            :titulo="tituloConSegundaVez('Turnos en proceso', turnosEnProcesoSegundaVez)"
             :loading="isLoadingKpis"
             color-card="grey-lighten-4"
             color-icon="blue-darken-2"
@@ -61,7 +61,7 @@
           <DashboardIndicador
             icon="mdi-check-circle-outline"
             :valor="turnosFinalizados"
-            titulo="Turnos finalizados"
+            :titulo="tituloConSegundaVez('Turnos finalizados', turnosFinalizadosSegundaVez)"
             :loading="isLoadingKpis"
             color-card="grey-lighten-4"
             color-icon="blue-darken-2"
@@ -216,6 +216,8 @@ const { snackbar, mostrarAviso } = useAvisos()
 const {
   turnosEnProceso,
   turnosFinalizados,
+  turnosEnProcesoSegundaVez,
+  turnosFinalizadosSegundaVez,
   siguienteTurno,
   kpiServicios,
   kpiServiciosTotal,
@@ -223,6 +225,10 @@ const {
   todayDate,
   cargarDashboard,
 } = useDashboardDatos()
+
+// Operativo: las segundas veces se incluyen en el conteo, con la marca "2ª vez".
+const tituloConSegundaVez = (titulo: string, n: number) =>
+  n > 0 ? `${titulo} (incl. ${n} 2ª vez)` : titulo
 
 function goCrearTurno() { router.push('/rtm/crear-turno') }
 function goTurnosDia()  { router.push('/rtm/turnos-dia') }

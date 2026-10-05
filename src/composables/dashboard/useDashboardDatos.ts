@@ -35,6 +35,9 @@ export function useDashboardDatos() {
   // 📊 Estado de los KPIs
   const turnosEnProceso   = ref(0)
   const turnosFinalizados = ref(0)
+  // Segundas veces incluidas en los dos conteos anteriores (marca "2ª vez")
+  const turnosEnProcesoSegundaVez = ref(0)
+  const turnosFinalizadosSegundaVez = ref(0)
   const siguienteTurno    = ref(0)
 
   // 👇 KPIs por servicio (en proceso)
@@ -76,6 +79,8 @@ export function useDashboardDatos() {
 
       turnosEnProceso.value   = Number(data?.turnosEnProceso ?? 0)
       turnosFinalizados.value = Number(data?.turnosFinalizados ?? 0)
+      turnosEnProcesoSegundaVez.value = Number(data?.turnosEnProcesoSegundaVez ?? 0)
+      turnosFinalizadosSegundaVez.value = Number(data?.turnosFinalizadosSegundaVez ?? 0)
       siguienteTurno.value    = Number(data?.siguienteTurno ?? 0)
 
       // Conteos por servicio (en proceso)
@@ -126,6 +131,8 @@ export function useDashboardDatos() {
     // estado expuesto
     turnosEnProceso,
     turnosFinalizados,
+    turnosEnProcesoSegundaVez,
+    turnosFinalizadosSegundaVez,
     siguienteTurno,
     kpiServicios,
     kpiServiciosTotal, // 👈 NUEVO
