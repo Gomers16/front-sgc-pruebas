@@ -487,6 +487,80 @@
               </v-alert>
             </v-col>
 
+            <!-- Segunda vez gratuita (RTM/PREV rechazado en las últimas 360 h) -->
+            <v-col cols="12" v-if="ventanaSV && (ventanaSVAbierta || puedeForzarSV)">
+              <v-alert
+                v-if="ventanaSVAbierta"
+                type="info"
+                color="deep-purple"
+                icon="mdi-autorenew"
+                variant="tonal"
+                density="comfortable"
+                class="rounded-lg"
+              >
+                <strong>Segunda vez gratuita hasta {{ svHastaTexto }}</strong><br />
+                Rechazada en el turno {{ ventanaSV.origenTurnoCodigo }} ({{ ventanaSV.origenFecha }}).
+                Sin facturación, sin dateo y sin comisión: solo Puerta y Certificación.
+                <v-checkbox
+                  v-model="segundaVezConfirmada"
+                  :disabled="svExcepcion === 'NO_APLICADA'"
+                  label="Confirmo que el vehículo regresa por su segunda vez gratuita"
+                  density="compact"
+                  hide-details
+                  class="mt-2"
+                />
+                <template v-if="puedeExcepcionSV">
+                  <v-checkbox
+                    :model-value="svExcepcion === 'NO_APLICADA'"
+                    label="Excepción: no aplicar la segunda vez (se cobra como turno normal)"
+                    density="compact"
+                    hide-details
+                    @update:model-value="toggleExcepcionSV('NO_APLICADA', $event)"
+                  />
+                  <v-text-field
+                    v-if="svExcepcion === 'NO_APLICADA'"
+                    v-model="svMotivo"
+                    label="Motivo de la excepción (obligatorio)"
+                    maxlength="255"
+                    counter="255"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-2"
+                  />
+                </template>
+              </v-alert>
+              <v-alert
+                v-else
+                type="warning"
+                icon="mdi-shield-key"
+                variant="tonal"
+                density="comfortable"
+                class="rounded-lg"
+              >
+                <strong>
+                  Segunda vez {{ ventanaSV.estado === 'VENCIDA' ? 'vencida' : 'ya no disponible' }}
+                </strong>
+                (turno {{ ventanaSV.origenTurnoCodigo }}, válida hasta {{ svHastaTexto }}).
+                <v-checkbox
+                  :model-value="svExcepcion === 'FORZADA'"
+                  label="Excepción: forzar la segunda vez gratuita"
+                  density="compact"
+                  hide-details
+                  @update:model-value="toggleExcepcionSV('FORZADA', $event)"
+                />
+                <v-text-field
+                  v-if="svExcepcion === 'FORZADA'"
+                  v-model="svMotivo"
+                  label="Motivo de la excepción (obligatorio)"
+                  maxlength="255"
+                  counter="255"
+                  density="compact"
+                  variant="outlined"
+                  class="mt-2"
+                />
+              </v-alert>
+            </v-col>
+
             <v-col cols="12">
               <v-textarea
                 v-model="form.observaciones"
@@ -782,6 +856,7 @@ import { DateTime } from 'luxon'
 import { authSetStore } from '@/stores/AuthStore'
 import type { VForm } from 'vuetify/components'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
+import { HttpError } from '@/services/http'
 import { BusquedasService } from '@/services/busquedas_service'
 import { TramitesService } from '@/services/tramitesService'
 
@@ -861,6 +936,21 @@ interface BusquedaResp {
   ultimaVisita: UltimaVisitaDTO | null
   vehiculos?: VehiculoDTO[] | null
   vehiculosCliente?: VehiculoDTO[] | null
+  ventanaSegundaVez?: VentanaSegundaVezDTO | null
+  ventanasSegundaVez?: VentanaSegundaVezDTO[]
+}
+
+interface VentanaSegundaVezDTO {
+  estado: 'ABIERTA' | 'USADA' | 'VENCIDA' | 'ANULADA' | 'SUPERADA' | 'NO_APLICA'
+  origenId: number
+  origenTurnoCodigo: string
+  origenFecha: string | null
+  servicioId: number
+  servicioCodigo?: string
+  rechazadoAt: string | null
+  hasta: string
+  horasRestantes: number
+  hijoActivoId: number | null
 }
 
 /** ===== Stores y estado base ===== **/
@@ -884,6 +974,44 @@ const lastSearched = ref<{ placa: string, tel: string }>({ placa: '', tel: '' })
 // 👇 NUEVA VARIABLE para el modal de observaciones
 const mostrarObservacionesDateo = ref(false)
 const alertaVentanaServicio = ref<{ servicio: string; vencimiento: string } | null>(null)
+
+/** ===== Segunda vez (backend: segunda_vez_service.ts) ===== **/
+// La ventana llega en la búsqueda unificada (ventanasSegundaVez) o en el 409
+// SEGUNDA_VEZ_DISPONIBLE de POST /turnos-rtm. El backend revalida siempre.
+const ventanaSV409 = ref<VentanaSegundaVezDTO | null>(null)
+const segundaVezConfirmada = ref(false)
+const svExcepcion = ref<'FORZADA' | 'NO_APLICADA' | null>(null)
+const svMotivo = ref('')
+const puedeExcepcionSV = computed(() => authStore.hasAnyRole(['SUPER_ADMIN', 'GERENCIA']))
+const ventanaSV = computed<VentanaSegundaVezDTO | null>(() => {
+  const sid = form.value.servicioId
+  if (!sid) return null
+  if (ventanaSV409.value?.servicioId === sid) return ventanaSV409.value
+  return (busqueda.value?.ventanasSegundaVez ?? []).find((v) => v.servicioId === sid) ?? null
+})
+const ventanaSVAbierta = computed(() => ventanaSV.value?.estado === 'ABIERTA')
+const puedeForzarSV = computed(
+  () =>
+    puedeExcepcionSV.value &&
+    !!ventanaSV.value &&
+    ['VENCIDA', 'SUPERADA'].includes(ventanaSV.value.estado)
+)
+const svHastaTexto = computed(() =>
+  ventanaSV.value
+    ? DateTime.fromISO(ventanaSV.value.hasta, { zone: 'America/Bogota' }).toFormat('dd/LL/yyyy hh:mm a')
+    : ''
+)
+function toggleExcepcionSV(tipo: 'FORZADA' | 'NO_APLICADA', activo: boolean | null) {
+  svExcepcion.value = activo ? tipo : null
+  if (activo) segundaVezConfirmada.value = false
+  if (!activo) svMotivo.value = ''
+}
+function resetSegundaVez() {
+  ventanaSV409.value = null
+  segundaVezConfirmada.value = false
+  svExcepcion.value = null
+  svMotivo.value = ''
+}
 
 const tipoVehiculoItems: ReadonlyArray<TipoVehiculoFrontend> = [
   'Liviano Particular',
@@ -1329,6 +1457,7 @@ async function resetFormFields() {
   busqueda.value = null
   lastSearched.value = { placa: '', tel: '' }
   tramiteForm.value = { nombreCliente: '', cedula: '', telefono: '', placa: '' }
+  resetSegundaVez()
   await fetchNextTurnNumbers()
   formRef.value?.resetValidation()
 }
@@ -1350,6 +1479,8 @@ onMounted(async () => {
 })
 
 watch(() => form.value.placa, () => {
+  // Otra placa: la confirmación/excepción de segunda vez no se arrastra.
+  resetSegundaVez()
   if (!AUTO_SEARCH_ON_COMPLETE || esTramites.value) return
   const p = (form.value.placa || '').trim().toUpperCase()
   if (PLACA_COMPLETA_AUTO_REGEX.test(p)) doSearch(false)
@@ -1365,6 +1496,9 @@ watch(() => form.value.medioEntero, () => {
   }
 })
 watch(() => form.value.servicioId, async () => {
+  segundaVezConfirmada.value = false
+  svExcepcion.value = null
+  svMotivo.value = ''
   tramiteForm.value = { nombreCliente: '', cedula: '', telefono: '', placa: '' }
   await fetchNextTurnNumbers()
   await refreshAlertaVentanaServicio()
@@ -1466,6 +1600,29 @@ async function submitForm() {
       return
     }
 
+    // Segunda vez: confirmación del operador o excepción con motivo.
+    if (svExcepcion.value && svMotivo.value.trim().length < 5) {
+      showSnackbar('Indica el motivo de la excepción (mínimo 5 caracteres).', 'warning')
+      return
+    }
+    if (ventanaSVAbierta.value && !segundaVezConfirmada.value && svExcepcion.value !== 'NO_APLICADA') {
+      showSnackbar('Esta placa tiene una segunda vez gratuita: confírmala en el aviso.', 'warning')
+      return
+    }
+    const origenSV = ventanaSV.value?.origenId ?? null
+    const segundaVezPayload =
+      svExcepcion.value === 'NO_APLICADA' && ventanaSVAbierta.value
+        ? { segundaVezExcepcion: 'NO_APLICADA' as const, segundaVezMotivo: svMotivo.value.trim() }
+        : svExcepcion.value === 'FORZADA' && puedeForzarSV.value
+          ? {
+              segundaVezOrigenId: origenSV,
+              segundaVezExcepcion: 'FORZADA' as const,
+              segundaVezMotivo: svMotivo.value.trim(),
+            }
+          : ventanaSVAbierta.value && segundaVezConfirmada.value
+            ? { segundaVezOrigenId: origenSV }
+            : {}
+
     const canal: CanalAtrib = form.value._captacionCanal ?? mapMedioEnteroToCanal(form.value.medioEntero)
 
     // Payload base con campos requeridos
@@ -1491,12 +1648,34 @@ async function submitForm() {
         clienteEmail: clienteEmail.value
       }),
       ...(convenioDetectado.value?.id && { convenioId: convenioDetectado.value.id }),
+      ...segundaVezPayload,
     }
 
     await TurnosDelDiaService.createTurno(payload)
-    showSnackbar('✅ Turno creado exitosamente', 'success')
+    showSnackbar(
+      'segundaVezOrigenId' in segundaVezPayload
+        ? '✅ Turno de segunda vez creado (sin facturación)'
+        : '✅ Turno creado exitosamente',
+      'success'
+    )
     await resetFormFields()
   } catch (err) {
+    // 409 de segunda vez: se muestra/actualiza el aviso con la ventana que
+    // devolvió el backend y el operador confirma y vuelve a crear.
+    const data = err instanceof HttpError ? (err.data as Record<string, unknown> | undefined) : undefined
+    const code = data?.code
+    if (code === 'SEGUNDA_VEZ_DISPONIBLE' || code === 'SEGUNDA_VEZ_NO_DISPONIBLE') {
+      ventanaSV409.value = (data?.ventana as VentanaSegundaVezDTO | null) ?? null
+      segundaVezConfirmada.value = false
+      showSnackbar(
+        code === 'SEGUNDA_VEZ_DISPONIBLE'
+          ? 'Esta placa tiene una segunda vez gratuita: confírmala en el aviso y vuelve a crear el turno.'
+          : `${(err as Error).message} Vuelve a crear el turno como turno normal.`,
+        'warning',
+        7000
+      )
+      return
+    }
     const message = err instanceof Error ? err.message : 'Error desconocido al crear el turno.'
     console.error('Error al crear turno:', err)
     showSnackbar(`❌ ${message}`, 'error')

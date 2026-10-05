@@ -1,6 +1,6 @@
 // src/services/turnosdeldiaService.ts
 import { DateTime } from 'luxon'
-import { get, post, put, patch, download } from './http'
+import { get, post, put, patch, download, HttpError } from './http'
 
 /* ================= Tipos base ================= */
 export type TipoVehiculoFrontend =
@@ -168,6 +168,13 @@ export interface Turno {
   // NULL = sin resultado (histórico / SOAT / PERI) → cuenta como aprobado.
   resultadoCertificacion?: 'APROBADA' | 'RECHAZADA' | null
 
+  // 👇 Segunda vez (reinspección gratuita RTM/PREV). es_segunda_vez es TINYINT:
+  // en el modelo serializado puede llegar 0/1 — usar siempre Boolean().
+  esSegundaVez?: boolean | number | null
+  turnoOrigenId?: number | null
+  // Lista de etapas que aplican (backend, turno_etapas_service): fuente de verdad.
+  etapasRequeridasLista?: Array<'puerta' | 'facturacion' | 'certificacion'>
+
   // 👇 NUEVO: semáforo de etapas, calculado en backend (turno_etapas_service)
   // única fuente de verdad — no recalcular esto en el frontend.
   etapasRequeridas?: number
@@ -237,6 +244,12 @@ export interface CreateTurnoPayload {
   conductorTelefono?: string
   conductorNombre?: string
    asesorDetectadoId?: number | null
+
+  /** 👇 Segunda vez: confirmación del operador (id del turno rechazado de origen) */
+  segundaVezOrigenId?: number | null
+  /** 👇 Excepción manual (solo SUPER_ADMIN / GERENCIA), con motivo obligatorio */
+  segundaVezExcepcion?: 'FORZADA' | 'NO_APLICADA' | null
+  segundaVezMotivo?: string | null
 }
 
 export interface UpdateTurnoPayload {
@@ -341,6 +354,14 @@ class TurnosDelDiaService {
       ...(payload.conductorTelefono ? { conductorTelefono: payload.conductorTelefono } : {}),
       ...(payload.conductorNombre ? { conductorNombre: payload.conductorNombre } : {}),
        ...(payload.asesorDetectadoId !== undefined ? { asesorDetectadoId: payload.asesorDetectadoId } : {}),
+
+      ...(payload.segundaVezOrigenId ? { segundaVezOrigenId: payload.segundaVezOrigenId } : {}),
+      ...(payload.segundaVezExcepcion
+        ? {
+            segundaVezExcepcion: payload.segundaVezExcepcion,
+            segundaVezMotivo: payload.segundaVezMotivo ?? '',
+          }
+        : {}),
     }
 
     try {
@@ -350,6 +371,9 @@ class TurnosDelDiaService {
     } catch (err: unknown) {
       const msg = TurnosDelDiaService.extractServerMessage(err)
       console.error('createTurno() falló:', msg, err)
+      // Se conservan status y body (code, ventana…) para que CrearTurno.vue
+      // pueda reaccionar a 409 SEGUNDA_VEZ_DISPONIBLE y similares.
+      if (err instanceof HttpError) throw new HttpError(err.status, msg, err.data)
       throw new Error(msg)
     }
   }
