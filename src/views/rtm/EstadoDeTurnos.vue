@@ -314,7 +314,11 @@
     </v-card>
 <!-- 👇 MODAL DETALLE CON TABS (extraído a componente compartido, reutilizado
          también desde Comisiones — mismo turno, mismo comportamiento) -->
-    <TurnoDetalleDialog v-model="detailsDialog" :turno="selectedTurno" />
+    <TurnoDetalleDialog
+      v-model="detailsDialog"
+      :turno="selectedTurno"
+      @resultado-corregido="applyFilters()"
+    />
 
     <!-- MODAL HISTORIAL DE VISITAS -->
     <v-dialog

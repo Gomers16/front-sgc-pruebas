@@ -318,6 +318,25 @@
       <v-divider />
 
       <v-card-actions class="pa-3 pa-sm-4">
+        <v-chip
+          v-if="resultadoActual"
+          :color="resultadoActual === 'APROBADA' ? 'success' : 'error'"
+          variant="tonal"
+          size="small"
+          class="mr-2"
+        >
+          {{ resultadoActual === 'APROBADA' ? 'Aprobada' : 'Rechazada' }}
+        </v-chip>
+        <v-btn
+          v-if="puedeCorregirResultado"
+          variant="tonal"
+          color="deep-purple"
+          prepend-icon="mdi-pencil"
+          :size="$vuetify.display.xs ? 'small' : 'default'"
+          @click="abrirCorreccion"
+        >
+          Corregir resultado
+        </v-btn>
         <v-spacer />
         <v-btn
           variant="text"
@@ -328,12 +347,96 @@
         </v-btn>
       </v-card-actions>
     </v-card>
+
+    <!-- Corrección del resultado de la certificación (SUPER_ADMIN / GERENCIA) -->
+    <v-dialog v-model="correccion.abierto" max-width="520" :persistent="correccion.guardando">
+      <v-card v-if="turno">
+        <v-card-title class="text-subtitle-1 font-weight-bold">
+          Corregir resultado · {{ turno.placa }}
+        </v-card-title>
+        <v-card-text>
+          <div class="text-body-2 mb-3">
+            Resultado actual:
+            <strong>{{ resultadoActual ?? 'sin resultado' }}</strong>
+          </div>
+          <v-radio-group v-model="correccion.nuevo" inline hide-details class="mb-2">
+            <v-radio
+              label="Aprobada"
+              value="APROBADA"
+              color="success"
+              :disabled="resultadoActual === 'APROBADA'"
+            />
+            <v-radio
+              label="Rechazada"
+              value="RECHAZADA"
+              color="error"
+              :disabled="resultadoActual === 'RECHAZADA'"
+            />
+          </v-radio-group>
+          <v-alert
+            v-if="correccion.nuevo"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
+            {{ efectoCorreccion }}
+          </v-alert>
+          <v-textarea
+            v-model="correccion.motivo"
+            label="Motivo de la corrección (obligatorio)"
+            rows="2"
+            auto-grow
+            counter="255"
+            maxlength="255"
+            variant="outlined"
+            density="comfortable"
+          />
+          <v-checkbox
+            v-model="correccion.confirmado"
+            label="Confirmo la corrección (queda registrada con mi usuario)"
+            density="compact"
+            hide-details
+          />
+          <v-alert
+            v-if="correccion.error"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            {{ correccion.error }}
+          </v-alert>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="correccion.guardando" @click="correccion.abierto = false">
+            Cancelar
+          </v-btn>
+          <v-btn
+            color="deep-purple"
+            variant="elevated"
+            :loading="correccion.guardando"
+            :disabled="!correccionValida"
+            @click="guardarCorreccion"
+          >
+            Guardar corrección
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { DateTime } from 'luxon'
+import { authSetStore } from '@/stores/AuthStore'
+import {
+  CertificacionService,
+  SERVICIOS_CON_RESULTADO,
+  type ResultadoCertificacion,
+} from '@/services/certificacion_service'
 
 /* ── Tipos (mismo shape que EstadoDeTurnos.vue, duplicado a propósito para
    no acoplar este componente compartido al script de esa vista) ── */
@@ -430,6 +533,9 @@ export interface Turno {
   visitaVehiculoTexto?: string | null
   /** Segunda vez gratuita (TINYINT: puede llegar 0/1). */
   esSegundaVez?: boolean | number | null
+  /** Resultado de la certificación RTM/PREV (NULL = sin resultado). */
+  resultadoCertificacion?: 'APROBADA' | 'RECHAZADA' | null
+  tieneCertificacion?: boolean | null
   visitaVehiculoUltimasFechas?: string[]
   visitasVehiculoDetalle?: HistVisit[]
 
@@ -465,9 +571,90 @@ const props = defineProps<{
   modelValue: boolean
   turno: Turno | null
 }>()
-defineEmits<{ (e: 'update:modelValue', value: boolean): void }>()
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: boolean): void
+  /** Se corrigió el resultado: el padre puede recargar su lista. */
+  (e: 'resultado-corregido', turnoId: number): void
+}>()
 
 const currentTab = ref('detalles')
+
+/* ── Corrección del resultado (SUPER_ADMIN / GERENCIA; backend:
+   PATCH /certificaciones/:turnoId/resultado, auditado) ── */
+const authStore = authSetStore()
+// El turno llega por prop (solo lectura): tras corregir se muestra el
+// resultado nuevo con este override local.
+const resultadoCorregido = ref<ResultadoCertificacion | null | undefined>(undefined)
+const resultadoActual = computed<ResultadoCertificacion | null>(() =>
+  resultadoCorregido.value !== undefined
+    ? resultadoCorregido.value
+    : (props.turno?.resultadoCertificacion ?? null)
+)
+const puedeCorregirResultado = computed(() => {
+  const t = props.turno
+  if (!t || !authStore.hasAnyRole(['SUPER_ADMIN', 'GERENCIA'])) return false
+  const codigo = (t.servicio?.codigoServicio ?? '').toUpperCase()
+  const certificado = !!t.horaSalida || !!t.tieneCertificacion
+  return SERVICIOS_CON_RESULTADO.includes(codigo) && t.estado === 'finalizado' && certificado
+})
+const correccion = reactive({
+  abierto: false,
+  nuevo: null as ResultadoCertificacion | null,
+  motivo: '',
+  confirmado: false,
+  guardando: false,
+  error: '',
+})
+const correccionValida = computed(
+  () =>
+    !!correccion.nuevo &&
+    correccion.nuevo !== resultadoActual.value &&
+    correccion.motivo.trim().length >= 5 &&
+    correccion.motivo.trim().length <= 255 &&
+    correccion.confirmado &&
+    !correccion.guardando
+)
+const efectoCorreccion = computed(() => {
+  const esSegundaVez = Boolean(props.turno?.esSegundaVez)
+  if (correccion.nuevo === 'APROBADA') {
+    return 'Si había una ventana de segunda vez, se anula. No se permite si el turno ya tiene una segunda vez activa.'
+  }
+  return esSegundaVez
+    ? 'Es una segunda vez: corregir a Rechazada no abre otra ventana.'
+    : 'Se abrirá una ventana de 15 días (360 h desde ahora) para segunda vez gratuita.'
+})
+function abrirCorreccion() {
+  correccion.nuevo = resultadoActual.value === 'APROBADA' ? 'RECHAZADA' : 'APROBADA'
+  correccion.motivo = ''
+  correccion.confirmado = false
+  correccion.error = ''
+  correccion.abierto = true
+}
+async function guardarCorreccion() {
+  if (!props.turno || !correccion.nuevo || !correccionValida.value) return
+  correccion.guardando = true
+  correccion.error = ''
+  try {
+    const resp = await CertificacionService.corregirResultado(
+      props.turno.id,
+      correccion.nuevo,
+      correccion.motivo.trim()
+    )
+    resultadoCorregido.value = resp.turno.resultadoCertificacion
+    correccion.abierto = false
+    emit('resultado-corregido', props.turno.id)
+  } catch (e) {
+    correccion.error = e instanceof Error ? e.message : 'No se pudo corregir el resultado.'
+  } finally {
+    correccion.guardando = false
+  }
+}
+watch(
+  () => props.turno?.id,
+  () => {
+    resultadoCorregido.value = undefined
+  }
+)
 
 // Cada vez que se abre el modal (con un turno nuevo o reabierto), vuelve
 // siempre a la pestaña "Detalles" — mismo comportamiento que openDetails()

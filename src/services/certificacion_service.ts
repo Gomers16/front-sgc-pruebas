@@ -1,5 +1,5 @@
 // src/services/certificacion_service.ts
-import { get, post } from './http'
+import { get, patch, post } from './http'
 
 export type ResultadoCertificacion = 'APROBADA' | 'RECHAZADA'
 
@@ -47,5 +47,33 @@ export class CertificacionService {
    */
   static async getByTurno(turnoId: number) {
     return get(`/api/certificaciones/turno/${turnoId}`)
+  }
+
+  /**
+   * Corrige el resultado de un turno RTM/PREV ya certificado (solo
+   * SUPER_ADMIN / GERENCIA; queda auditado con el motivo).
+   *
+   * PATCH /api/certificaciones/:turnoId/resultado
+   */
+  static async corregirResultado(
+    turnoId: number,
+    resultado: ResultadoCertificacion,
+    motivo: string
+  ) {
+    return patch<CorreccionResultadoResp, { resultado: ResultadoCertificacion; motivo: string }>(
+      `/api/certificaciones/${turnoId}/resultado`,
+      { resultado, motivo }
+    )
+  }
+}
+
+export interface CorreccionResultadoResp {
+  message: string
+  turno: {
+    id: number
+    resultadoCertificacion: ResultadoCertificacion | null
+    rechazadoAt: string | null
+    ventanaSegundaVezHasta: string | null
+    esSegundaVez: boolean
   }
 }
