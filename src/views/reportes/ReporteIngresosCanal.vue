@@ -109,8 +109,9 @@
           @click:row="onClickCanalRow"
         >
           <template #item.canal="{ item }">
-            <span :class="{ 'pl-6 text-medium-emphasis': item.es_subcanal }">
+            <span :class="claseFilaCanal(item)">
               {{ nombreCanalReporte(item) }}
+              <span v-if="item.es_informativa" class="text-caption">{{ notaFilaCanal(item) }}</span>
             </span>
           </template>
           <template #item.total_bruto="{ item }">
@@ -227,7 +228,10 @@ import {
   getIngresosPorCanal,
   getDetalleCanal,
   getRangoMesActual,
+  claseFilaCanal,
   nombreCanalReporte,
+  nombreFilaCanalExcel,
+  notaFilaCanal,
   tituloCanalReporte,
   type IngresosCanalResponse,
   type IngresoCanal,
@@ -352,7 +356,7 @@ function exportarExcel(
 function exportarCanal() {
   const encabezados = ['Canal', 'Vehículos', 'Total Bruto', 'Total Neto', 'Promedio Ticket']
   const filas = canalRows.value.map((r) => [
-    r.es_subcanal ? `    · ${nombreCanalReporte(r)}` : nombreCanalReporte(r),
+    nombreFilaCanalExcel(r),
     r.cantidad,
     r.total_bruto,
     r.total_neto,
