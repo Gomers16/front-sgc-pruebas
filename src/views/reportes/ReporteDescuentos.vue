@@ -149,6 +149,7 @@
               </v-btn>
             </div>
 
+            <AvisoCanal :aviso="avisoCanal" />
             <v-data-table
               class="tabla-clickable"
               :headers="headersPorCanal"
@@ -159,7 +160,11 @@
               hide-default-footer
               @click:row="onClickCanalRow"
             >
-              <template #item.canal="{ item }">{{ nombreCanal(item.canal) }}</template>
+              <template #item.canal="{ item }">
+                <span :class="{ 'pl-6 text-medium-emphasis': item.es_subcanal }">
+                  {{ nombreCanalReporte(item) }}
+                </span>
+              </template>
               <template #item.total_descuentos="{ item }">{{ formatCOP(item.total_descuentos) }}</template>
               <template #item.porcentaje="{ item }">{{ formatPercent(item.porcentaje) }}</template>
 
@@ -174,7 +179,7 @@
               </template>
             </v-data-table>
 
-            <v-alert v-if="!loading && !porCanalRows.length" type="info" variant="tonal" class="mt-4">
+            <v-alert v-if="!loading && !totalesCanal?.cantidad" type="info" variant="tonal" class="mt-4">
               No hay datos para el rango de fechas seleccionado.
             </v-alert>
           </v-window-item>
@@ -249,7 +254,7 @@
             density="compact"
           >
             <template #item.fecha="{ item }">{{ soloFecha(item.fecha) }}</template>
-            <template #item.captacion_canal="{ item }">{{ nombreCanal(item.captacion_canal) }}</template>
+            <template #item.canal="{ item }">{{ canalDetalle(item) }}</template>
             <template #item.tipo_vehiculo="{ item }">{{ item.tipo_vehiculo ?? '—' }}</template>
             <template #item.asesor="{ item }">{{ nombreAsesorConvenio(item) }}</template>
             <template #item.descuento_nombre="{ item }">{{ item.descuento_nombre }}</template>
@@ -317,7 +322,11 @@ import {
   type DescuentoPorAutorizador,
   type DetalleDescuento,
   type TotalesDescuentos,
+  type AvisoCanal as AvisoCanalTipo,
+  nombreCanalReporte,
+  tituloCanalReporte,
 } from '@/services/reportesAdminService'
+import AvisoCanal from '@/components/reportes/AvisoCanal.vue'
 
 /* ===== Filtros de fecha (por defecto: mes actual) ===== */
 const rangoMes = getRangoMesActual()
@@ -328,16 +337,10 @@ const tab = ref('tipo')
 const loading = ref(false)
 const snack = reactive({ show: false, text: '' })
 
-/* ===== Mapeo de nombres de canal ===== */
-const CANAL_LABELS: Record<string, string> = {
-  FACHADA: 'Fachada',
-  ASESOR_COMERCIAL: 'Asesor Comercial',
-  ASESOR_CONVENIO: 'Asesor Convenio',
-  TELEMERCADEO: 'Telemercadeo',
-  REDES: 'Redes / Marketing Digital',
-}
-function nombreCanal(c: string) {
-  return CANAL_LABELS[c] ?? c
+/* ===== Nombres de canal ("¿Cómo se enteró de nosotros?") ===== */
+function canalDetalle(d: DetalleDescuento) {
+  if (!d.canal) return nombreCanalReporte(d.captacion_canal)
+  return tituloCanalReporte({ canal: d.canal, es_subcanal: d.canal.startsWith('ASESOR_') })
 }
 
 /* ===== Formato de pesos colombianos ===== */
@@ -373,6 +376,7 @@ const porAutorizadorRows = ref<DescuentoPorAutorizador[]>([])
 
 const totalesTipo = ref<TotalesDescuentos | null>(null)
 const totalesCanal = ref<TotalesDescuentos | null>(null)
+const avisoCanal = ref<AvisoCanalTipo | null>(null)
 const totalesAutorizador = ref<TotalesDescuentos | null>(null)
 
 /* ===== Headers ===== */
@@ -402,7 +406,7 @@ const headersDialogDescuento = [
   { title: 'Placa', key: 'placa' },
   { title: 'Fecha', key: 'fecha' },
   { title: 'Tipo Vehículo', key: 'tipo_vehiculo' },
-  { title: 'Canal', key: 'captacion_canal' },
+  { title: 'Canal', key: 'canal' },
   { title: 'Asesor/Convenio', key: 'asesor' },
   { title: 'Tipo Descuento', key: 'descuento_nombre' },
   { title: 'Monto Descuento', key: 'descuento_monto_aplicado' },
@@ -457,6 +461,7 @@ async function generarReporte() {
     totalesTipo.value = tipo.totales
     porCanalRows.value = canal.por_canal
     totalesCanal.value = canal.totales
+    avisoCanal.value = canal.aviso_canal ?? null
     porAutorizadorRows.value = autor.por_autorizador
     totalesAutorizador.value = autor.totales
   } catch (err) {
@@ -504,7 +509,7 @@ function exportarPorTipo() {
 function exportarPorCanal() {
   const encabezados = ['Canal', 'Cantidad', 'Total descuento', 'Tipos usados']
   const filas = porCanalRows.value.map((r) => [
-    nombreCanal(r.canal),
+    r.es_subcanal ? `    · ${nombreCanalReporte(r)}` : nombreCanalReporte(r),
     r.cantidad,
     r.total_descuentos,
     r.tipos_usados,
@@ -587,7 +592,7 @@ function onClickTipoRow(_e: unknown, { item }: { item: DescuentoPorTipo }) {
 }
 
 function onClickCanalRow(_e: unknown, { item }: { item: DescuentoPorCanal }) {
-  dialogDetalle.titulo = nombreCanal(item.canal)
+  dialogDetalle.titulo = tituloCanalReporte(item)
   cargarDetalle({ canal: item.canal })
 }
 
@@ -606,7 +611,7 @@ function exportarDialogDetalle() {
     d.placa,
     soloFecha(d.fecha),
     d.tipo_vehiculo ?? '—',
-    nombreCanal(d.captacion_canal),
+    canalDetalle(d),
     nombreAsesorConvenio(d),
     d.descuento_nombre,
     d.descuento_monto_aplicado,
