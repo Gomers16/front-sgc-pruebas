@@ -361,10 +361,13 @@
                           @update:model-value="toggleFilaExport('canal', i)"
                         />
                       </td>
-                      <td :class="{ 'pl-6 text-medium-emphasis': c.es_subcanal }">{{ nombreCanalReporte(c) }}</td>
+                      <td :class="claseFilaCanal(c)">
+                        {{ nombreCanalReporte(c) }}
+                        <span v-if="c.es_informativa" class="text-caption">{{ notaFilaCanal(c) }}</span>
+                      </td>
                       <td class="text-right">{{ c.cantidad }}</td>
                       <td class="text-right">{{ formatCOP(c.monto) }}</td>
-                      <td class="text-right">{{ c.porcentaje }}%</td>
+                      <td class="text-right">{{ c.es_informativa ? '—' : `${c.porcentaje}%` }}</td>
                     </tr>
                     <tr v-if="liquidacionExpandido.canal.has(i)" v-show="filaVisibleBusqueda('canal', i)">
                       <td colspan="6" class="pa-0">
@@ -2201,10 +2204,13 @@
               </thead>
               <tbody>
                 <tr v-for="c in trazabilidad.data.por_canal" :key="c.canal">
-                  <td :class="{ 'pl-6 text-medium-emphasis': c.es_subcanal }">{{ nombreCanalReporte(c) }}</td>
+                  <td :class="claseFilaCanal(c)">
+                    {{ nombreCanalReporte(c) }}
+                    <span v-if="c.es_informativa" class="text-caption">{{ notaFilaCanal(c) }}</span>
+                  </td>
                   <td class="text-right">{{ c.cantidad }}</td>
                   <td class="text-right">{{ formatCOP(c.monto) }}</td>
-                  <td class="text-right">{{ c.porcentaje }}%</td>
+                  <td class="text-right">{{ c.es_informativa ? '—' : `${c.porcentaje}%` }}</td>
                 </tr>
                 <tr v-if="!trazabilidad.data.por_canal.length">
                   <td colspan="4" class="text-center text-medium-emphasis">Sin facturación RTM confirmada en este rango</td>
@@ -3562,7 +3568,9 @@ import {
   descargarHistorialLiquidacionesExcel,
   getLiquidacionRtmDetallePlacas,
   getLiquidacionRtmDetallePlacasCanal,
+  claseFilaCanal,
   nombreCanalReporte,
+  notaFilaCanal,
   tituloCanalReporte,
   getLiquidacionRtmDetallePlacasDescuento,
   getLiquidacionRtmBuscarPlaca,
