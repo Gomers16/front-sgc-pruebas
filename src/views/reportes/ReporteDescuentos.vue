@@ -161,12 +161,13 @@
               @click:row="onClickCanalRow"
             >
               <template #item.canal="{ item }">
-                <span :class="{ 'pl-6 text-medium-emphasis': item.es_subcanal }">
+<span :class="claseFilaCanal(item)">
                   {{ nombreCanalReporte(item) }}
+                  <span v-if="item.es_informativa" class="text-caption">{{ notaFilaCanal(item) }}</span>
                 </span>
               </template>
               <template #item.total_descuentos="{ item }">{{ formatCOP(item.total_descuentos) }}</template>
-              <template #item.porcentaje="{ item }">{{ formatPercent(item.porcentaje) }}</template>
+              <template #item.porcentaje="{ item }">{{ item.es_informativa ? '—' : formatPercent(item.porcentaje ?? 0) }}</template>
 
               <template #body.append v-if="totalesCanal">
                 <tr class="fila-totales">
@@ -323,7 +324,10 @@ import {
   type DetalleDescuento,
   type TotalesDescuentos,
   type AvisoCanal as AvisoCanalTipo,
+  claseFilaCanal,
   nombreCanalReporte,
+  nombreFilaCanalExcel,
+  notaFilaCanal,
   tituloCanalReporte,
 } from '@/services/reportesAdminService'
 import AvisoCanal from '@/components/reportes/AvisoCanal.vue'
@@ -340,7 +344,7 @@ const snack = reactive({ show: false, text: '' })
 /* ===== Nombres de canal ("¿Cómo se enteró de nosotros?") ===== */
 function canalDetalle(d: DetalleDescuento) {
   if (!d.canal) return nombreCanalReporte(d.captacion_canal)
-  return tituloCanalReporte({ canal: d.canal, es_subcanal: d.canal.startsWith('ASESOR_') })
+  return tituloCanalReporte(d.canal)
 }
 
 /* ===== Formato de pesos colombianos ===== */
@@ -509,7 +513,7 @@ function exportarPorTipo() {
 function exportarPorCanal() {
   const encabezados = ['Canal', 'Cantidad', 'Total descuento', 'Tipos usados']
   const filas = porCanalRows.value.map((r) => [
-    r.es_subcanal ? `    · ${nombreCanalReporte(r)}` : nombreCanalReporte(r),
+    nombreFilaCanalExcel(r),
     r.cantidad,
     r.total_descuentos,
     r.tipos_usados,
