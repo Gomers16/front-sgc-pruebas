@@ -221,12 +221,16 @@
             </div>
           </div>
         </v-alert>
+        <AvisoCanal :aviso="datos.ingresosCanalAnterior.aviso_canal" />
         <v-data-table density="compact" :headers="headersIngresosCanal" :items="filasIngresosCanal" hide-default-footer>
+          <template #item.canal="{ item }">
+            <span :class="{ 'pl-6 text-medium-emphasis': item.esSubcanal }">{{ item.canal }}</span>
+          </template>
           <template #item.variacion="{ item }">
             <span :style="{ color: item.variacionAbs >= 0 ? '#1e7e34' : '#c0392b' }">{{ item.variacion }}</span>
           </template>
         </v-data-table>
-        <v-alert v-if="!datos.ingresosCanal.por_canal.length" type="info" variant="tonal" density="compact" class="mt-3">
+        <v-alert v-if="!datos.ingresosCanal.totales.cantidad" type="info" variant="tonal" density="compact" class="mt-3">
           Sin datos en este rango.
         </v-alert>
       </v-card-text>
@@ -303,8 +307,11 @@
           </v-col>
         </v-row>
         <div class="text-caption font-weight-bold mb-1">Por Canal</div>
+        <AvisoCanal :aviso="datos.retencion.aviso_canal" />
         <v-data-table density="compact" :headers="headersRetencionCanal" :items="datos.retencion.por_canal" hide-default-footer class="mb-4">
-          <template #item.canal="{ item }">{{ nombreCanal(item.canal) }}</template>
+          <template #item.canal="{ item }">
+            <span :class="{ 'pl-6 text-medium-emphasis': item.es_subcanal }">{{ nombreCanalReporte(item) }}</span>
+          </template>
           <template #item.total_bruto="{ item }">{{ formatPeso(item.total_bruto) }}</template>
           <template #item.porcentaje="{ item }">{{ formatPct(item.porcentaje) }}</template>
         </v-data-table>
@@ -334,8 +341,11 @@
         </div>
 
         <div class="text-caption font-weight-bold mb-1 mt-2">Por Canal</div>
+        <AvisoCanal :aviso="datos.descuentosCanal.aviso_canal" />
         <v-data-table density="compact" :headers="headersDescuentosCanal" :items="datos.descuentosCanal.por_canal" hide-default-footer class="mb-4">
-          <template #item.canal="{ item }">{{ nombreCanal(item.canal) }}</template>
+          <template #item.canal="{ item }">
+            <span :class="{ 'pl-6 text-medium-emphasis': item.es_subcanal }">{{ nombreCanalReporte(item) }}</span>
+          </template>
           <template #item.total_descuentos="{ item }">{{ formatPeso(item.total_descuentos) }}</template>
           <template #item.porcentaje="{ item }">{{ formatPct(item.porcentaje) }}</template>
         </v-data-table>
@@ -369,6 +379,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import AvisoCanal from '@/components/reportes/AvisoCanal.vue'
+import { nombreCanalReporte } from '@/services/reportesAdminService'
 import type {
   SuperInformeMetaMensualResponse,
   SuperInformeMetaComercialResponse,
@@ -430,16 +442,7 @@ function semaforoLabel(s: string) {
   return SEMAFORO_LABEL[s] ?? s
 }
 
-const CANAL_LABELS: Record<string, string> = {
-  FACHADA: 'Fachada',
-  ASESOR_COMERCIAL: 'Asesor Comercial',
-  ASESOR_CONVENIO: 'Asesor Convenio',
-  TELEMERCADEO: 'Telemercadeo',
-  REDES: 'Redes / Marketing Digital',
-}
-function nombreCanal(c: string) {
-  return CANAL_LABELS[c] ?? c
-}
+
 
 const MESES_LABEL = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -560,7 +563,8 @@ const filasIngresosCanal = computed(() => {
     const variacionPct = base > 0 ? Math.round((variacionAbs / base) * 1000) / 10 : null
     const pctTotal = totalBrutoGeneral > 0 ? Math.round((c.total_bruto / totalBrutoGeneral) * 10000) / 100 : 0
     return {
-      canal: nombreCanal(c.canal),
+      canal: nombreCanalReporte(c),
+      esSubcanal: !!c.es_subcanal,
       vehiculos: formatNum(c.cantidad),
       totalBruto: formatPeso(c.total_bruto),
       totalNeto: formatPeso(c.total_neto),
@@ -575,6 +579,7 @@ const filasIngresosCanal = computed(() => {
   const variacionPctTotal = baseTotal > 0 ? Math.round((variacionAbsTotal / baseTotal) * 1000) / 10 : null
   filas.push({
     canal: 'Totales',
+    esSubcanal: false,
     vehiculos: formatNum(props.datos.ingresosCanal.totales.cantidad),
     totalBruto: formatPeso(props.datos.ingresosCanal.totales.total_bruto),
     totalNeto: formatPeso(props.datos.ingresosCanal.totales.total_neto),
