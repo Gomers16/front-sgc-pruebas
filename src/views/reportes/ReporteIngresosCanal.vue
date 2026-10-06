@@ -96,6 +96,8 @@
           </v-btn>
         </div>
 
+        <AvisoCanal :aviso="canalData?.aviso_canal" />
+
         <v-data-table
           class="tabla-clickable"
           :headers="headersCanal"
@@ -107,7 +109,9 @@
           @click:row="onClickCanalRow"
         >
           <template #item.canal="{ item }">
-            {{ nombreCanal(item.canal) }}
+            <span :class="{ 'pl-6 text-medium-emphasis': item.es_subcanal }">
+              {{ nombreCanalReporte(item) }}
+            </span>
           </template>
           <template #item.total_bruto="{ item }">
             {{ formatCOP(item.total_bruto) }}
@@ -130,7 +134,7 @@
           </template>
         </v-data-table>
 
-        <v-alert v-if="!loading && !canalRows.length" type="info" variant="tonal" class="mt-4">
+        <v-alert v-if="!loading && !canalData?.totales?.cantidad" type="info" variant="tonal" class="mt-4">
           No hay datos para el rango de fechas seleccionado.
         </v-alert>
       </v-card-text>
@@ -218,10 +222,13 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted } from 'vue'
 import * as XLSX from 'xlsx'
+import AvisoCanal from '@/components/reportes/AvisoCanal.vue'
 import {
   getIngresosPorCanal,
   getDetalleCanal,
   getRangoMesActual,
+  nombreCanalReporte,
+  tituloCanalReporte,
   type IngresosCanalResponse,
   type IngresoCanal,
   type DetalleTicket,
@@ -239,17 +246,7 @@ const snack = reactive({ show: false, text: '' })
 const canalData = ref<IngresosCanalResponse | null>(null)
 const canalRows = computed(() => canalData.value?.por_canal ?? [])
 
-/* ===== Mapeo de nombres de canal ===== */
-const CANAL_LABELS: Record<string, string> = {
-  FACHADA: 'Fachada',
-  ASESOR_COMERCIAL: 'Asesor Comercial',
-  ASESOR_CONVENIO: 'Asesor Convenio',
-  TELEMERCADEO: 'Telemercadeo',
-  REDES: 'Redes / Marketing Digital',
-}
-function nombreCanal(c: string) {
-  return CANAL_LABELS[c] ?? c
-}
+
 
 /* ===== Formato de pesos colombianos ===== */
 function formatCOP(value: number | string) {
@@ -355,7 +352,7 @@ function exportarExcel(
 function exportarCanal() {
   const encabezados = ['Canal', 'Vehículos', 'Total Bruto', 'Total Neto', 'Promedio Ticket']
   const filas = canalRows.value.map((r) => [
-    nombreCanal(r.canal),
+    r.es_subcanal ? `    · ${nombreCanalReporte(r)}` : nombreCanalReporte(r),
     r.cantidad,
     r.total_bruto,
     r.total_neto,
@@ -399,13 +396,14 @@ function nombreAsesorDetalle(d: DetalleTicket) {
 }
 
 function onClickCanalRow(_e: unknown, { item }: { item: IngresoCanal }) {
-  abrirDetalleCanal(item.canal || 'FACHADA')
+  abrirDetalleCanal(item)
 }
 
-async function abrirDetalleCanal(canal: string) {
+async function abrirDetalleCanal(fila: IngresoCanal) {
+  const canal = fila.canal
   dialogDetalle.open = true
   dialogDetalle.loading = true
-  dialogDetalle.titulo = nombreCanal(canal)
+  dialogDetalle.titulo = tituloCanalReporte(fila)
   dialogDetalle.canalCodigo = canal
   dialogDetalle.detalle = []
   dialogDetalle.totalVehiculos = 0
