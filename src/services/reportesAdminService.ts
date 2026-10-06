@@ -85,8 +85,50 @@ async function apiFetchBlobPost(endpoint: string, body: unknown): Promise<Blob> 
 
 /* ============================ Tipos ============================ */
 
-export interface IngresoCanal {
+/**
+ * Fila de un reporte "por canal" (canal = "¿Cómo se enteró de nosotros?" del
+ * turno): el backend las manda en orden fijo — Fachada, Redes Sociales, Call
+ * Center, Asesor (con Comercial / Convenio debajo, es_subcanal) y Google ADS —
+ * con su nombre ya resuelto.
+ */
+export interface FilaCanalReporte {
   canal: string
+  nombre?: string
+  es_subcanal?: boolean
+}
+
+/** Aviso de fecha confiable del desglose por canal (CANAL_CONFIABLE_DESDE). */
+export interface AvisoCanal {
+  confiable_desde: string | null
+  aplica: boolean
+  mensaje: string | null
+}
+
+const NOMBRE_CANAL_REPORTE: Record<string, string> = {
+  FACHADA: 'Fachada',
+  REDES: 'Redes Sociales',
+  TELE: 'Call Center',
+  TELEMERCADEO: 'Call Center',
+  ASESOR: 'Asesor',
+  ASESOR_COMERCIAL: 'Comercial',
+  ASESOR_CONVENIO: 'Convenio',
+  ASESOR_SIN_DETALLE: 'Asesor (sin detalle)',
+  GOOGLE_ADS: 'Google ADS',
+}
+
+/** Nombre de una fila por canal (el que manda el backend, o el del código). */
+export function nombreCanalReporte(fila: { canal: string; nombre?: string } | string): string {
+  if (typeof fila === 'string') return NOMBRE_CANAL_REPORTE[fila] ?? fila
+  return fila.nombre ?? NOMBRE_CANAL_REPORTE[fila.canal] ?? fila.canal
+}
+
+/** Título de un detalle por canal: los subcanales llevan "Asesor — ". */
+export function tituloCanalReporte(fila: FilaCanalReporte): string {
+  const n = nombreCanalReporte(fila)
+  return fila.es_subcanal && fila.canal !== 'ASESOR_SIN_DETALLE' ? `Asesor — ${n}` : n
+}
+
+export interface IngresoCanal extends FilaCanalReporte {
   cantidad: number
   total_bruto: number
   total_neto: number
@@ -95,6 +137,7 @@ export interface IngresoCanal {
 export interface IngresosCanalResponse {
   fecha_inicio: string
   fecha_fin: string
+  aviso_canal?: AvisoCanal
   por_canal: IngresoCanal[]
   totales: IngresoCanal
 }
@@ -169,6 +212,7 @@ export interface DetalleAsesorResponse {
 
 export interface DetalleCanalResponse {
   canal: string
+  nombre?: string
   total_vehiculos: number
   total_bruto: number
   detalle: DetalleTicket[]
@@ -180,8 +224,7 @@ export interface ResumenRetencion {
   porcentaje: number
 }
 
-export interface RetencionPorCanal {
-  canal: string
+export interface RetencionPorCanal extends FilaCanalReporte {
   nuevos: number
   recurrentes: number
   recuperaciones: number
@@ -202,6 +245,7 @@ export interface RetencionResponse {
   fecha_inicio: string
   fecha_fin: string
   meses_minimos: number
+  aviso_canal?: AvisoCanal
   resumen: {
     nuevos: ResumenRetencion
     recurrentes: ResumenRetencion
@@ -222,6 +266,9 @@ export interface DetalleRetencionTicket {
   fecha: string
   tipo_vehiculo: string | null
   total: number
+  /** Canal del reporte ("¿Cómo se enteró de nosotros?"); captacion_canal es el del dateo. */
+  canal?: string
+  canal_nombre?: string
   captacion_canal: string
   agente_comercial_nombre: string | null
   asesor_convenio_nombre?: string | null
@@ -420,8 +467,7 @@ export interface DescuentosPorTipoResponse {
   totales: TotalesDescuentos
 }
 
-export interface DescuentoPorCanal {
-  canal: string
+export interface DescuentoPorCanal extends FilaCanalReporte {
   cantidad: number
   total_descuentos: number
   tipos_usados: number
@@ -430,6 +476,7 @@ export interface DescuentoPorCanal {
 export interface DescuentosPorCanalResponse {
   fecha_inicio: string
   fecha_fin: string
+  aviso_canal?: AvisoCanal
   por_canal: DescuentoPorCanal[]
   totales: TotalesDescuentos
 }
@@ -477,6 +524,8 @@ export async function getDescuentosPorAutorizador(
 export interface DetalleDescuento {
   placa: string
   fecha: string
+  canal?: string
+  canal_nombre?: string
   captacion_canal: string
   tipo_vehiculo: string | null
   total: number
@@ -618,8 +667,7 @@ export async function getDetalleComisionesPorConvenio(
 
 /* ======================= Liquidación RTM ======================= */
 
-export interface LiquidacionPorCanal {
-  canal: string
+export interface LiquidacionPorCanal extends FilaCanalReporte {
   cantidad: number
   monto: number
   porcentaje: number
@@ -657,6 +705,7 @@ export interface LiquidacionRtmResponse {
   fecha_inicio: string
   fecha_fin: string
   resumen: { total_comisiones: number; total_monto: number }
+  aviso_canal?: AvisoCanal
   por_canal: LiquidacionPorCanal[]
   descuentos: LiquidacionDescuentoTipo[]
   comerciales: LiquidacionComercial[]
@@ -856,6 +905,7 @@ export interface TrazabilidadRtmResponse {
   fecha_inicio: string
   fecha_fin: string
   resumen: { total_comisiones: number; total_monto: number }
+  aviso_canal?: AvisoCanal
   por_canal: LiquidacionPorCanal[]
   comerciales: ComisionComercial[]
   asesores_convenio: ComisionAsesorConvenio[]
