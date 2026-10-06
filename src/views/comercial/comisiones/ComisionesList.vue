@@ -317,12 +317,13 @@
               <!-- Por canal de captación -->
               <div id="liq-seccion-canal" class="text-caption text-medium-emphasis mb-2 d-flex align-center gap-1">
                 Por canal de captación
-                <v-tooltip text="Turnos y montos agrupados por cómo llegó el cliente (fachada, asesor comercial, asesor convenio, telemercadeo, redes)." location="top">
+                <v-tooltip text="Turnos y montos agrupados por cómo se enteró el cliente de nosotros (Fachada, Redes Sociales, Call Center, Asesor —Comercial / Convenio— y Google ADS)." location="top">
                   <template #activator="{ props }">
                     <v-icon v-bind="props" size="14" color="medium-emphasis">mdi-information-outline</v-icon>
                   </template>
                 </v-tooltip>
               </div>
+              <AvisoCanal :aviso="liquidacion.data.aviso_canal" />
               <v-table density="compact" class="mb-4">
                 <thead>
                   <tr>
@@ -360,7 +361,7 @@
                           @update:model-value="toggleFilaExport('canal', i)"
                         />
                       </td>
-                      <td>{{ CANAL_LABELS_LIQUIDACION[c.canal] ?? c.canal }}</td>
+                      <td :class="{ 'pl-6 text-medium-emphasis': c.es_subcanal }">{{ nombreCanalReporte(c) }}</td>
                       <td class="text-right">{{ c.cantidad }}</td>
                       <td class="text-right">{{ formatCOP(c.monto) }}</td>
                       <td class="text-right">{{ c.porcentaje }}%</td>
@@ -2193,13 +2194,14 @@
             <div class="text-caption text-medium-emphasis mb-2">
               Por canal de captación (total <strong>generado</strong>, todos los estados)
             </div>
+            <AvisoCanal :aviso="trazabilidad.data.aviso_canal" />
             <v-table density="compact" class="mb-4">
               <thead>
                 <tr><th>Canal</th><th class="text-right">Turnos</th><th class="text-right">Monto</th><th class="text-right">%</th></tr>
               </thead>
               <tbody>
                 <tr v-for="c in trazabilidad.data.por_canal" :key="c.canal">
-                  <td>{{ CANAL_LABELS_LIQUIDACION[c.canal] ?? c.canal }}</td>
+                  <td :class="{ 'pl-6 text-medium-emphasis': c.es_subcanal }">{{ nombreCanalReporte(c) }}</td>
                   <td class="text-right">{{ c.cantidad }}</td>
                   <td class="text-right">{{ formatCOP(c.monto) }}</td>
                   <td class="text-right">{{ c.porcentaje }}%</td>
@@ -3560,6 +3562,8 @@ import {
   descargarHistorialLiquidacionesExcel,
   getLiquidacionRtmDetallePlacas,
   getLiquidacionRtmDetallePlacasCanal,
+  nombreCanalReporte,
+  tituloCanalReporte,
   getLiquidacionRtmDetallePlacasDescuento,
   getLiquidacionRtmBuscarPlaca,
   exportarLiquidacionRtmPlacas,
@@ -3570,6 +3574,7 @@ import {
   type LiquidacionBuscarPlacaMatch,
 } from '@/services/reportesAdminService'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
+import AvisoCanal from '@/components/reportes/AvisoCanal.vue'
 import TurnoDetalleDialog, { type Turno as TurnoDetalle } from '@/components/rtm/TurnoDetalleDialog.vue'
 
 /* ── Extended types ── */
@@ -4461,17 +4466,8 @@ function applyFilters() {
 }
 
 /* ── Modal Liquidación RTM ── */
-// El desglose "por canal" ahora sale de facturacion_tickets.captacion_canal
-// (texto libre), que usa 'TELEMERCADEO' en vez del 'TELE' corto del enum de
-// captacion_dateos.canal — se mapean ambos por compatibilidad.
-const CANAL_LABELS_LIQUIDACION: Record<string, string> = {
-  FACHADA: 'Fachada',
-  ASESOR_COMERCIAL: 'Asesor Comercial',
-  ASESOR_CONVENIO: 'Asesor Convenio',
-  TELE: 'Telemercadeo',
-  TELEMERCADEO: 'Telemercadeo',
-  REDES: 'Redes / Marketing Digital',
-}
+// El desglose "por canal" es "¿Cómo se enteró de nosotros?" del turno: el
+// backend manda las filas en orden fijo con su nombre (nombreCanalReporte).
 
 /** Clasificación de negocio de la placa en el drill-down (Comerciales /
  * Asesores Convenio / Convenios) — derivada de turnos_rtms.es_recurrente/
@@ -4574,7 +4570,7 @@ function textoBusquedaFila(seccion: SeccionModal, row: any): string {
     row.asesor_nombre,
     row.convenio_nombre,
     row.asesor_comercial_nombre,
-    seccion === 'canal' ? (CANAL_LABELS_LIQUIDACION[row.canal] ?? row.canal) : null,
+    seccion === 'canal' ? tituloCanalReporte(row) : null,
     seccion === 'descuentos' ? row.nombre : null,
   ]
   return partes.filter(Boolean).join(' ').toUpperCase()
@@ -4895,7 +4891,7 @@ async function exportarPlacasSeleccionadas() {
     const canalIdx = [...liquidacionSeleccionExport.value.canal]
     if (canalIdx.length) {
       secciones.canal = canalIdx.map((i) => ({
-        nombre: CANAL_LABELS_LIQUIDACION[data.por_canal[i].canal] ?? data.por_canal[i].canal,
+        nombre: tituloCanalReporte(data.por_canal[i]),
         canal: data.por_canal[i].canal,
       }))
     }
@@ -4949,7 +4945,8 @@ async function exportarPlacasSeleccionadas() {
  * sumando directo las columnas que ya trae cada respuesta (cantidad_vehiculos
  * = turnos por fila), sin queries nuevas al backend. */
 const totalesPorCanal = computed(() => {
-  const rows = liquidacion.value.data?.por_canal ?? []
+  // Los subcanales de Asesor ya están dentro de la fila Asesor.
+  const rows = (liquidacion.value.data?.por_canal ?? []).filter((r) => !r.es_subcanal)
   return {
     cantidad: rows.reduce((acc, r) => acc + r.cantidad, 0),
     monto: rows.reduce((acc, r) => acc + r.monto, 0),
