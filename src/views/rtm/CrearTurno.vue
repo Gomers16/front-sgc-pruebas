@@ -202,12 +202,12 @@
               />
             </v-col>
 
-            <!-- ¿Cómo nos conoció? — oculto en TRAMITES -->
+            <!-- ¿Cómo se enteró de nosotros? — oculto en TRAMITES -->
             <v-col v-if="!esTramites" cols="12" sm="6">
               <v-select
                 v-model="form.medioEntero"
                 :items="medioEnteroItems"
-                label="¿Cómo nos conoció?"
+                label="¿Cómo se enteró de nosotros?"
                 variant="outlined"
                 required
                 :density="$vuetify.display.xs ? 'compact' : 'comfortable'"

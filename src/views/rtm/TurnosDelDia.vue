@@ -870,7 +870,7 @@
             <v-col cols="12" md="6">
               <v-card variant="outlined" class="pa-3 pa-sm-4">
                 <v-card-title class="text-subtitle-1 text-sm-h6 text-secondary">
-                  Canal de captación (¿Cómo nos conoció?)
+                  Canal de captación (¿Cómo se enteró de nosotros?)
                 </v-card-title>
                 <v-list density="compact">
                   <v-list-item

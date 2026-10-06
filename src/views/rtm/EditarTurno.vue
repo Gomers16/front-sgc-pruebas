@@ -114,12 +114,12 @@
               />
             </v-col>
 
-            <!-- ¿Cómo nos conoció? -->
+            <!-- ¿Cómo se enteró de nosotros? -->
             <v-col cols="12" sm="6">
               <v-select
                 v-model="form.medioEntero"
                 :items="medioEnteroItems"
-                label="¿Cómo nos conoció?"
+                label="¿Cómo se enteró de nosotros?"
                 variant="outlined"
                 required
                 :density="$vuetify.display.xs ? 'compact' : 'comfortable'"
@@ -1033,7 +1033,7 @@ async function save() {
   }
 
   if (!form.value.medioEntero) {
-    showSnackbar('El campo "¿Cómo nos conoció?" es requerido', 'warning')
+    showSnackbar('El campo "¿Cómo se enteró de nosotros?" es requerido', 'warning')
     return
   }
 
