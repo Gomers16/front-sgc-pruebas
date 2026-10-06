@@ -17,6 +17,7 @@ Este documento es una referencia completa del frontend, organizada por **módulo
 > Actualizado: 2026-09-18 (**módulo Turnero completo, nuevo — pantalla de exhibición de sala de espera.** Rol `TURNERO` nuevo, encerrado en `/turnero` sin sidebar (`BlankLayout.vue` nuevo + guard en `main.ts`). Vistas nuevas: `TurnosParaLlamar.vue` (admin, llama turnos a un módulo — select de 6 opciones fijas en vez de texto libre — y gestiona Entregar/No se presentó/Volver a llamar), `ConfiguracionTurnero.vue` (admin de multimedia+ticker), `views/turnero/` completo (pantalla de exhibición: `TurneroDisplayView.vue` + 8 componentes + 4 composables con test + config). Ver sección nueva `Turnero` para el detalle completo. **Corrección importante a la sección "Guard de rutas" (10.9 más abajo):** ya no es cierto que "no existe `router.beforeEach`" — esta sesión agregó uno real en `src/main.ts` (no en `router/index.ts`) que sí lee `to.meta.roles`/`requiresAuth` y bloquea navegación, corregido en sitio. Sincronizado a producción local — ver commits `bc10526`+`d8be611`/`4388eb6`+`f9bdcb6` (`MAPA_DEL_SISTEMA_BACKEND.md`)).
 > Actualizado: 2026-09-29 (**rediseño de la pantalla de exhibición del Turnero**: grilla de 3 columnas Cola | Publicidad | Llamando ahora con masthead y cinta de mensajes a todo el ancho; la cola pasa a una sola tabla con acento de color por estado; "Llamando ahora" pasa a hero + tabla histórico; ambas tablas en texto plano con código corto de canal compartido (`canales.ts::textoTurnoCorto`). Nuevos: `CintaMensajes.vue`, `useMensajesTicker.ts`. Se documentan por primera vez `MastheadInfo.vue`, `TarjetaTurno.vue` y `TarjetaEntrega.vue`, que ya existían sin entrada. Corrige la descripción de `ColaSeguimiento.vue`/`PanelEntrega.vue` de la entrada del 2026-09-18, que describía el diseño anterior).
 > Actualizado: 2026-10-01 (**Turnero: "No se presentó" devuelve el turno a "Turnos para Llamar" y botón "Preguntar" en ambas tablas de `TurnosParaLlamar.vue`.** "No se presentó" pasa a ser de una sola vía (se quita "Marcar como presente"); chips "No se presentó" / "Pregunta enviada" en la tabla de arriba. La pantalla `/turnero` distingue el tipo de anuncio (`tipoLlamado`): "Por favor acérquese a" en hero, modal y voz, "Pregunta · {módulo}" en el histórico; las preguntas sobre turnos todavía sin llamar (`enModulo=false`) solo disparan el anuncio, no entran al hero ni al histórico. Tests nuevos `useVozTurno.spec.ts` y `PanelEntrega.spec.ts`. Backend: endpoints `preguntar`/`llamar-pregunta` y filtro de fecha unificado, ver `MAPA_DEL_SISTEMA_BACKEND.md`. Sincronizado a producción local — ver commits `b6c6dc9`/`3063fae`).
+> Actualizado: 2026-10-06 (sincronización a producción local): **Segunda vez** (Certificación con resultado, banner y confirmación en Crear turno, chip "2ª vez", Corregir resultado, reporte Admin → Segunda vez), **Google ADS** y etiqueta "¿Cómo se enteró de nosotros?", **reportes por canal** (filas fijas, Asesor comercial / Asesor convenio, línea informativa "de los cuales, por convenio", aviso de fecha confiable). Ver secciones 1, 6 y 7.
 
 ## Índice
 
@@ -78,6 +79,18 @@ Gestiona el flujo completo de un vehículo por el CDA: creación del turno en Pu
 - Nota: las rutas de RTM **no** tienen `meta.roles` en el router — el control es solo visual vía `can.xxx()` en `AppSidebar.vue`; la URL sigue siendo navegable directamente.
 
 ---
+
+
+### Segunda vez, Google ADS y canal elegido (2026-10)
+
+- **Crear turno** (`CrearTurno.vue`): el desplegable se llama **"¿Cómo se enteró de nosotros?"** y suma la opción **Google ADS** (canal `GOOGLE_ADS`). Opciones y mapeos en `src/views/rtm/canalCaptacion.ts` (`medioEnteroItems`, `canalToMedio()`, `medioToCanal()`, `resolverCaptacion()`): se guarda **lo que quedó elegido** aunque la búsqueda haya sugerido otro canal; el asesor sugerido solo viaja si se mantuvo el canal sugerido. Test: `src/views/rtm/__tests__/canalCaptacion.spec.ts`.
+- **Segunda vez en Crear turno**: con ventana abierta (RTM/PREV rechazada, 360 h) muestra un banner con el turno de origen y una **casilla de confirmación** obligatoria; al crear envía `segundaVezOrigenId`. Si el backend responde 409 `SEGUNDA_VEZ_DISPONIBLE` / `SEGUNDA_VEZ_NO_DISPONIBLE` se muestra/actualiza el aviso. Excepciones (solo SUPER_ADMIN/GERENCIA, con motivo): `NO_APLICADA` (turno normal) y `FORZADA`. La segunda vez **automática sin casilla no está implementada**.
+- **Editar turno** (`EditarTurno.vue`): misma etiqueta y opción Google ADS; ya no convierte Google ADS en Fachada al guardar.
+- **Certificación** (`CertificacionTurnoView.vue`, `certificacion_service.ts`): para RTM/PREV exige el resultado **Aprobada / Rechazada** (`resultado` en el FormData); una rechazada avisa que abre la ventana de segunda vez.
+- **Etapas y chip**: los turnos de segunda vez no tienen etapa de facturación y llevan el chip **"2ª vez"** (Turnos del día, detalle del turno); RTM/PREV solo se finalizan por Certificación.
+- **Detalle del turno** (`TurnoDetalleDialog.vue`): botón **"Corregir resultado"** (SUPER_ADMIN/GERENCIA) → `PATCH /certificaciones/:turnoId/resultado` con motivo. Muestra Google ADS con su nombre.
+- **Contador de captación** (`ContadorConvenios.vue`): no cuenta segundas veces; incluye el medio "Google ADS" (conteo, filtro y export).
+- Google ADS con su nombre también en Estado de turnos, estadísticas de Turnos del día, Histórico de facturación y `turnosdeldiaService.ts` (tipos y mapas).
 
 ## 2. Trámites
 
@@ -321,6 +334,15 @@ No hay componentes compartidos propios de `@/components` para este módulo; cada
 
 ---
 
+
+### Reportes por canal y Segunda vez (2026-10)
+
+- **Filas por canal** ("¿Cómo se enteró de nosotros?", calculadas en el backend con `canal_reporte_service`): Ingresos por canal (`ReporteIngresosCanal.vue`), Retención (`ReporteRetencion.vue`), Descuentos (`ReporteDescuentos.vue`), vista previa del Súper Informe (`SuperInformePreview.vue`) y el apartado "por canal" de Liquidación RTM / Trazabilidad (`ComisionesList.vue`). Orden fijo con ceros: Fachada, Redes Sociales, Call Center, Asesor (· Asesor comercial, · Asesor convenio, "Asesor (sin detalle)" si hay datos), Google ADS.
+- **Línea informativa "de los cuales, por convenio"** bajo Asesor comercial (`es_informativa`): cursiva gris, "—" en "% del total" y nota "(N % de Asesor comercial)"; los totales de pantalla la saltan (`!es_subcanal`); tiene su propio detalle al hacer clic; en los Excel va con "(informativa, no suma)".
+- Helpers en `reportesAdminService.ts`: `nombreCanalReporte()`, `tituloCanalReporte()`, `claseFilaCanal()`, `notaFilaCanal()`, `nombreFilaCanalExcel()`; tipos `FilaCanalReporte` / `AvisoCanal`. Test: `src/services/__tests__/canalReporte.spec.ts`.
+- **Aviso de fecha confiable**: componente `src/components/reportes/AvisoCanal.vue` (muestra `aviso_canal.mensaje` cuando el rango empieza antes de `CANAL_CONFIABLE_DESDE` del backend).
+- **Reportes Admin → Segunda vez** (`/reportes-admin/segunda-vez`, `ReporteSegundaVez.vue`, entrada "Segunda vez" en `AppSidebar.vue`): conteos por estado de ventana y su Excel.
+
 ## 7. Dashboard
 
 Panel de inicio con KPIs operativos del día (turnos en proceso/finalizados por servicio: RTM, Preventiva, Peritaje, SOAT) y accesos rápidos a Turnos.
@@ -334,6 +356,9 @@ Panel de inicio con KPIs operativos del día (turnos en proceso/finalizados por 
 **Roles:** `verDashboard` → `SUPER_ADMIN, GERENCIA, OPERATIVO_TURNOS, TRAMITADOR`.
 
 ---
+
+
+- **Segunda vez** (2026-10): los indicadores operativos del día incluyen las segundas veces con la marca "(incl. N 2ª vez)" (`DashboardView.vue`, `useDashboardDatos.ts`).
 
 ## 8. Autenticación / Login
 
