@@ -258,7 +258,8 @@ export interface RetencionPorCanal extends FilaCanalReporte {
   recuperaciones: number
   total: number
   total_bruto: number
-  porcentaje: number
+  /** null en la línea informativa. */
+  porcentaje: number | null
 }
 
 export interface RetencionPorMes {

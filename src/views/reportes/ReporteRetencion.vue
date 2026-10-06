@@ -178,8 +178,9 @@
               hide-default-footer
             >
               <template #item.canal="{ item }">
-                <span :class="{ 'pl-6 text-medium-emphasis': item.es_subcanal }">
+<span :class="claseFilaCanal(item)">
                   {{ nombreCanalReporte(item) }}
+                  <span v-if="item.es_informativa" class="text-caption">{{ notaFilaCanal(item) }}</span>
                 </span>
               </template>
               <template #item.nuevos="{ item }">
@@ -204,7 +205,7 @@
                 {{ formatCOP(item.total_bruto) }}
               </template>
               <template #item.porcentaje="{ item }">
-                {{ formatPercent(item.porcentaje) }}
+                {{ item.es_informativa ? '—' : formatPercent(item.porcentaje ?? 0) }}
               </template>
 
               <template #body.append v-if="porCanalRows.length">
@@ -360,7 +361,10 @@ import {
   getRetencionClientes,
   getDetalleRetencion,
   getRangoMesActual,
+  claseFilaCanal,
   nombreCanalReporte,
+  nombreFilaCanalExcel,
+  notaFilaCanal,
   tituloCanalReporte,
   type RetencionResponse,
   type DetalleRetencionTicket,
@@ -415,7 +419,7 @@ const totalesPorMes = computed(() =>
 
 /* ===== Nombres de canal ("¿Cómo se enteró de nosotros?") ===== */
 function tituloCanal(canal: string) {
-  return tituloCanalReporte({ canal, es_subcanal: canal.startsWith('ASESOR_') })
+  return tituloCanalReporte(canal)
 }
 function canalDetalle(d: DetalleRetencionTicket) {
   return d.canal ? tituloCanal(d.canal) : nombreCanalReporte(d.captacion_canal)
@@ -553,7 +557,7 @@ function exportarExcel(
 function exportarPorCanal() {
   const encabezados = ['Canal', 'Nuevos', 'Recurrentes', 'Recuperaciones', 'Total', 'Total Bruto']
   const filas = porCanalRows.value.map((r) => [
-    r.es_subcanal ? `    · ${nombreCanalReporte(r)}` : nombreCanalReporte(r),
+    nombreFilaCanalExcel(r),
     r.nuevos,
     r.recurrentes,
     r.recuperaciones,
