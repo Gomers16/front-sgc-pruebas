@@ -9,15 +9,16 @@ export type TipoVehiculoFrontend =
   | 'Liviano Público'
   | 'Motocicleta'
 
-export type MedioEnteroFront = 'redes_sociales' | 'call_center' | 'fachada' | 'asesor'
+export type MedioEnteroFront = 'redes_sociales' | 'call_center' | 'fachada' | 'asesor' | 'google_ads'
 
 export type MedioEnteroFinalDB =
   | 'Redes Sociales'
   | 'Call Center'
   | 'Fachada'
   | 'Asesor Comercial'
+  | 'Google ADS'
 
-export type CanalAtrib = 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES'
+export type CanalAtrib = 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES' | 'GOOGLE_ADS'
 export type ServicioCodigo = 'RTM' | 'PREV' | 'PERI' | 'SOAT'
 
 /* ====== Mapas ====== */
@@ -26,6 +27,7 @@ export const MEDIO_MAP: Record<MedioEnteroFront, MedioEnteroFinalDB> = {
   call_center: 'Call Center',
   fachada: 'Fachada',
   asesor: 'Asesor Comercial',
+  google_ads: 'Google ADS',
 }
 
 const MEDIO_TO_CANAL: Record<MedioEnteroFront, CanalAtrib> = {
@@ -33,6 +35,7 @@ const MEDIO_TO_CANAL: Record<MedioEnteroFront, CanalAtrib> = {
   call_center: 'TELE',
   fachada: 'FACHADA',
   asesor: 'ASESOR',
+  google_ads: 'GOOGLE_ADS',
 }
 
 /* ========== Helpers ========== */
@@ -57,7 +60,8 @@ function to24hFrom12(s?: string) {
 function normalizeCanal(input?: string | null, medio?: MedioEnteroFront | null): CanalAtrib | null {
   const v = (input || '').toString().trim().toUpperCase()
 
-  if (['FACHADA', 'ASESOR', 'TELE', 'REDES'].includes(v)) return v as CanalAtrib
+  if (['FACHADA', 'ASESOR', 'TELE', 'REDES', 'GOOGLE_ADS'].includes(v)) return v as CanalAtrib
+  if (['GOOGLE ADS', 'GOOGLEADS'].includes(v)) return 'GOOGLE_ADS'
   if (v === 'ASESOR_COMERCIAL') return 'ASESOR'
 
   if (['REDES', 'REDES_SOCIALES', 'SOCIAL', 'SOCIALES', 'RRSS'].includes(v)) return 'REDES'
@@ -558,6 +562,7 @@ public static async exportTurnosExcelMultiple(filters: ExportFiltersMultiple) {
       'Redes Sociales': 'REDES',
       'Call Center': 'TELE',
       'Asesor Comercial': 'ASESOR',
+      'Google ADS': 'GOOGLE_ADS',
     }
     const canales = filters.mediosSeleccionados.map(m => canalMap[m])
     params.canalAtribucion = canales.join(',')
@@ -615,6 +620,7 @@ public static async exportTurnosExcelMultiple(filters: ExportFiltersMultiple) {
       'Redes Sociales': 'REDES',
       'Call Center': 'TELE',
       'Asesor Comercial': 'ASESOR',
+      'Google ADS': 'GOOGLE_ADS',
     }
 
     const params: Record<string, string> = {

@@ -859,6 +859,13 @@ import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import { HttpError } from '@/services/http'
 import { BusquedasService } from '@/services/busquedas_service'
 import { TramitesService } from '@/services/tramitesService'
+import {
+  canalToMedio,
+  medioEnteroItems,
+  resolverCaptacion,
+  type CanalAtrib,
+  type MedioEntero,
+} from './canalCaptacion'
 
 /** ===== Parámetros de búsqueda ===== **/
 const PLACA_REGEX = /^(?:[A-Z]{3}\d{3}|[A-Z]{3}\d{2}[A-Z]?|\d{3}[A-Z]{3})$/
@@ -876,8 +883,6 @@ type TipoVehiculoFrontend =
   | 'Liviano Público'
   | 'Motocicleta'
 
-type MedioEntero = 'redes_sociales' | 'call_center' | 'fachada' | 'asesor'
-type CanalAtrib = 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES'
 type AgenteTipo = 'ASESOR_INTERNO' | 'ASESOR_EXTERNO' | 'TELEMERCADEO' | string
 
 interface ServicioDTO { id: number; codigo: string; nombre: string }
@@ -1018,13 +1023,6 @@ const tipoVehiculoItems: ReadonlyArray<TipoVehiculoFrontend> = [
   'Liviano Taxi',
   'Liviano Público',
   'Motocicleta',
-] as const
-
-const medioEnteroItems: ReadonlyArray<{ title: string; value: MedioEntero }> = [
-  { title: 'Redes Sociales', value: 'redes_sociales' },
-  { title: 'Call Center', value: 'call_center' },
-  { title: 'Fachada', value: 'fachada' },
-  { title: 'Asesor', value: 'asesor' },
 ] as const
 
 interface TurnoForm {
@@ -1185,21 +1183,6 @@ function mapClaseToTipo(clase?: { codigo?: string; nombre?: string } | null): Ti
   return null
 }
 
-function mapCanalToMedioEntero(canal: CanalAtrib): MedioEntero {
-  if (canal === 'FACHADA') return 'fachada'
-  if (canal === 'TELE')    return 'call_center'
-  if (canal === 'REDES')   return 'redes_sociales'
-  return 'asesor'
-}
-function mapMedioEnteroToCanal(medio: MedioEntero | null): CanalAtrib {
-  switch (medio) {
-    case 'redes_sociales': return 'REDES'
-    case 'call_center':    return 'TELE'
-    case 'asesor':         return 'ASESOR'
-    case 'fachada':
-    default:               return 'FACHADA'
-  }
-}
 
 const captacionChipText = computed(() => {
   const s = busqueda.value?.captacionSugerida
@@ -1365,7 +1348,7 @@ async function doSearch(force: boolean = false) {
     if (resp?.captacionSugerida) {
       const canal = resp.captacionSugerida.canal
       const agente = resp.captacionSugerida.agente
-      form.value.medioEntero = mapCanalToMedioEntero(canal)
+      form.value.medioEntero = canalToMedio(canal)
       form.value._captacionCanal = canal
       form.value._captacionAgenteId = agente?.id ?? null
       form.value.asesorNombre = canal === 'ASESOR' ? (agente?.nombre ?? '') : null
@@ -1623,7 +1606,12 @@ async function submitForm() {
             ? { segundaVezOrigenId: origenSV }
             : {}
 
-    const canal: CanalAtrib = form.value._captacionCanal ?? mapMedioEnteroToCanal(form.value.medioEntero)
+    // Se guarda lo que quedó elegido en el desplegable, aunque la búsqueda
+    // haya sugerido otro canal (ver resolverCaptacion).
+    const { canal, agenteCaptacionId } = resolverCaptacion(form.value.medioEntero, {
+      canal: form.value._captacionCanal,
+      agenteId: form.value._captacionAgenteId,
+    })
 
     // Payload base con campos requeridos
     const payload = {
@@ -1637,7 +1625,7 @@ async function submitForm() {
       canal,
       // Campos opcionales
       ...(form.value._dateoId && { dateoId: form.value._dateoId }),
-      ...(form.value._captacionAgenteId && { agenteCaptacionId: form.value._captacionAgenteId }),
+      ...(agenteCaptacionId && { agenteCaptacionId }),
       ...(!busquedaCliente.value?.telefono && clienteTelefono.value && {
         clienteTelefono: clienteTelefono.value.replace(/\D/g, '')
       }),

@@ -573,6 +573,7 @@ import { useRoute, useRouter } from 'vue-router'
 import type { VForm } from 'vuetify/components'
 import { authSetStore } from '@/stores/AuthStore'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
+import { canalToMedio, medioEnteroItems, medioToCanal, type MedioEntero } from './canalCaptacion'
 
 type TipoVehiculoFrontend =
   | 'Liviano Particular'
@@ -580,7 +581,6 @@ type TipoVehiculoFrontend =
   | 'Liviano Público'
   | 'Motocicleta'
 
-type MedioEntero = 'redes_sociales' | 'call_center' | 'fachada' | 'asesor'
 type AsesorTipo = 'ASESOR_INTERNO' | 'ASESOR_EXTERNO'
 
 interface ServicioDTO { id: number; codigo: string; nombre: string }
@@ -742,13 +742,6 @@ const tipoVehiculoItems: ReadonlyArray<TipoVehiculoFrontend> = [
   'Motocicleta',
 ] as const
 
-const medioEnteroItems: ReadonlyArray<{ title: string; value: MedioEntero }> = [
-  { title: 'Redes Sociales', value: 'redes_sociales' },
-  { title: 'Call Center', value: 'call_center' },
-  { title: 'Fachada', value: 'fachada' },
-  { title: 'Asesor', value: 'asesor' },
-] as const
-
 const serviciosItems = ref<ServicioItem[]>([])
 const serviciosLoading = ref(false)
 const serviciosMapById = ref<Record<number, ServicioDTO>>({})
@@ -848,6 +841,7 @@ const canalPretty = computed(() => {
   if (c === 'TELE') return 'Telemercadeo'
   if (c === 'ASESOR') return 'Asesor'
   if (c === 'REDES') return 'Redes Sociales'
+  if (c === 'GOOGLE_ADS') return 'Google ADS'
   if (c === 'FACHADA') return 'Fachada'
   return '—'
 })
@@ -910,22 +904,6 @@ function formatConvenioChip(c?: ConvenioDTO | null): string {
 function onPlacaInput(e: Event) {
   const target = e.target as HTMLInputElement | null
   if (target) form.value.placa = target.value.toUpperCase().replace(/\s|-/g, '')
-}
-
-/** Mapas medio<->canal */
-function canalToMedio(canal: string | null | undefined): MedioEntero {
-  const c = (canal || '').toUpperCase()
-  if (c === 'REDES') return 'redes_sociales'
-  if (c === 'TELE')  return 'call_center'
-  if (c === 'ASESOR')return 'asesor'
-  return 'fachada'
-}
-
-function medioToCanal(medio: MedioEntero | null): 'FACHADA'|'TELE'|'REDES'|'ASESOR' {
-  if (medio === 'redes_sociales') return 'REDES'
-  if (medio === 'call_center')    return 'TELE'
-  if (medio === 'asesor')         return 'ASESOR'
-  return 'FACHADA'
 }
 
 /** Catálogo de servicios */
