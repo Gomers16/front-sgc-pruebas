@@ -482,6 +482,7 @@ interface Turno {
     | 'Fachada'
     | 'Referido Interno'
     | 'Asesor Comercial'
+    | 'Google ADS'
     | null
   observaciones: string | null
   funcionarioId: number

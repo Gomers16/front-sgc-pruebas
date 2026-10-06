@@ -804,6 +804,7 @@ function humanCanal(c?: string | null) {
     'TELEMERCADEO': 'Call Center',
     'TELE': 'Call Center',
     'REDES': 'Redes',
+    'GOOGLE_ADS': 'Google ADS',
     'CONVENIO': 'Convenio',
     'REFERIDO': 'Referido',
   }
@@ -817,6 +818,7 @@ function canalChipColor(c?: string | null) {
     case 'TELEMERCADEO':
     case 'TELE': return 'indigo'
     case 'REDES': return 'cyan'
+    case 'GOOGLE_ADS': return 'teal'
     case 'CONVENIO': return 'blue-grey'
     case 'REFERIDO': return 'green'
     default: return 'grey'

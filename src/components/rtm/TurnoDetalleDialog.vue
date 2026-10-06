@@ -487,7 +487,7 @@ export interface CaptacionDateoMin {
 }
 
 export type EstadoTurno = 'activo' | 'inactivo' | 'cancelado' | 'finalizado'
-export type CanalAtrib = 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES' | string
+export type CanalAtrib = 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES' | 'GOOGLE_ADS' | string
 
 export interface HistVisit {
   id: number
@@ -819,6 +819,8 @@ const prettifyCanal = (canal?: CanalAtrib): string => {
       return 'Call Center'
     case 'REDES':
       return 'Redes Sociales'
+    case 'GOOGLE_ADS':
+      return 'Google ADS'
     default:
       return canal || '—'
   }

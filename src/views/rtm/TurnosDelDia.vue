@@ -964,7 +964,7 @@ const TIPO_VEHICULO_KEYS: TipoVehiculoStatsKey[] = [
   'Desconocido',
 ]
 
-type MedioCaptacionLabel = 'Redes Sociales' | 'Call Center' | 'Fachada' | 'Asesor' | 'Otros'
+type MedioCaptacionLabel = 'Redes Sociales' | 'Call Center' | 'Fachada' | 'Asesor' | 'Google ADS' | 'Otros'
 
 interface ServicioEnTurno {
   id: number
@@ -1543,6 +1543,7 @@ const statsData = ref({
     'Call Center': 0,
     Fachada: 0,
     Asesor: 0,
+    'Google ADS': 0,
     Otros: 0,
   } as Record<MedioCaptacionLabel, number>,
 })
@@ -1560,6 +1561,7 @@ const mapMedioToCanalCaptacion = (
   const m = medio.toString().toLowerCase()
 
   if (m.includes('redes')) return 'Redes Sociales'
+  if (m.includes('google')) return 'Google ADS'
   if (m.includes('call') || m.includes('tele')) return 'Call Center'
   if (m.includes('fachada')) return 'Fachada'
   if (m.includes('asesor')) return 'Asesor'
@@ -1583,6 +1585,7 @@ const calculateStats = () => {
     'Call Center': 0,
     Fachada: 0,
     Asesor: 0,
+    'Google ADS': 0,
     Otros: 0,
   }
 

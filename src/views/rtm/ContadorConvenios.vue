@@ -467,7 +467,7 @@ interface Turno {
   servicioId?: number | null
   servicio?: ServicioEnTurno | null
   servicioCodigo?: ServicioCodigo | string
-  canalAtribucion?: 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES' | string
+  canalAtribucion?: 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES' | 'GOOGLE_ADS' | string
   agenteCaptacion?: AgenteCaptacionLite | null
   /** Segunda vez gratuita (TINYINT: puede llegar 0/1). */
   esSegundaVez?: boolean | number | null
@@ -497,6 +497,7 @@ const mediosOptions = [
   { value: 'Redes Sociales' as MedioEnteroFinalDB, title: 'Redes Sociales' },
   { value: 'Call Center' as MedioEnteroFinalDB,    title: 'Call Center' },
   { value: 'Asesor Comercial' as MedioEnteroFinalDB, title: 'Asesor Comercial' },
+  { value: 'Google ADS' as MedioEnteroFinalDB,     title: 'Google ADS' },
 ]
 const selectedMedios = ref<MedioEnteroFinalDB[]>([])
 const mediosOrder = mediosOptions
@@ -510,6 +511,7 @@ const reportData = ref({
     'Redes Sociales': 0,
     'Call Center': 0,
     'Asesor Comercial': 0,
+    'Google ADS': 0,
   } as Record<MedioEnteroFinalDB, number>,
   servicios: {} as Record<string, number>,
 })
@@ -616,6 +618,7 @@ const prettifyCanal = (canal?: string): string => {
     case 'ASESOR':  return 'Asesor'
     case 'TELE':    return 'Telemercadeo'
     case 'REDES':   return 'Redes Sociales'
+    case 'GOOGLE_ADS': return 'Google ADS'
     default:        return canal || '—'
   }
 }
@@ -650,12 +653,13 @@ const loadServiciosOptions = async () => {
 }
 
 /** Mapea medio de UI a canal de backend */
-const mapMedioToCanal = (medio: MedioEnteroFinalDB): 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES' => {
+const mapMedioToCanal = (medio: MedioEnteroFinalDB): 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES' | 'GOOGLE_ADS' => {
   switch (medio) {
     case 'Fachada': return 'FACHADA'
     case 'Redes Sociales': return 'REDES'
     case 'Call Center': return 'TELE'
     case 'Asesor Comercial': return 'ASESOR'
+    case 'Google ADS': return 'GOOGLE_ADS'
     default: return 'FACHADA'
   }
 }
@@ -701,7 +705,7 @@ const fetchTurnosForReport = async () => {
     console.error('Error al cargar turnos para el reporte:', error)
     showSnackbar(error instanceof Error ? error.message : 'Error al cargar los turnos para el reporte.', 'error')
     turnos.value = []
-    reportData.value.medios = { 'Fachada': 0, 'Redes Sociales': 0, 'Call Center': 0, 'Asesor Comercial': 0 }
+    reportData.value.medios = { 'Fachada': 0, 'Redes Sociales': 0, 'Call Center': 0, 'Asesor Comercial': 0, 'Google ADS': 0 }
     reportData.value.servicios = {}
   } finally {
     isLoading.value = false
@@ -710,7 +714,7 @@ const fetchTurnosForReport = async () => {
 
 const calculateReportData = () => {
   const mediosCount: Record<MedioEnteroFinalDB, number> =
-    { 'Fachada': 0, 'Redes Sociales': 0, 'Call Center': 0, 'Asesor Comercial': 0 }
+    { 'Fachada': 0, 'Redes Sociales': 0, 'Call Center': 0, 'Asesor Comercial': 0, 'Google ADS': 0 }
 
   const serviciosCount: Record<string, number> = {}
 
