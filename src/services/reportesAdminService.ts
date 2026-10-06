@@ -88,13 +88,18 @@ async function apiFetchBlobPost(endpoint: string, body: unknown): Promise<Blob> 
 /**
  * Fila de un reporte "por canal" (canal = "¿Cómo se enteró de nosotros?" del
  * turno): el backend las manda en orden fijo — Fachada, Redes Sociales, Call
- * Center, Asesor (con Comercial / Convenio debajo, es_subcanal) y Google ADS —
- * con su nombre ya resuelto.
+ * Center, Asesor (con Asesor comercial / Asesor convenio debajo, es_subcanal)
+ * y Google ADS — con su nombre ya resuelto. Debajo de Asesor comercial va la
+ * línea informativa "de los cuales, por convenio" (es_informativa): ya está
+ * dentro de Asesor comercial, NO suma a ningún total y no tiene % del total.
  */
 export interface FilaCanalReporte {
   canal: string
   nombre?: string
   es_subcanal?: boolean
+  es_informativa?: boolean
+  /** Solo en la línea informativa: su % sobre Asesor comercial. */
+  porcentaje_sobre_asesor_comercial?: number
 }
 
 /** Aviso de fecha confiable del desglose por canal (CANAL_CONFIABLE_DESDE). */
@@ -110,8 +115,9 @@ const NOMBRE_CANAL_REPORTE: Record<string, string> = {
   TELE: 'Call Center',
   TELEMERCADEO: 'Call Center',
   ASESOR: 'Asesor',
-  ASESOR_COMERCIAL: 'Comercial',
-  ASESOR_CONVENIO: 'Convenio',
+  ASESOR_COMERCIAL: 'Asesor comercial',
+  ASESOR_COMERCIAL_CONVENIO: 'de los cuales, por convenio',
+  ASESOR_CONVENIO: 'Asesor convenio',
   ASESOR_SIN_DETALLE: 'Asesor (sin detalle)',
   GOOGLE_ADS: 'Google ADS',
 }
@@ -122,10 +128,32 @@ export function nombreCanalReporte(fila: { canal: string; nombre?: string } | st
   return fila.nombre ?? NOMBRE_CANAL_REPORTE[fila.canal] ?? fila.canal
 }
 
-/** Título de un detalle por canal: los subcanales llevan "Asesor — ". */
-export function tituloCanalReporte(fila: FilaCanalReporte): string {
-  const n = nombreCanalReporte(fila)
-  return fila.es_subcanal && fila.canal !== 'ASESOR_SIN_DETALLE' ? `Asesor — ${n}` : n
+/** Título de un detalle por canal ("Asesor comercial — por convenio" para la línea informativa). */
+export function tituloCanalReporte(fila: FilaCanalReporte | string): string {
+  const canal = typeof fila === 'string' ? fila : fila.canal
+  if (canal === 'ASESOR_COMERCIAL_CONVENIO') return 'Asesor comercial — por convenio'
+  return nombreCanalReporte(fila)
+}
+
+/** Clases de la celda "Canal": subcanales sangrados; la línea informativa, en cursiva gris. */
+export function claseFilaCanal(fila: FilaCanalReporte): string {
+  if (fila.es_informativa) return 'pl-10 font-italic text-medium-emphasis'
+  return fila.es_subcanal ? 'pl-6 text-medium-emphasis' : ''
+}
+
+/** "(78 % de Asesor comercial)" para la línea informativa; vacío en las demás. */
+export function notaFilaCanal(fila: FilaCanalReporte): string {
+  if (!fila.es_informativa) return ''
+  const pct = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(
+    fila.porcentaje_sobre_asesor_comercial ?? 0
+  )
+  return `(${pct} % de Asesor comercial)`
+}
+
+/** Nombre de la fila para Excel: sangría y "(informativa, no suma)" en la línea por convenio. */
+export function nombreFilaCanalExcel(fila: FilaCanalReporte): string {
+  if (fila.es_informativa) return `        ${nombreCanalReporte(fila)} (informativa, no suma)`
+  return fila.es_subcanal ? `    · ${nombreCanalReporte(fila)}` : nombreCanalReporte(fila)
 }
 
 export interface IngresoCanal extends FilaCanalReporte {
@@ -471,7 +499,8 @@ export interface DescuentoPorCanal extends FilaCanalReporte {
   cantidad: number
   total_descuentos: number
   tipos_usados: number
-  porcentaje: number
+  /** null en la línea informativa. */
+  porcentaje: number | null
 }
 export interface DescuentosPorCanalResponse {
   fecha_inicio: string
@@ -670,7 +699,8 @@ export async function getDetalleComisionesPorConvenio(
 export interface LiquidacionPorCanal extends FilaCanalReporte {
   cantidad: number
   monto: number
-  porcentaje: number
+  /** null en la línea informativa. */
+  porcentaje: number | null
 }
 
 export interface LiquidacionComercial extends ComisionComercial {
