@@ -168,6 +168,7 @@
               </v-btn>
             </div>
 
+            <AvisoCanal :aviso="retencionData?.aviso_canal" />
             <v-data-table
               :headers="headersPorCanal"
               :items="porCanalRows"
@@ -177,7 +178,9 @@
               hide-default-footer
             >
               <template #item.canal="{ item }">
-                {{ nombreCanal(item.canal) }}
+                <span :class="{ 'pl-6 text-medium-emphasis': item.es_subcanal }">
+                  {{ nombreCanalReporte(item) }}
+                </span>
               </template>
               <template #item.nuevos="{ item }">
                 <span
@@ -217,7 +220,7 @@
               </template>
             </v-data-table>
 
-            <v-alert v-if="!loading && !porCanalRows.length" type="info" variant="tonal" class="mt-4">
+            <v-alert v-if="!loading && !totalesPorCanal.total" type="info" variant="tonal" class="mt-4">
               No hay datos para el rango de fechas seleccionado.
             </v-alert>
           </v-window-item>
@@ -274,7 +277,7 @@
           <div class="d-flex align-center flex-wrap" style="gap:10px">
             <span>{{ categoriaEmoji(dialogDetalle.categoria) }} {{ categoriaNombre(dialogDetalle.categoria) }}</span>
             <v-chip size="small" color="primary" variant="tonal">
-              {{ dialogDetalle.canal ? nombreCanal(dialogDetalle.canal) : 'Todos los canales' }}
+              {{ dialogDetalle.canal ? tituloCanal(dialogDetalle.canal) : 'Todos los canales' }}
             </v-chip>
           </div>
           <v-btn icon="mdi-close" variant="text" density="comfortable" @click="dialogDetalle.open = false" />
@@ -297,7 +300,7 @@
           >
             <template #item.fecha="{ item }">{{ soloFecha(item.fecha) }}</template>
             <template #item.tipo_vehiculo="{ item }">{{ item.tipo_vehiculo ?? '—' }}</template>
-            <template #item.captacion_canal="{ item }">{{ nombreCanal(item.captacion_canal) }}</template>
+            <template #item.canal="{ item }">{{ canalDetalle(item) }}</template>
             <template #item.asesor="{ item }">{{ nombreAsesorDetalle(item) }}</template>
             <template #item.meses_desde_ultima_visita="{ item }">
               {{ formatMesesDesdeUltimaVisita(item.meses_desde_ultima_visita) }}
@@ -357,9 +360,12 @@ import {
   getRetencionClientes,
   getDetalleRetencion,
   getRangoMesActual,
+  nombreCanalReporte,
+  tituloCanalReporte,
   type RetencionResponse,
   type DetalleRetencionTicket,
 } from '@/services/reportesAdminService'
+import AvisoCanal from '@/components/reportes/AvisoCanal.vue'
 
 /* ===== Filtros de fecha (por defecto: mes actual) ===== */
 const rangoMes = getRangoMesActual()
@@ -381,8 +387,9 @@ const resumenRecurrentes = computed(() => retencionData.value?.resumen.recurrent
 const resumenRecuperaciones = computed(() => retencionData.value?.resumen.recuperaciones ?? resumenVacio)
 
 /* ===== Totales de tablas ===== */
+// Los subcanales de Asesor (Comercial/Convenio) ya están dentro de la fila Asesor.
 const totalesPorCanal = computed(() =>
-  porCanalRows.value.reduce(
+  porCanalRows.value.filter((r) => !r.es_subcanal).reduce(
     (acc, r) => ({
       nuevos: acc.nuevos + r.nuevos,
       recurrentes: acc.recurrentes + r.recurrentes,
@@ -406,16 +413,12 @@ const totalesPorMes = computed(() =>
   )
 )
 
-/* ===== Mapeo de nombres de canal ===== */
-const CANAL_LABELS: Record<string, string> = {
-  FACHADA: 'Fachada',
-  ASESOR_COMERCIAL: 'Asesor Comercial',
-  ASESOR_CONVENIO: 'Asesor Convenio',
-  TELEMERCADEO: 'Telemercadeo',
-  REDES: 'Redes / Marketing Digital',
+/* ===== Nombres de canal ("¿Cómo se enteró de nosotros?") ===== */
+function tituloCanal(canal: string) {
+  return tituloCanalReporte({ canal, es_subcanal: canal.startsWith('ASESOR_') })
 }
-function nombreCanal(c: string) {
-  return CANAL_LABELS[c] ?? c
+function canalDetalle(d: DetalleRetencionTicket) {
+  return d.canal ? tituloCanal(d.canal) : nombreCanalReporte(d.captacion_canal)
 }
 
 /* ===== Formato de mes ('YYYY-MM' -> 'junio 2026') ===== */
@@ -469,7 +472,7 @@ const headersDialogRetencion = [
   { title: 'Placa', key: 'placa' },
   { title: 'Fecha', key: 'fecha' },
   { title: 'Tipo Vehículo', key: 'tipo_vehiculo' },
-  { title: 'Canal', key: 'captacion_canal' },
+  { title: 'Canal', key: 'canal' },
   { title: 'Asesor/Convenio', key: 'asesor' },
   { title: 'Meses desde última visita', key: 'meses_desde_ultima_visita' },
   { title: 'Cliente', key: 'cliente_nombre' },
@@ -550,7 +553,7 @@ function exportarExcel(
 function exportarPorCanal() {
   const encabezados = ['Canal', 'Nuevos', 'Recurrentes', 'Recuperaciones', 'Total', 'Total Bruto']
   const filas = porCanalRows.value.map((r) => [
-    nombreCanal(r.canal),
+    r.es_subcanal ? `    · ${nombreCanalReporte(r)}` : nombreCanalReporte(r),
     r.nuevos,
     r.recurrentes,
     r.recuperaciones,
@@ -672,7 +675,7 @@ function exportarDialogDetalle() {
     d.placa,
     soloFecha(d.fecha),
     d.tipo_vehiculo ?? '—',
-    nombreCanal(d.captacion_canal),
+    canalDetalle(d),
     nombreAsesorDetalle(d),
     formatMesesDesdeUltimaVisita(d.meses_desde_ultima_visita),
     d.cliente_nombre ?? 'Sin RepGeneral',
