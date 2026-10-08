@@ -1,11 +1,18 @@
-// Responsabilidad: anunciar por voz el turno que se está llamando, con la
-// Web Speech API del navegador (SpeechSynthesisUtterance) — sin archivos de
-// audio grabados. Complementa el pitido corto de useAlarma.ts: el patrón es
-// pitido de atención + locución inmediatamente después, igual que una
-// cartelera digital real (ver useColaModales.ts, que encadena ambos).
+// Responsabilidad: anunciar por voz el turno que se está llamando.
+// Complementa el pitido corto de useAlarma.ts: el patrón es pitido de
+// atención + locución inmediatamente después, igual que una cartelera
+// digital real (ver useColaModales.ts, que encadena ambos).
 //
-// Selección de voz: no hay garantía de que Chrome/Edge en Windows tengan
-// instalada una voz es-CO exacta. Se prueba en el orden de
+// Primero con clips WAV pregrabados (useClipsAnuncio.ts): los TV de la sala
+// (LG viejo, Roku) reproducen Audio pero no tienen speechSynthesis. Si no se
+// puede armar con clips (módulo fuera de los 6 fijos, placa sin letras ni
+// dígitos, clip faltante) o fallan al sonar, se usa la Web Speech API
+// (SpeechSynthesisUtterance) como respaldo. `vozBloqueada` queda en true solo
+// si ninguna de las dos pudo sonar — es lo que prende el indicador "Sin
+// sonido" de TurneroDisplayView.vue.
+//
+// Selección de voz (respaldo): no hay garantía de que Chrome/Edge en Windows
+// tengan instalada una voz es-CO exacta. Se prueba en el orden de
 // config/constantes.ts::PREFERENCIA_IDIOMA_VOZ (variante exacta de Colombia,
 // luego variantes latinoamericanas, luego cualquier es-*). Si no se
 // encuentra ninguna voz en español, se deja que el navegador use su propio
@@ -20,34 +27,48 @@
 
 import { ref } from 'vue'
 import { PREFERENCIA_IDIOMA_VOZ } from '../config/constantes'
-import type { TurnoLlamado } from './useTurnos'
+import { clipsAnuncio, urlsDeClips, useClipsAnuncio, type DatosAnuncio } from './useClipsAnuncio'
 
 // Texto de la locución — función pura, exportada para testearla sin la Web
-// Speech API (ver __tests__/useVozTurno.spec.ts). Siempre con el módulo real;
-// solo cambia la instrucción (ver INSTRUCCION_LLAMADO_PREGUNTA):
+// Speech API (ver __tests__/useVozTurno.spec.ts). Los clips dicen lo mismo
+// (ver clipsAnuncio()). Siempre con el módulo real; solo cambia la
+// instrucción (ver INSTRUCCION_LLAMADO_PREGUNTA):
 //  - Llamado a módulo: "Turno con placa X, diríjase al Módulo N - …."
 //  - Pregunta:         "Turno con placa X, por favor acérquese al Módulo N - …."
-export function textoAnuncio(turno: Pick<TurnoLlamado, 'placa' | 'modulo' | 'tipoLlamado'>): string {
+export function textoAnuncio(turno: DatosAnuncio): string {
   const instruccion = turno.tipoLlamado === 'pregunta' ? 'por favor acérquese al' : 'diríjase al'
   return `Turno con placa ${turno.placa}, ${instruccion} ${turno.modulo}.`
 }
 
-export function useVozTurno() {
+// Solo para la página de prueba (TurneroPruebaVozView.vue): forzar el
+// camino de respaldo o el de "sin speechSynthesis" en un PC que sí la tiene.
+export interface OpcionesVozTurno {
+  simularSinSintesis?: () => boolean
+  simularSinClips?: () => boolean
+}
+
+export function useVozTurno(opciones: OpcionesVozTurno = {}) {
   const vozBloqueada = ref(false)
-  // true exactamente mientras el motor de voz está pronunciando la locución
-  // actual (entre onstart y onend del utterance) — no cubre el pitido de
-  // useAlarma.ts, que termina antes de que esto se prenda. Lo consume el
-  // panel derecho de TurneroDisplayView.vue para el indicador visual de
-  // "hablando ahora" (ver useColaModales.ts, que lo re-expone hacia arriba).
+  // true exactamente mientras suena la locución actual (clips o voz
+  // sintética) — no cubre el pitido de useAlarma.ts, que termina antes de
+  // que esto se prenda. Lo consume el panel derecho de
+  // TurneroDisplayView.vue para el indicador visual de "hablando ahora" (ver
+  // useColaModales.ts, que lo re-expone hacia arriba).
   const hablando = ref(false)
+
+  const clips = useClipsAnuncio()
 
   let vozPreferida: SpeechSynthesisVoice | null = null
   let vocesResueltas = false
 
-  const disponible = typeof window !== 'undefined' && 'speechSynthesis' in window
+  const sintesisInstalada = typeof window !== 'undefined' && 'speechSynthesis' in window
+
+  function sintesisDisponible() {
+    return sintesisInstalada && !opciones.simularSinSintesis?.()
+  }
 
   function elegirVoz() {
-    if (!disponible) return
+    if (!sintesisInstalada) return
     const voces = window.speechSynthesis.getVoices()
     if (!voces.length) return // todavía no cargaron — se reintenta en 'voiceschanged'
 
@@ -76,15 +97,19 @@ export function useVozTurno() {
     )
   }
 
-  if (disponible) {
+  if (sintesisInstalada) {
     elegirVoz() // por si ya estaban cargadas (p. ej. otra pestaña las disparó antes)
     window.speechSynthesis.onvoiceschanged = elegirVoz
   }
 
-  function anunciar(turno: Pick<TurnoLlamado, 'placa' | 'modulo' | 'tipoLlamado'>) {
-    if (!disponible) {
+  function hablarConSintesis(turno: DatosAnuncio) {
+    if (!sintesisDisponible()) {
       vozBloqueada.value = true
-      console.warn('[useVozTurno] Este navegador no soporta la Web Speech API (speechSynthesis).')
+      hablando.value = false
+      console.warn(
+        '[useVozTurno] Sin locución: no sonaron los clips y este navegador no soporta la ' +
+          'Web Speech API (speechSynthesis).'
+      )
       return
     }
 
@@ -96,14 +121,17 @@ export function useVozTurno() {
 
     utterance.onstart = () => {
       hablando.value = true
+      vozBloqueada.value = false
     }
     utterance.onend = () => {
       hablando.value = false
     }
 
     utterance.onerror = (evento) => {
-      vozBloqueada.value = true
       hablando.value = false
+      // Cortada a propósito por un llamado nuevo (ver anunciar): no es un fallo.
+      if (evento.error === 'interrupted' || evento.error === 'canceled') return
+      vozBloqueada.value = true
       console.warn(
         '[useVozTurno] El navegador rechazó o falló la síntesis de voz (falta de interacción ' +
           'previa del usuario, política de autoplay, o error interno del motor de voz). El ' +
@@ -119,6 +147,34 @@ export function useVozTurno() {
       hablando.value = false
       console.warn('[useVozTurno] Excepción al invocar speechSynthesis.speak():', error)
     }
+  }
+
+  function anunciar(turno: DatosAnuncio) {
+    // Un llamado nuevo corta el anterior (clips o voz sintética), sin solaparse.
+    clips.cancelar()
+    // Solo si está hablando: en Chrome, cancel() justo antes de speak() a
+    // veces deja mudo el utterance siguiente.
+    if (sintesisInstalada && window.speechSynthesis.speaking) window.speechSynthesis.cancel()
+    hablando.value = false
+
+    const urls = opciones.simularSinClips?.() ? null : urlsDeClips(clipsAnuncio(turno))
+    if (!urls) {
+      hablarConSintesis(turno)
+      return
+    }
+
+    hablando.value = true
+    clips.reproducir(urls, {
+      alTerminar: () => {
+        hablando.value = false
+        vozBloqueada.value = false
+      },
+      alFallar: (motivo) => {
+        hablando.value = false
+        console.warn('[useVozTurno] Falló la locución por clips; se usa speechSynthesis.', motivo)
+        hablarConSintesis(turno)
+      },
+    })
   }
 
   return { anunciar, vozBloqueada, hablando }

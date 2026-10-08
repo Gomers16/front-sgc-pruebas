@@ -9,8 +9,11 @@
 // front solo pinta los primeros N tal como vienen (ver PanelEntrega.vue).
 export const CANTIDAD_ULTIMOS_LLAMADOS = 5
 
-// Duración que permanece abierto el modal de llamado, en milisegundos.
-export const DURACION_MODAL_MS = 6000
+// Duración que permanece abierto el modal de llamado, en milisegundos. Con
+// la locución por clips (pitido + "turno con placa" + placa letra por letra +
+// instrucción + módulo) el anuncio dura ~8 s; 12 s le dan margen a un TV
+// lento cargando clips sin que el siguiente llamado lo corte.
+export const DURACION_MODAL_MS = 12000
 
 // Margen entre el cierre de un modal y la apertura del siguiente en la cola,
 // para que el cambio se perciba como dos llamados distintos y no como un
@@ -21,6 +24,10 @@ export const PAUSA_ENTRE_MODALES_MS = 400
 // con `new URL(...)` para que Vite resuelva el archivo con el hash correcto
 // en el build de producción.
 export const RUTA_SONIDO_LLAMADO = new URL('../assets/sonidos/llamado.wav', import.meta.url).href
+
+// Si el pitido no dispara 'ended' (pasa en navegadores de TV viejos), la
+// locución arranca igual pasado este tiempo. El pitido dura ~0.35 s.
+export const PITIDO_TIMEOUT_MS = 3000
 
 // Cada cuánto se refresca la cola contra el backend, en milisegundos.
 export const INTERVALO_POLL_MS = 8000
@@ -98,6 +105,32 @@ export type ModuloTurnero = (typeof MODULOS_TURNERO)[number]
 // texto libre tipo "Caja 2") — cae acá en vez de romper el select o mostrar
 // un valor inválido. Ver TurnosParaLlamar.vue::cargarTurnos().
 export const MODULO_TURNERO_DEFECTO: ModuloTurnero = MODULOS_TURNERO[0]
+
+// Locución por clips pregrabados (ver useClipsAnuncio.ts): cada módulo es UN
+// clip en assets/sonidos/voz/ con el módulo completo ("módulo cinco, caja
+// RTM"). El Record obliga a que los 6 tengan clip; si cambia un texto de
+// MODULOS_TURNERO hay que cambiarlo también en scripts/generar-clips-voz.py y
+// regenerar. Un módulo guardado que no sea uno de los 6 se anuncia con
+// speechSynthesis (respaldo).
+export const CLIPS_VOZ_MODULO: Record<ModuloTurnero, string> = {
+  'Módulo 1 - Caja SOAT': 'modulo-1',
+  'Módulo 2 - Caja SOAT': 'modulo-2',
+  'Módulo 3 - Caja SOAT': 'modulo-3',
+  'Módulo 4 - Entrega': 'modulo-4',
+  'Módulo 5 - Caja RTM': 'modulo-5',
+  'Módulo 6 - Caja RTM': 'modulo-6',
+}
+
+// Si un clip no dispara 'ended' ni 'error' en este tiempo, se salta al
+// siguiente. El clip más largo (modulo-6) dura ~2.5 s.
+export const CLIP_VOZ_TIMEOUT_MS = 4000
+
+// Página de prueba de la locución (/turnero/prueba-voz,
+// TurneroPruebaVozView.vue): existe en `npm run dev` y, en un build, solo si
+// se compila con VITE_TURNERO_PRUEBA_VOZ=true (para probar en el TV). En el
+// build normal la ruta no se registra y su código no entra al bundle.
+export const PRUEBA_VOZ_HABILITADA =
+  import.meta.env.DEV || import.meta.env.VITE_TURNERO_PRUEBA_VOZ === 'true'
 
 // Llamado de pregunta (tipoLlamado === 'pregunta', botón "Preguntar" en
 // TurnosParaLlamar.vue): siempre con el módulo REAL — solo cambia la

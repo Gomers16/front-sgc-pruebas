@@ -43,8 +43,14 @@ router.beforeEach((to, _from, next) => {
   // El rol TURNERO queda encerrado en /turnero: sin sidebar, sin acceso a
   // ninguna otra vista aunque la escriba directo en la URL (la mayoría de
   // rutas no declara `roles`, así que el chequeo genérico de abajo no
-  // alcanza para bloquearlo).
-  if (auth.isAuthenticated && auth.userRole === 'TURNERO' && to.name !== 'Turnero') {
+  // alcanza para bloquearlo). Única excepción: la prueba de voz, que solo
+  // existe con PRUEBA_VOZ_HABILITADA (ver router/index.ts).
+  if (
+    auth.isAuthenticated &&
+    auth.userRole === 'TURNERO' &&
+    to.name !== 'Turnero' &&
+    to.name !== 'TurneroPruebaVoz'
+  ) {
     next({ name: 'Turnero' })
     return
   }

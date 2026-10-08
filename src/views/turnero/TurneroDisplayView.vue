@@ -18,6 +18,11 @@
     </div>
 
     <ModalLlamado :turno="turnoEnModal" />
+
+    <!-- Solo si la última locución no sonó ni con clips ni con
+         speechSynthesis (ver useVozTurno.ts). Esquina inferior, sobre la
+         cinta: no tapa ningún turno. -->
+    <div v-if="sinSonido" class="turnero-pantalla__sin-sonido" role="status">Sin sonido</div>
   </div>
 </template>
 
@@ -34,5 +39,5 @@ import './styles/tokens.css'
 import './styles/layout.css'
 
 const { colaSeguimiento, ultimosLlamados, listo } = useTurnos()
-const { turnoEnModal, hablando } = useColaModales(ultimosLlamados, listo)
+const { turnoEnModal, hablando, sinSonido } = useColaModales(ultimosLlamados, listo)
 </script>

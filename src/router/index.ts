@@ -38,6 +38,7 @@ import DateoDetail from '@/views/comercial/dateos/DateoDetail.vue'
 import ComisionesList from '@/views/comercial/comisiones/ComisionesList.vue'
 import ComisionDetail from '@/views/comercial/comisiones/ComisionesDetail.vue'
 import ComisionesConfig from '@/views/comercial/comisiones/ComisionesConfig.vue'
+import { PRUEBA_VOZ_HABILITADA } from '@/views/turnero/config/constantes'
 
 const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/login' },
@@ -115,6 +116,26 @@ const routes: RouteRecordRaw[] = [
       roles: ['TURNERO', 'SUPER_ADMIN', 'GERENCIA'],
     },
   },
+
+  // Prueba de la locución del Turnero (clips / speechSynthesis): solo en dev
+  // o con VITE_TURNERO_PRUEBA_VOZ=true — ver PRUEBA_VOZ_HABILITADA. Abierta
+  // también al rol TURNERO para poder probarla en el TV de la sala (ver
+  // main.ts).
+  ...(PRUEBA_VOZ_HABILITADA
+    ? [
+        {
+          path: '/turnero/prueba-voz',
+          name: 'TurneroPruebaVoz',
+          component: () => import('@/views/turnero/TurneroPruebaVozView.vue'),
+          meta: {
+            layout: 'BlankLayout',
+            title: 'Prueba de voz del Turnero',
+            requiresAuth: true,
+            roles: ['TURNERO', 'SUPER_ADMIN', 'GERENCIA'],
+          },
+        },
+      ]
+    : []),
 
   // ✅ Configuración del Turnero: multimedia del panel central + mensajes
   // de la cinta. Solo administración, con sidebar normal (MainLayout).

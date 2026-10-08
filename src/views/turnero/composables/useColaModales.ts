@@ -1,7 +1,8 @@
 // Responsabilidad: encolar y temporizar el modal de llamado a partir de
-// `ultimosLlamados`. Devuelve `{ turnoEnModal, hablando }` — el turno que
-// debe mostrarse ahora mismo (o `null` si no hay ninguno), y si en este
-// momento useVozTurno.ts está pronunciando su locución (ver más abajo).
+// `ultimosLlamados`. Devuelve `{ turnoEnModal, hablando, sinSonido }` — el
+// turno que debe mostrarse ahora mismo (o `null` si no hay ninguno), si en
+// este momento useVozTurno.ts está pronunciando su locución (ver más abajo),
+// y si la última locución no pudo sonar ni con clips ni con speechSynthesis.
 //
 // `ultimosLlamados` puede recibir varios turnos nuevos casi al mismo tiempo
 // (por ejemplo, si el back agrupa actualizaciones); este composable
@@ -21,7 +22,10 @@
 // reciente primero: esta detección no depende de la posición en el arreglo.
 //
 // Al mostrar cada turno: pitido corto (useAlarma.ts) seguido inmediatamente
-// por la locución de voz (useVozTurno.ts) — ver mostrarSiguiente().
+// por la locución de voz (useVozTurno.ts: clips, con speechSynthesis de
+// respaldo) — ver mostrarSiguiente(). Como el modal se muestra de a uno, los
+// anuncios tampoco se pisan; si uno se alargara más que DURACION_MODAL_MS, el
+// siguiente lo corta (useVozTurno.anunciar).
 //
 // Base de "ya existía al cargar la pantalla": se captura de `ultimosLlamados`
 // recién cuando `listo` (ver useTurnos.ts) se vuelve true, es decir, cuando
@@ -53,7 +57,8 @@ export function useColaModales(ultimosLlamados: Ref<TurnoLlamado[]>, listo: Ref<
   // locución también sale de acá, en mostrarSiguiente), así que este es el
   // único lugar donde existe ese estado — no se crea una segunda instancia
   // del composable en otro componente, que quedaría desincronizada.
-  const { anunciar, hablando } = useVozTurno()
+  // `vozBloqueada` sale como `sinSonido` → indicador discreto en la pantalla.
+  const { anunciar, hablando, vozBloqueada: sinSonido } = useVozTurno()
 
   function capturarBase(listaActual: TurnoLlamado[]) {
     listaActual.forEach((turno) => ultimoLlamadoEnAnunciado.set(turno.id, turno.llamadoEn))
@@ -119,5 +124,5 @@ export function useColaModales(ultimosLlamados: Ref<TurnoLlamado[]>, listo: Ref<
   // `baseCapturada` sea true.
   watch(ultimosLlamados, (lista) => encolarNuevos(lista), { deep: true })
 
-  return { turnoEnModal, hablando }
+  return { turnoEnModal, hablando, sinSonido }
 }

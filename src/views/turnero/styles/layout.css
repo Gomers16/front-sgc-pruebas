@@ -85,6 +85,23 @@
   grid-row: 3;
 }
 
+/* Indicador "Sin sonido" (ver TurneroDisplayView.vue): chico y tenue, en la
+   esquina inferior derecha justo encima de la cinta — se nota de cerca, no
+   compite con el turno. Por encima del modal (z-index 100) para que siga
+   visible mientras hay un llamado en pantalla. */
+.turnero-pantalla__sin-sonido {
+  position: fixed;
+  right: var(--espacio-xs);
+  bottom: calc(6vh + var(--espacio-xs));
+  z-index: 101;
+  padding: var(--espacio-2xs) var(--espacio-xs);
+  border-radius: 0.6vh;
+  font-size: var(--texto-2xs);
+  color: var(--marca-texto-tenue);
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
 /* Reset mínimo, scoped a la pantalla del turnero (no toca el resto del sistema) */
 .turnero-pantalla h1,
 .turnero-pantalla h2,
