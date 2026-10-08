@@ -125,6 +125,42 @@ export const CLIPS_VOZ_MODULO: Record<ModuloTurnero, string> = {
 // siguiente. El clip más largo (modulo-6) dura ~2.5 s.
 export const CLIP_VOZ_TIMEOUT_MS = 4000
 
+// Armado de la locución en UN solo WAV (ver useClipsAnuncio.ts::armarWav):
+// los clips se pegan con silencios exactos en vez de encadenar un Audio por
+// clip (el LG viejo pierde el arranque de cada clip al recargar el src).
+//  - SILENCIO_INICIAL_MS: al principio del WAV, para que el TV no se coma el
+//    arranque de "turno con placa" mientras abre la salida de audio.
+//  - SILENCIO_ENTRE_CLIPS_MS: entre letras/dígitos y antes del módulo.
+//  - SILENCIO_ANTES_INSTRUCCION_MS: antes de "diríjase al" / "por favor
+//    acérquese al", para separar la placa de la instrucción.
+//  - SILENCIO_FINAL_MS: al final del WAV, para que un TV que corta el final
+//    no se coma "caja RTM".
+export const SILENCIO_INICIAL_MS = 150
+export const SILENCIO_ENTRE_CLIPS_MS = 30
+export const SILENCIO_ANTES_INSTRUCCION_MS = 120
+export const SILENCIO_FINAL_MS = 200
+
+// Reproducción muda del WAV único: si tras play() no hay progreso ('playing',
+// 'timeupdate' con currentTime > 0, o currentTime que avanza — revisado
+// también por sondeo cada PROGRESO_WAV_SONDEO_MS por si el motor no dispara
+// eventos) en PROGRESO_WAV_TIMEOUT_MS, esa fuente (Blob o data: URI) se da
+// por fallida y se pasa al siguiente respaldo.
+export const PROGRESO_WAV_TIMEOUT_MS = 1500
+export const PROGRESO_WAV_SONDEO_MS = 250
+
+// Si el WAV armado no dispara 'ended', se da por terminado a los (duración
+// del WAV + este margen), contados desde que se confirma el progreso.
+export const WAV_UNICO_MARGEN_MS = 2000
+
+// Precarga de los 45 clips en memoria al abrir el turnero (ver
+// useClipsAnuncio.ts::crearPrecarga): uno a la vez, en segundo plano. Los
+// que fallen se reintentan en otra ronda pasado PRECARGA_CLIPS_REINTENTO_MS,
+// hasta PRECARGA_CLIPS_MAX_RONDAS rondas; mientras falte alguno, el llamado
+// usa el encadenado por clips.
+export const PRECARGA_CLIP_TIMEOUT_MS = 15000
+export const PRECARGA_CLIPS_REINTENTO_MS = 15000
+export const PRECARGA_CLIPS_MAX_RONDAS = 5
+
 // Página de prueba de la locución (/turnero/prueba-voz,
 // TurneroPruebaVozView.vue): existe en `npm run dev` y, en un build, solo si
 // se compila con VITE_TURNERO_PRUEBA_VOZ=true (para probar en el TV). En el

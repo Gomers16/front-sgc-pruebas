@@ -16,6 +16,15 @@ vi.mock('@/services/http', () => ({ get: vi.fn() }))
 vi.mock('../useAlarma', () => ({
   useAlarma: () => ({ reproducir: vi.fn(), audioBloqueado: { value: false } }),
 }))
+// useVozTurno() arranca la precarga de clips (XMLHttpRequest): sin este
+// doble, jsdom intenta conectarse de verdad y llena la salida de errores.
+vi.stubGlobal(
+  'XMLHttpRequest',
+  class {
+    open() {}
+    send() {}
+  }
+)
 
 function deferido<T>() {
   let resolve!: (valor: T) => void

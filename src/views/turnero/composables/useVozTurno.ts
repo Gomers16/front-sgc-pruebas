@@ -4,9 +4,11 @@
 // digital real (ver useColaModales.ts, que encadena ambos).
 //
 // Primero con clips WAV pregrabados (useClipsAnuncio.ts): los TV de la sala
-// (LG viejo, Roku) reproducen Audio pero no tienen speechSynthesis. Si no se
-// puede armar con clips (módulo fuera de los 6 fijos, placa sin letras ni
-// dígitos, clip faltante) o fallan al sonar, se usa la Web Speech API
+// (LG viejo, Roku) reproducen Audio pero no tienen speechSynthesis. Los clips
+// suenan pegados en un solo WAV en memoria si ya se precargaron (la precarga
+// arranca al instanciar este composable) y, si no, encadenados uno por uno.
+// Si no se puede armar con clips (módulo fuera de los 6 fijos, placa sin
+// letras ni dígitos, clip faltante) o fallan al sonar, se usa la Web Speech API
 // (SpeechSynthesisUtterance) como respaldo. `vozBloqueada` queda en true solo
 // si ninguna de las dos pudo sonar — es lo que prende el indicador "Sin
 // sonido" de TurneroDisplayView.vue.
@@ -27,7 +29,13 @@
 
 import { ref } from 'vue'
 import { PREFERENCIA_IDIOMA_VOZ } from '../config/constantes'
-import { clipsAnuncio, urlsDeClips, useClipsAnuncio, type DatosAnuncio } from './useClipsAnuncio'
+import {
+  clipsAnuncio,
+  urlsDeClips,
+  useClipsAnuncio,
+  type DatosAnuncio,
+  type PrecargaClips,
+} from './useClipsAnuncio'
 
 // Texto de la locución — función pura, exportada para testearla sin la Web
 // Speech API (ver __tests__/useVozTurno.spec.ts). Los clips dicen lo mismo
@@ -45,7 +53,15 @@ export function textoAnuncio(turno: DatosAnuncio): string {
 export interface OpcionesVozTurno {
   simularSinSintesis?: () => boolean
   simularSinClips?: () => boolean
+  // Forzar el encadenado por clips aunque estén precargados.
+  simularSinWavUnico?: () => boolean
+  // Solo tests: precarga propia en vez de la compartida (XMLHttpRequest).
+  precarga?: PrecargaClips
 }
+
+// Camino por el que sonó (o está sonando) el último anuncio. 'ninguno' =
+// "Sin sonido".
+export type CaminoVoz = 'wav-unico' | 'encadenado' | 'speechSynthesis' | 'ninguno'
 
 export function useVozTurno(opciones: OpcionesVozTurno = {}) {
   const vozBloqueada = ref(false)
@@ -56,7 +72,14 @@ export function useVozTurno(opciones: OpcionesVozTurno = {}) {
   // useColaModales.ts, que lo re-expone hacia arriba).
   const hablando = ref(false)
 
-  const clips = useClipsAnuncio()
+  const clips = useClipsAnuncio(undefined, opciones.precarga)
+  // En segundo plano: no bloquea la pantalla; mientras no termine, los
+  // llamados usan el encadenado.
+  clips.precarga.iniciar()
+
+  // Diagnóstico para la página de prueba (TurneroPruebaVozView.vue).
+  const camino = ref<CaminoVoz | null>(null)
+  const duracionWavMs = ref<number | null>(null)
 
   let vozPreferida: SpeechSynthesisVoice | null = null
   let vocesResueltas = false
@@ -103,7 +126,10 @@ export function useVozTurno(opciones: OpcionesVozTurno = {}) {
   }
 
   function hablarConSintesis(turno: DatosAnuncio) {
+    camino.value = 'speechSynthesis'
+    duracionWavMs.value = null
     if (!sintesisDisponible()) {
+      camino.value = 'ninguno'
       vozBloqueada.value = true
       hablando.value = false
       console.warn(
@@ -131,6 +157,7 @@ export function useVozTurno(opciones: OpcionesVozTurno = {}) {
       hablando.value = false
       // Cortada a propósito por un llamado nuevo (ver anunciar): no es un fallo.
       if (evento.error === 'interrupted' || evento.error === 'canceled') return
+      camino.value = 'ninguno'
       vozBloqueada.value = true
       console.warn(
         '[useVozTurno] El navegador rechazó o falló la síntesis de voz (falta de interacción ' +
@@ -143,6 +170,7 @@ export function useVozTurno(opciones: OpcionesVozTurno = {}) {
     try {
       window.speechSynthesis.speak(utterance)
     } catch (error) {
+      camino.value = 'ninguno'
       vozBloqueada.value = true
       hablando.value = false
       console.warn('[useVozTurno] Excepción al invocar speechSynthesis.speak():', error)
@@ -157,14 +185,19 @@ export function useVozTurno(opciones: OpcionesVozTurno = {}) {
     if (sintesisInstalada && window.speechSynthesis.speaking) window.speechSynthesis.cancel()
     hablando.value = false
 
-    const urls = opciones.simularSinClips?.() ? null : urlsDeClips(clipsAnuncio(turno))
-    if (!urls) {
+    const nombres = opciones.simularSinClips?.() ? null : clipsAnuncio(turno)
+    const urls = urlsDeClips(nombres)
+    if (!nombres || !urls) {
       hablarConSintesis(turno)
       return
     }
 
     hablando.value = true
-    clips.reproducir(urls, {
+    clips.anunciar(nombres, urls, {
+      alCambiarCamino: (nuevo, duracionMs) => {
+        camino.value = nuevo
+        duracionWavMs.value = duracionMs
+      },
       alTerminar: () => {
         hablando.value = false
         vozBloqueada.value = false
@@ -174,8 +207,17 @@ export function useVozTurno(opciones: OpcionesVozTurno = {}) {
         console.warn('[useVozTurno] Falló la locución por clips; se usa speechSynthesis.', motivo)
         hablarConSintesis(turno)
       },
-    })
+    }, { sinWavUnico: opciones.simularSinWavUnico?.() })
   }
 
-  return { anunciar, vozBloqueada, hablando }
+  return {
+    anunciar,
+    vozBloqueada,
+    hablando,
+    camino,
+    duracionWavMs,
+    clipsListos: clips.precarga.listos,
+    clipsCargados: clips.precarga.cargados,
+    clipsTotal: clips.precarga.total,
+  }
 }

@@ -40,12 +40,22 @@
       <input v-model="simularSinClips" type="checkbox" />
       Simular clips ausentes (fuerza speechSynthesis)
     </label>
+    <label class="prueba-voz__check">
+      <input v-model="simularSinWavUnico" type="checkbox" />
+      Forzar encadenado por clips (sin WAV único)
+    </label>
 
     <button type="button" class="prueba-voz__llamar" @click="llamar">Reproducir llamado de prueba</button>
 
     <dl class="prueba-voz__estado">
       <dt>Clips</dt>
       <dd>{{ clips ? clips.join(' · ') : 'no se puede armar con clips → speechSynthesis' }}</dd>
+      <dt>Clips en memoria</dt>
+      <dd>{{ clipsCargados }} / {{ clipsTotal }}{{ clipsListos ? ' (listos)' : ' (cargando…)' }}</dd>
+      <dt>Camino del último llamado</dt>
+      <dd>{{ camino ? NOMBRE_CAMINO[camino] : '—' }}</dd>
+      <dt>Duración del WAV armado</dt>
+      <dd>{{ duracionWavMs !== null ? `${(duracionWavMs / 1000).toFixed(2)} s` : '—' }}</dd>
       <dt>Texto (respaldo)</dt>
       <dd>{{ textoAnuncio(turno) }}</dd>
       <dt>speechSynthesis en este navegador</dt>
@@ -66,17 +76,24 @@
 import { computed, ref } from 'vue'
 import { MODULOS_TURNERO } from './config/constantes'
 import { useAlarma } from './composables/useAlarma'
-import { textoAnuncio, useVozTurno } from './composables/useVozTurno'
+import { textoAnuncio, useVozTurno, type CaminoVoz } from './composables/useVozTurno'
 import { clipsAnuncio, type DatosAnuncio } from './composables/useClipsAnuncio'
 
 const PLACAS_EJEMPLO = ['ABC123', 'ABC12D', 'XYZ-98 7', 'WQK 054']
 const MODULO_LIBRE = 'Caja 2'
+const NOMBRE_CAMINO: Record<CaminoVoz, string> = {
+  'wav-unico': 'WAV único',
+  encadenado: 'encadenado por clips',
+  speechSynthesis: 'speechSynthesis',
+  ninguno: 'ninguno (sin sonido)',
+}
 
 const placa = ref('ABC123')
 const modulo = ref<string>(MODULOS_TURNERO[4])
 const tipoLlamado = ref<DatosAnuncio['tipoLlamado']>('modulo')
 const simularSinSintesis = ref(false)
 const simularSinClips = ref(false)
+const simularSinWavUnico = ref(false)
 
 const turno = computed<DatosAnuncio>(() => ({
   placa: placa.value,
@@ -89,9 +106,19 @@ const sintesisInstalada = typeof window !== 'undefined' && 'speechSynthesis' in 
 const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : ''
 
 const { reproducir, audioBloqueado } = useAlarma()
-const { anunciar, hablando, vozBloqueada } = useVozTurno({
+const {
+  anunciar,
+  hablando,
+  vozBloqueada,
+  camino,
+  duracionWavMs,
+  clipsListos,
+  clipsCargados,
+  clipsTotal,
+} = useVozTurno({
   simularSinSintesis: () => simularSinSintesis.value,
   simularSinClips: () => simularSinClips.value,
+  simularSinWavUnico: () => simularSinWavUnico.value,
 })
 
 // Mismo encadenamiento que useColaModales.ts: pitido y, al terminar, la voz.

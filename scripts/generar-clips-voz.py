@@ -1,13 +1,16 @@
 """Genera los 45 clips WAV de la locución del turnero (ver
 src/views/turnero/composables/useClipsAnuncio.ts).
 
-Voz: edge-tts es-CO-SalomeNeural (internet solo al generar, nunca en el TV).
+Voz: edge-tts es-CO-SalomeNeural a VELOCIDAD (+10 %: a la velocidad normal
+sonaba pausada en la sala). Internet solo al generar, nunca en el TV.
 La letra "a" sola la lee como preposición (0.19 s, casi muda), así que se
 sintetiza dentro de "la vocal a." y se corta desde donde empieza esa palabra
 (tiempos de WordBoundary de edge-tts) — ver CONTEXTO.
 Cada clip: MP3 de edge-tts -> WAV mono 22050 Hz 16 bit, silencio recortado
 al inicio y al final (dejando ~70 ms de aire) y nivel medio igualado a
-NIVEL_MEDIO_DB con un limitador de picos. Los MP3 intermedios van a una
+NIVEL_MEDIO_DB con un limitador de picos. El silencio de arranque de la
+locución y las pausas entre clips NO van en los clips: los pone el turnero al
+pegarlos en un solo WAV (SILENCIO_*_MS en src/views/turnero/config/constantes.ts). Los MP3 intermedios van a una
 carpeta temporal del sistema y se borran: nunca quedan en el repo.
 
 Uso (desde la raíz del repo):
@@ -30,6 +33,7 @@ from pathlib import Path
 import edge_tts
 
 VOZ = 'es-CO-SalomeNeural'
+VELOCIDAD = '+10%'  # parámetro rate de edge-tts
 DESTINO = Path(__file__).resolve().parent.parent / 'src/views/turnero/assets/sonidos/voz'
 NIVEL_MEDIO_DB = -16.0  # nivel medio (RMS) objetivo de cada clip
 PICO_MAX = 0.89  # ~ -1 dBFS, límite del alimiter
@@ -67,7 +71,7 @@ MARGEN_CORTE_S = 0.02  # se corta un poco antes del inicio de la palabra
 
 async def sintetizar(texto: str, destino: Path) -> float:
     """Escribe el MP3 y devuelve el inicio (s) de la última palabra."""
-    comunicador = edge_tts.Communicate(texto, VOZ, boundary='WordBoundary')
+    comunicador = edge_tts.Communicate(texto, VOZ, rate=VELOCIDAD, boundary='WordBoundary')
     inicio_ultima = 0.0
     with destino.open('wb') as archivo:
         async for trozo in comunicador.stream():
