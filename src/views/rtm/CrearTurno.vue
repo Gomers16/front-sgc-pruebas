@@ -121,8 +121,21 @@
             </v-col>
 
             <!-- Fecha y Hora -->
+            <!-- SUPER_ADMIN/GERENCIA: fecha (máximo hoy) y hora editables (fechaRetroactiva.ts) -->
             <v-col cols="12" sm="6">
               <v-text-field
+                v-if="puedeFechaRetroactiva"
+                v-model="form.fecha"
+                type="date"
+                label="Fecha"
+                variant="outlined"
+                :max="hoyBogotaISO()"
+                :rules="[(v: string) => reglaFechaTurno(v, hoyBogotaISO(), puedeFechaRetroactiva)]"
+                :density="$vuetify.display.xs ? 'compact' : 'comfortable'"
+                prepend-inner-icon="mdi-calendar"
+              />
+              <v-text-field
+                v-else
                 v-model="form.fecha"
                 label="Fecha"
                 variant="outlined"
@@ -133,6 +146,17 @@
             </v-col>
             <v-col cols="12" sm="6">
               <v-text-field
+                v-if="puedeFechaRetroactiva"
+                v-model="form.horaIngreso"
+                type="time"
+                label="Hora de Ingreso"
+                variant="outlined"
+                :rules="[reglaHoraIngreso]"
+                :density="$vuetify.display.xs ? 'compact' : 'comfortable'"
+                prepend-inner-icon="mdi-clock-time-four-outline"
+              />
+              <v-text-field
+                v-else
                 :model-value="formattedHoraIngreso"
                 label="Hora de Ingreso"
                 variant="outlined"
@@ -140,6 +164,18 @@
                 :density="$vuetify.display.xs ? 'compact' : 'comfortable'"
                 prepend-inner-icon="mdi-clock-time-four-outline"
               />
+            </v-col>
+            <v-col v-if="fechaEsRetroactiva" cols="12">
+              <v-alert
+                type="warning"
+                variant="tonal"
+                density="comfortable"
+                icon="mdi-calendar-alert"
+                class="rounded-lg"
+              >
+                <strong>Turno con fecha retroactiva:</strong> se creará con fecha {{ form.fecha }}
+                (no hoy) y la hora de ingreso indicada.
+              </v-alert>
             </v-col>
 
             <!-- ========== CAMPOS TRAMITES ========== -->
@@ -866,6 +902,13 @@ import {
   type CanalAtrib,
   type MedioEntero,
 } from './canalCaptacion'
+import {
+  ROLES_FECHA_RETROACTIVA,
+  esFechaRetroactiva,
+  hoyBogotaISO,
+  reglaFechaTurno,
+  reglaHoraIngreso,
+} from './fechaRetroactiva'
 
 /** ===== Parámetros de búsqueda ===== **/
 const PLACA_REGEX = /^(?:[A-Z]{3}\d{3}|[A-Z]{3}\d{2}[A-Z]?|\d{3}[A-Z]{3})$/
@@ -1054,6 +1097,14 @@ const form = ref<TurnoForm>({
   _captacionCanal: null,
   _captacionAgenteId: null,
 })
+
+/** ===== Fecha retroactiva (SUPER_ADMIN/GERENCIA; ver fechaRetroactiva.ts) ===== **/
+const puedeFechaRetroactiva = computed(() =>
+  authStore.hasAnyRole([...ROLES_FECHA_RETROACTIVA])
+)
+const fechaEsRetroactiva = computed(
+  () => puedeFechaRetroactiva.value && esFechaRetroactiva(form.value.fecha, hoyBogotaISO())
+)
 
 
 // ===== Formulario trámite =====

@@ -93,6 +93,12 @@ Gestiona el flujo completo de un vehículo por el CDA: creación del turno en Pu
 - **Contador de captación** (`ContadorConvenios.vue`): no cuenta segundas veces; incluye el medio "Google ADS" (conteo, filtro y export).
 - Google ADS con su nombre también en Estado de turnos, estadísticas de Turnos del día, Histórico de facturación y `turnosdeldiaService.ts` (tipos y mapas).
 
+### Turno con fecha retroactiva (2026-10-09)
+
+- **Crear turno** (`CrearTurno.vue`): para **SUPER_ADMIN y GERENCIA** (`ROLES_FECHA_RETROACTIVA` en `src/views/rtm/fechaRetroactiva.ts`, vía `authStore.hasAnyRole`) la **Fecha** es un selector (`type="date"`, máximo = hoy en Bogotá) y la **Hora de ingreso** es editable (`type="time"`, HH:mm); si la fecha elegida es anterior a hoy aparece el aviso **"Turno con fecha retroactiva"**. Los demás roles siguen con fecha y hora fijas (solo lectura), sin cambios. El payload no cambia: ya enviaba `fecha` y `horaIngreso`.
+- Reglas puras en `fechaRetroactiva.ts` (`hoyBogotaISO()`, `esFechaRetroactiva()`, `reglaFechaTurno()`, `reglaHoraIngreso()`); el backend revalida siempre: 403 `FECHA_RETROACTIVA_NO_AUTORIZADA` (rol sin permiso, fecha anterior) y 422 `FECHA_FUTURA`. Test: `src/views/rtm/__tests__/fechaRetroactiva.spec.ts`.
+- El turno retroactivo no aparece en Turnos del día / Turnero (filtran por hoy); se certifica desde `/rtm/certificacion/:id`.
+
 ## 2. Trámites
 
 Cola de gestión de trámites de tránsito (matrículas, traspasos, cambios de placa, etc.) que se cobran aparte de RTM. Un turno con servicio "TRÁMITES" (creado desde `CrearTurno.vue`) puede llevar **varios trámites** agrupados bajo el mismo número de turno (ej: traspaso + duplicado de placas del mismo cliente).
