@@ -1157,7 +1157,7 @@
                   </td>
                 </tr>
                 <tr v-for="o in continuidadResultado.overrides" :key="o.id">
-                  <td>{{ o.asesorConvenio?.nombre || o.convenio?.nombre || '—' }}</td>
+                  <td>{{ o.asesorConvenio?.nombre || etiquetaConvenio(o.convenio) || '—' }}</td>
                   <td>
                     <v-chip size="small" :color="overrideChipColor(o.estado)" variant="flat">
                       {{ o.estado }}
@@ -1589,6 +1589,7 @@ import {
   type SimularComisionResultado,
   type DescuentoItem,
 } from '@/services/comisionesService'
+import { etiquetaConvenio } from '@/services/conveniosService'
 
 type Scope = 'GLOBAL' | 'ASESOR'
 type Section = 'REGLAS' | 'METAS' | 'RECURRENCIA' | 'CONTINUIDAD' | 'SIMULADOR'

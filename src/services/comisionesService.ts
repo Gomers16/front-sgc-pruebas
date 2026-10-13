@@ -1,4 +1,6 @@
 // src/services/comisionesService.ts
+import { listConveniosLight } from '@/services/conveniosService'
+
 const BASE = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/api`
   : '/api'
@@ -61,6 +63,7 @@ export interface AgenteLight {
 export interface ConvenioLight {
   id: number
   nombre: string
+  establecimiento?: string | null
   metodo_pago?: string | null
   numero_metodo_pago?: string | null
 }
@@ -69,6 +72,7 @@ export interface ConvenioLight {
 export interface ConvenioItem {
   id: number
   nombre: string
+  establecimiento?: string | null
 }
 
 // 🆕 Ítem de descuento para el filtro
@@ -373,6 +377,7 @@ function mapConvenio(api: unknown): ConvenioLight | null {
   return {
     id: c.id as number,
     nombre: c.nombre as string,
+    establecimiento: (c.establecimiento ?? null) as string | null,
     metodo_pago: (c.metodo_pago ?? c.metodoPago ?? null) as string | null,
     numero_metodo_pago: (c.numero_metodo_pago ?? c.numeroMetodoPago ?? null) as string | null,
   }
@@ -933,19 +938,12 @@ export async function listAgentesCaptacion(): Promise<AgenteLight[]> {
 // 🆕 Lista convenios para el autocomplete del filtro de convenio
 export async function listConvenios(): Promise<ConvenioItem[]> {
   try {
-    const raw = await apiFetch<{ data?: unknown[] } | unknown[]>('/convenios', {
-      query: { perPage: 200, activos: 1 },
-    })
-    const r = raw as Record<string, unknown>
-    const rows: unknown[] = Array.isArray(r?.data)
-      ? r.data
-      : Array.isArray(raw)
-      ? raw as unknown[]
-      : []
-    return rows.map((row) => {
-      const a = row as Record<string, unknown>
-      return { id: a.id as number, nombre: String(a.nombre ?? '—') }
-    })
+    const rows = await listConveniosLight()
+    return rows.map((c) => ({
+      id: c.id,
+      nombre: String(c.nombre ?? '—'),
+      establecimiento: c.establecimiento ?? null,
+    }))
   } catch (err) {
     console.error('Error cargando convenios:', err)
     return []
@@ -1248,7 +1246,7 @@ export async function patchComisionEditar(
   })
   return mapComisionToDetail(raw)
 }
-export async function listConveniosDeAsesor(asesorId: number): Promise<{ id: number; nombre: string }[]> {
+export async function listConveniosDeAsesor(asesorId: number): Promise<ConvenioItem[]> {
   try {
     const raw = await apiFetch<{ data?: unknown[] } | unknown[]>(
       `/agentes-captacion/${asesorId}/convenios`
@@ -1258,7 +1256,11 @@ export async function listConveniosDeAsesor(asesorId: number): Promise<{ id: num
     return rows.map((row) => {
       const a = row as Record<string, unknown>
       const convenio = (a.convenio ?? a) as Record<string, unknown>
-      return { id: convenio.id as number, nombre: String(convenio.nombre ?? '—') }
+      return {
+        id: convenio.id as number,
+        nombre: String(convenio.nombre ?? '—'),
+        establecimiento: (convenio.establecimiento ?? null) as string | null,
+      }
     })
   } catch {
     return []
@@ -1351,7 +1353,7 @@ export interface ContinuidadOverrideItem {
   createdAt: string
   updatedAt: string
   asesorConvenio?: { id: number; nombre: string } | null
-  convenio?: { id: number; nombre: string } | null
+  convenio?: { id: number; nombre: string; establecimiento?: string | null } | null
   creadoPor?: { id: number; nombres: string; apellidos: string } | null
 }
 

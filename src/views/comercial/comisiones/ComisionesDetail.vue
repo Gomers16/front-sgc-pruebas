@@ -58,7 +58,7 @@
                   <strong>Asesor:</strong> {{ comision?.asesor?.nombre || '—' }}
                   <span v-if="comision?.asesor">({{ comision.asesor.tipo }})</span>
                 </div>
-                <div class="text-body-2"><strong>Convenio:</strong> {{ comision?.convenio?.nombre || '—' }}</div>
+                <div class="text-body-2"><strong>Convenio:</strong> {{ etiquetaConvenio(comision?.convenio) || '—' }}</div>
               </v-col>
             </v-row>
           </v-card-text>
@@ -303,6 +303,7 @@ import {
   type ComisionDetail,
   type ComisionEstado,
 } from '@/services/comisionesService'
+import { etiquetaConvenio } from '@/services/conveniosService'
 
 interface ComisionDetailExtended extends ComisionDetail {
   es_avance?: boolean | null

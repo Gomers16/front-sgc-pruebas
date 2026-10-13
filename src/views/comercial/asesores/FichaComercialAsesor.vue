@@ -419,6 +419,9 @@
               <template #loading>
                 <v-skeleton-loader type="table-row@6" />
               </template>
+              <template #item.nombre="{ item }">
+                {{ etiquetaConvenio(item) }}
+              </template>
               <template #item.vigencia="{ item }">
                 {{ vigenciaText(item) }}
               </template>
@@ -541,7 +544,7 @@
               <!-- Convenio -->
               <template #item.convenio="{ item }">
                 <v-chip v-if="item.convenio?.nombre" size="small" variant="flat">
-                  {{ item.convenio.nombre }}
+                  {{ etiquetaConvenio(item.convenio) }}
                 </v-chip>
                 <span v-else class="text-medium-emphasis">—</span>
               </template>
@@ -796,7 +799,7 @@
               <!-- Convenio -->
               <template #item.convenio="{ item }">
                 <v-chip v-if="item.convenio?.nombre" size="small" variant="flat">
-                  {{ item.convenio.nombre }}
+                  {{ etiquetaConvenio(item.convenio) }}
                 </v-chip>
                 <span v-else class="text-medium-emphasis">—</span>
               </template>
@@ -1241,6 +1244,7 @@ import {
   type ProspectoDetail,
   formatDate as formatFechaDocBase,
 } from '@/services/prospectosService'
+import { etiquetaConvenio } from '@/services/conveniosService'
 
 /* ===== Tipos locales ===== */
 type Asesor = {
@@ -1261,6 +1265,7 @@ type Asesor = {
 type Convenio = {
   id: number
   nombre: string
+  establecimiento?: string | null
   vigencia_desde?: string | null
   vigencia_hasta?: string | null
 }
@@ -1268,7 +1273,7 @@ type Convenio = {
 type DateoConExtras = Dateo & {
   exitoso?: boolean
   consumido_exitoso?: boolean
-  convenio?: { id: number; nombre: string } | null
+  convenio?: { id: number; nombre: string; establecimiento?: string | null } | null
   descuento?: { id: number; codigo: string; nombre: string } | null
   es_avance?: boolean | null
   created_at_fmt?: string
@@ -2071,7 +2076,7 @@ const historialPagos = computed(() => {
       id: comisionPagada.id,
       fecha: fechaPago,
       placa: dateo.placa || '—',
-      convenio: dateo.convenio?.nombre || 'Sin convenio',
+      convenio: etiquetaConvenio(dateo.convenio) || 'Sin convenio',
       tipoClienteLabel: tipoInfo.label,
       tipoClienteColor: tipoInfo.color,
       monto: comisionPagada.monto,

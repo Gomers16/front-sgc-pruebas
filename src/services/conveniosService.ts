@@ -73,6 +73,15 @@ export interface AsesorActivoResp {
 export interface ConvenioSimple {
   id: number
   nombre: string
+  establecimiento?: string | null
+}
+
+/** Ítem de los desplegables de convenio (GET /api/convenios/light) */
+export interface ConvenioLight {
+  id: number
+  nombre: string
+  establecimiento?: string | null
+  codigo?: string | null
 }
 
 export interface AsignarAsesorPayload {
@@ -153,6 +162,63 @@ export function formatDateTime(d?: string | Date | null) {
   if (!d) return '—'
   const dt = typeof d === 'string' ? new Date(d) : d
   return isNaN(dt.getTime()) ? String(d ?? '') : dt.toLocaleString()
+}
+
+/* ===== Etiqueta de convenio: "NOMBRE · NEGOCIO" ===== */
+export interface ConvenioEtiquetable {
+  nombre?: string | null
+  establecimiento?: string | null
+  codigo?: string | null
+}
+
+/**
+ * Texto único para mostrar un convenio en toda la app: "NOMBRE · NEGOCIO".
+ * Sin negocio (o si repite el nombre) queda solo el nombre, sin separador colgando.
+ */
+export function etiquetaConvenio(c?: ConvenioEtiquetable | null): string {
+  if (!c) return ''
+  const nombre = String(c.nombre ?? '').trim()
+  const negocio = String(c.establecimiento ?? '').trim()
+  if (!negocio || negocio.toUpperCase() === nombre.toUpperCase()) return nombre
+  if (!nombre) return negocio
+  return `${nombre} · ${negocio}`
+}
+
+/** Igual que etiquetaConvenio con el código delante: "CÓDIGO — NOMBRE · NEGOCIO" (sin SIN-COD) */
+export function etiquetaConvenioConCodigo(c?: ConvenioEtiquetable | null): string {
+  if (!c) return ''
+  const etiqueta = etiquetaConvenio(c)
+  const codigo = String(c.codigo ?? '').trim().toUpperCase()
+  return codigo && codigo !== 'SIN-COD' ? `${codigo} — ${etiqueta}` : etiqueta
+}
+
+function normalizarBusqueda(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+}
+
+/**
+ * custom-filter de v-autocomplete para convenios: busca en nombre Y negocio,
+ * sin tildes ni mayúsculas; cada palabra de la búsqueda debe aparecer.
+ */
+export function filtroConvenio(value: string, query: string, item?: { raw?: unknown }): boolean {
+  const palabras = normalizarBusqueda(String(query ?? '')).split(/\s+/).filter(Boolean)
+  if (!palabras.length) return true
+  const raw = (item?.raw ?? null) as ConvenioEtiquetable | null
+  const texto = normalizarBusqueda(
+    [value, raw?.nombre, raw?.establecimiento].filter(Boolean).join(' ')
+  )
+  return palabras.every((p) => texto.includes(p))
+}
+
+/* ===== Convenios: catálogo para desplegables ===== */
+/** Todos los convenios activos (sin paginar), ordenados por nombre */
+export async function listConveniosLight(): Promise<ConvenioLight[]> {
+  const r = await get<unknown>(`${API}/convenios/light`, {
+    params: { select: 'id,nombre,establecimiento,codigo' },
+  })
+  const rObj = r as Record<string, unknown>
+  const arr = Array.isArray(r) ? r : Array.isArray(rObj?.data) ? rObj.data : []
+  return arr as ConvenioLight[]
 }
 
 /* ===== Convenios: LIST ===== */

@@ -120,7 +120,7 @@
                       v-for="row in visitas"
                       :key="row.id"
                       :title="`${formatDate(row.fecha)} — ${row.servicioNombre ?? '—'}`"
-                      :subtitle="`Sede: ${row.sedeNombre ?? '—'} · Placa: ${row.placa}${row.asesorNombre ? ' · ' + row.asesorNombre : ''}${row.convenioNombre ? ' · ' + row.convenioNombre : ''}`"
+                      :subtitle="`Sede: ${row.sedeNombre ?? '—'} · Placa: ${row.placa}${row.asesorNombre ? ' · ' + row.asesorNombre : ''}${row.convenioNombre ? ' · ' + etiquetaConvenio({ nombre: row.convenioNombre, establecimiento: row.convenioEstablecimiento }) : ''}`"
                     >
                       <template #append>
   <div class="d-flex align-center gap-1">
@@ -206,6 +206,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ClientesService, type ClienteDetalle, type ClienteHistorialItem } from '@/services/clientes_service'
+import { etiquetaConvenio } from '@/services/conveniosService'
 
 type UltimaVisitaPorVehiculo = {
   vehiculoId: number
@@ -216,6 +217,7 @@ type UltimaVisitaPorVehiculo = {
   sedeNombre: string | null
   asesorNombre?: string | null
   convenioNombre?: string | null
+  convenioEstablecimiento?: string | null
   esRecurrente?: boolean | null
   esRecuperacion?: boolean | null
 }
@@ -229,6 +231,7 @@ type VisitaReciente = {
   sedeNombre: string | null
   asesorNombre?: string | null
   convenioNombre?: string | null
+  convenioEstablecimiento?: string | null
   esRecurrente?: boolean | null
   esRecuperacion?: boolean | null
 }

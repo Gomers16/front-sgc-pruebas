@@ -1,4 +1,9 @@
 // src/services/prospectosService.ts
+import { listConveniosLight as listConveniosLightBase } from '@/services/conveniosService'
+import type { ConvenioLight } from '@/services/conveniosService'
+
+export type { ConvenioLight }
+
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
@@ -74,11 +79,6 @@ export interface AgenteLight {
   id: number
   nombre: string
   tipo: 'ASESOR_COMERCIAL' | 'ASESOR_CONVENIO' | 'TELEMERCADEO' | string
-}
-
-export interface ConvenioLight {
-  id: number
-  nombre: string
 }
 
 export type EstadoVigencia = 'vigente' | 'vencido' | 'sin_datos'
@@ -407,11 +407,8 @@ export async function listAgentesCaptacion() {
   } catch { return [] }
 }
 
-export async function listConveniosLight() {
+export async function listConveniosLight(): Promise<ConvenioLight[]> {
   try {
-    const res = await apiFetch<{ data: ConvenioLight[] } | ConvenioLight[]>('/convenios', {
-      query: { activo: 1, perPage: 200, select: 'id,nombre' },
-    })
-    return Array.isArray(res) ? res : (res?.data ?? [])
+    return await listConveniosLightBase()
   } catch { return [] }
 }

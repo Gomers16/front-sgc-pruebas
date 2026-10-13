@@ -56,6 +56,7 @@ export type ClienteDetalle = {
     sedeNombre?: string | null
     asesorNombre?: string | null
 convenioNombre?: string | null
+convenioEstablecimiento?: string | null
 esRecurrente?: boolean | null
 esRecuperacion?: boolean | null
   }>
@@ -81,6 +82,7 @@ export type ClienteHistorialItem = {
   sedeNombre: string | null
   asesorNombre?: string | null
   convenioNombre?: string | null
+  convenioEstablecimiento?: string | null
   esRecurrente?: boolean | null
 esRecuperacion?: boolean | null
 }

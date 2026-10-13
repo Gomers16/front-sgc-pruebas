@@ -281,7 +281,7 @@
                     </div>
                     <div class="capt-line" v-if="dialog.item?.dateo?.convenio?.nombre">
                       <v-chip size="x-small" color="blue-grey" variant="tonal">Convenio</v-chip>
-                      <span class="text-medium-emphasis">{{ dialog.item?.dateo?.convenio?.nombre }}</span>
+                      <span class="text-medium-emphasis">{{ etiquetaConvenio(dialog.item?.dateo?.convenio) }}</span>
                     </div>
                     <div v-if="!dialog.item?.dateo?.agente && !dialog.item?.dateo?.asesorConvenio && !dialog.item?.dateo?.convenio">
                       —
@@ -469,6 +469,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FacturacionService, type FacturacionTicket, type Paginated } from '@/services/facturacion_service'
+import { etiquetaConvenio } from '@/services/conveniosService'
 
 const route = useRoute()
 const router = useRouter()

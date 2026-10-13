@@ -23,7 +23,8 @@
             <v-autocomplete
               v-model="filters.convenioId"
               :items="conveniosItems"
-              item-title="nombre"
+              :item-title="etiquetaConvenio"
+              :custom-filter="filtroConvenio"
               item-value="id"
               label="Convenio"
               variant="outlined"
@@ -246,7 +247,9 @@ import {
   datearProspecto,
   formatDate,
   type ProspectoDetail as Prospecto,
+  type ConvenioLight,
 } from '@/services/prospectosService'
+import { etiquetaConvenio, filtroConvenio } from '@/services/conveniosService'
 
 const router = useRouter()
 
@@ -294,7 +297,7 @@ const dateandoId = ref<number | null>(null)
 ============================ */
 const asesoresItems = ref<{ id: number; nombre: string; tipo?: string }[]>([])
 const asesoresLoading = ref(false)
-const conveniosItems = ref<{ id: number; nombre: string }[]>([])
+const conveniosItems = ref<ConvenioLight[]>([])
 const conveniosLoading = ref(false)
 
 async function loadAsesores() {

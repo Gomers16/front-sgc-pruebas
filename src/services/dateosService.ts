@@ -1,5 +1,9 @@
 // src/services/dateosService.ts
 import { get, post, put, del, patch } from '@/services/http'
+import { listConveniosLight as listConveniosLightBase } from '@/services/conveniosService'
+import type { ConvenioLight } from '@/services/conveniosService'
+
+export type { ConvenioLight }
 
 export type CanalCaptacion = 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES'
 export type ResultadoDateo =
@@ -15,11 +19,6 @@ export interface AgenteLight {
   id: number
   nombre: string
   tipo: 'INTERNO' | 'EXTERNO' | string
-}
-
-export interface ConvenioLight {
-  id: number
-  nombre: string
 }
 
 /** Metadatos de imagen que guardas en el dateo */
@@ -317,13 +316,9 @@ export async function listAgentesCaptacion(): Promise<AgenteLight[]> {
     return []
   }
 }
-export async function listConveniosLight() {
+export async function listConveniosLight(): Promise<ConvenioLight[]> {
   try {
-    const r = await get<{ data: ConvenioLight[] }>(`/api/convenios`, {
-      params: { activos: 1, select: 'id,nombre' },
-    })
-    const arr = Array.isArray(r?.data) ? r.data : []
-    return [...arr].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    return await listConveniosLightBase()
   } catch {
     return []
   }

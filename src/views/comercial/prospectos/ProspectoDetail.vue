@@ -214,6 +214,7 @@
 import { onMounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProspectoById, formatDate, type ProspectoDetail, type EstadoVigencia } from '@/services/prospectosService'
+import { etiquetaConvenioConCodigo } from '@/services/conveniosService'
 
 const route = useRoute()
 const router = useRouter()
@@ -266,7 +267,7 @@ const peritaje = computed(() =>
 
 /* Convenio chip (oculta SIN-COD) */
 interface ConvenioData {
-  convenio?: { nombre?: string; codigo?: string } | null
+  convenio?: { nombre?: string; codigo?: string; establecimiento?: string | null } | null
   convenioNombre?: string | null
   convenioCodigo?: string | null
 }
@@ -280,10 +281,12 @@ const convenioCodigo = computed<string | null>(() => {
   return p?.convenio?.codigo ?? p?.convenioCodigo ?? null
 })
 const convenioChip = computed<string>(() => {
-  const n = convenioNombre.value || ''
-  const c = (convenioCodigo.value || '').toUpperCase()
-  if (!n && !c) return ''
-  return c && c !== 'SIN-COD' ? `${c} — ${n}` : `${n}`
+  const p = prospecto.value as ConvenioData | null
+  return etiquetaConvenioConCodigo({
+    nombre: convenioNombre.value,
+    establecimiento: p?.convenio?.establecimiento ?? null,
+    codigo: convenioCodigo.value,
+  })
 })
 
 async function fetchProspecto() {

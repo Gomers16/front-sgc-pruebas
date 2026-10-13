@@ -1227,7 +1227,8 @@
       <v-autocomplete
         v-model="filters.convenioId"
         :items="conveniosFiltroComercial"
-        item-title="nombre"
+        :item-title="etiquetaConvenio"
+        :custom-filter="filtroConvenio"
         item-value="id"
         label="Convenio del comercial"
         density="comfortable"
@@ -1579,7 +1580,7 @@
                       </template>
 
                       <template #item.asesor="{ item }"><span class="cell-wrap">{{ item.asesor?.nombre || '—' }}</span></template>
-                      <template #item.convenio="{ item }"><span class="cell-wrap">{{ item.convenio?.nombre || '—' }}</span></template>
+                      <template #item.convenio="{ item }"><span class="cell-wrap">{{ etiquetaConvenio(item.convenio) || '—' }}</span></template>
                       <template #item.generado_at="{ item }">{{ formatDate(item.generado_at) }}</template>
 
                       <template #item.rep_general="{ item }">
@@ -1835,7 +1836,7 @@
             </template>
 
             <template #item.asesor="{ item }"><span class="cell-wrap">{{ item.asesor?.nombre || '—' }}</span></template>
-            <template #item.convenio="{ item }"><span class="cell-wrap">{{ item.convenio?.nombre || '—' }}</span></template>
+            <template #item.convenio="{ item }"><span class="cell-wrap">{{ etiquetaConvenio(item.convenio) || '—' }}</span></template>
             <template #item.generado_at="{ item }">{{ formatDate(item.generado_at) }}</template>
             <template #item.rep_general="{ item }">
               <v-chip
@@ -2577,7 +2578,7 @@
           <v-col cols="12" md="6">
             <v-card variant="outlined" class="rounded-lg pa-3" :class="{ 'border-opacity-0 bg-grey-lighten-4': !detailDialog.item.convenio }">
               <div class="text-caption text-medium-emphasis">Convenio</div>
-              <div class="font-weight-medium">{{ detailDialog.item.convenio?.nombre || '—' }}</div>
+              <div class="font-weight-medium">{{ etiquetaConvenio(detailDialog.item.convenio) || '—' }}</div>
               <div class="text-caption text-medium-emphasis mt-1">
                 Turno #{{ detailDialog.item.turno?.numero_global || detailDialog.item.turno?.id || '—' }}
                 · Placa: {{ detailDialog.item.turno?.placa || '—' }}
@@ -3012,7 +3013,7 @@
               <v-autocomplete
                 v-model="editDialog.form.convenioId"
                 :items="conveniosParaEdicion"
-                item-title="nombre" item-value="id"
+                :item-title="etiquetaConvenio" :custom-filter="filtroConvenio" item-value="id"
                 label="Convenio (opcional)"
                 density="compact" variant="outlined" clearable
                 :loading="conveniosEditLoading"
@@ -3402,7 +3403,7 @@
                 <v-autocomplete
                   v-model="crearDialog.form.convenioId"
                   :items="crearDialog.conveniosParaCrear"
-                  item-title="nombre" item-value="id"
+                  :item-title="etiquetaConvenio" :custom-filter="filtroConvenio" item-value="id"
                   label="Convenio (opcional)"
                   density="compact" variant="outlined" clearable
                   :loading="crearDialog.conveniosCrearLoading"
@@ -3557,6 +3558,7 @@ import {
   type ResumenComisionesResponse,
 } from '@/services/comisionesService'
 import { createComprobantes, type ComprobantePago as ComprobantePagoDto } from '@/services/comprobantesService'
+import { etiquetaConvenio, filtroConvenio } from '@/services/conveniosService'
 import { ClientesService, type ClienteDetalle } from '@/services/clientes_service'
 import { getLiquidacionRtm, type LiquidacionRtmResponse } from '@/services/reportesAdminService'
 import {
@@ -5725,7 +5727,7 @@ function abrirDialogAccionMasiva(
 }
 
 const nombreSeleccion = computed(() => {
-  const nombres = new Set(selectedItemsData.value.map((i) => i.asesor?.nombre || i.convenio?.nombre || '—'))
+  const nombres = new Set(selectedItemsData.value.map((i) => i.asesor?.nombre || etiquetaConvenio(i.convenio) || '—'))
   return nombres.size === 1 ? [...nombres][0] : `${nombres.size} beneficiarios`
 })
 

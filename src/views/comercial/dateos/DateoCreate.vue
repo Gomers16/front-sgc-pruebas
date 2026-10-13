@@ -98,7 +98,8 @@
               <v-autocomplete
                 v-model="form.convenio_id"
                 :items="conveniosVisibles"
-                item-title="nombre"
+                :item-title="etiquetaConvenio"
+                :custom-filter="filtroConvenio"
                 item-value="id"
                 label="Convenio (opcional)"
                 variant="outlined"
@@ -585,7 +586,12 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { createDateo, esDescuentoAvance, verificarPlacaRtm, type RtmVerificacion } from '@/services/dateosService'
 import { HttpError } from '@/services/http'
-import { listAgentesCaptacion, listConveniosAsignados } from '@/services/conveniosService'
+import {
+  listAgentesCaptacion,
+  listConveniosAsignados,
+  etiquetaConvenio,
+  filtroConvenio,
+} from '@/services/conveniosService'
 import { uploadImage, type UploadImageResponse } from '@/services/uploadsService'
 import { listConveniosLight } from '@/services/dateosService'
 import descuentosService from '@/services/descuentosService'

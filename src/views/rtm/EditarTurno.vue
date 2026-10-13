@@ -574,6 +574,7 @@ import type { VForm } from 'vuetify/components'
 import { authSetStore } from '@/stores/AuthStore'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import { canalToMedio, medioEnteroItems, medioToCanal, type MedioEntero } from './canalCaptacion'
+import { etiquetaConvenioConCodigo } from '@/services/conveniosService'
 
 type TipoVehiculoFrontend =
   | 'Liviano Particular'
@@ -618,6 +619,7 @@ interface ConvenioDTO {
   id?: number
   nombre?: string
   codigo?: string | null
+  establecimiento?: string | null
 }
 
 interface DateoDTO {
@@ -893,11 +895,7 @@ const dateoAgenteNombre = computed(() => {
 })
 
 function formatConvenioChip(c?: ConvenioDTO | null): string {
-  if (!c) return ''
-  const codeRaw = c.codigo ?? ''
-  const code = typeof codeRaw === 'string' ? codeRaw.toUpperCase() : String(codeRaw).toUpperCase()
-  const name = c.nombre ?? ''
-  return code && code !== 'SIN-COD' ? `${code} — ${name}` : `${name}`
+  return etiquetaConvenioConCodigo(c)
 }
 
 /** Input placa */

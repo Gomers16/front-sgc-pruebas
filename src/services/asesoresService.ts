@@ -58,6 +58,7 @@ export interface ProspectoLite {
 export interface ConvenioLite {
   id: number
   nombre: string
+  establecimiento?: string | null
   vigencia_desde?: string | null
   vigencia_hasta?: string | null
 }
@@ -172,6 +173,7 @@ function mapConvenio(raw: unknown): ConvenioLite {
   return {
     id: Number(rawObj?.id),
     nombre: String(rawObj?.nombre ?? ''),
+    establecimiento: (rawObj?.establecimiento ?? null) as string | null,
     vigencia_desde:
       (rawObj?.vigencia_desde ??
       pivot?.fecha_inicio ??

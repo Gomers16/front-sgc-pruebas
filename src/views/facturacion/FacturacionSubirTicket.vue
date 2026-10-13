@@ -197,7 +197,7 @@
               <!-- Convenio -->
               <div class="capt-line" v-if="turnoCard.convenioNombre">
                 <v-chip size="small" color="blue-grey" variant="tonal">Convenio</v-chip>
-                <span class="text-medium-emphasis">{{ turnoCard.convenioNombre }}</span>
+                <span class="text-medium-emphasis">{{ etiquetaConvenio({ nombre: turnoCard.convenioNombre, establecimiento: turnoCard.convenioEstablecimiento }) }}</span>
               </div>
 
               <!-- ++ AVANCE ++ -->
@@ -449,7 +449,7 @@
                   </div>
                   <div class="capt-line" v-if="turnoCard.convenioNombre">
                     <v-chip size="x-small" color="blue-grey" variant="tonal">Convenio</v-chip>
-                    <span class="text-medium-emphasis">{{ turnoCard.convenioNombre }}</span>
+                    <span class="text-medium-emphasis">{{ etiquetaConvenio({ nombre: turnoCard.convenioNombre, establecimiento: turnoCard.convenioEstablecimiento }) }}</span>
                   </div>
                   <!-- ++ AVANCE en modal de confirmación ++ -->
                   <div class="capt-line" v-if="turnoMeta.esAvance">
@@ -995,6 +995,7 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import { FacturacionService } from '@/services/facturacion_service'
+import { etiquetaConvenio } from '@/services/conveniosService'
 // ✅ FIX 1: descuentosService es default export → sin llaves, minúscula
 import descuentosService from '@/services/descuentosService'
 // ✅ FIX 2: obtenerUsuarios existe en UserService → no hace falta crear usuariosService
@@ -1522,6 +1523,7 @@ type Card = {
   agenteComercialNombre?: string | null
   asesorConvenioNombre?: string | null
   convenioNombre?: string | null
+  convenioEstablecimiento?: string | null
 }
 const turnoCard = reactive<Card>({})
 
@@ -1641,14 +1643,14 @@ const impactoComisionPolicia = computed(() => {
     // CASO 3: comercial datea con convenio
     return {
       comercial: { nombre: turnoCard.agenteComercialNombre!, monto: '$4.300 (baja de comisión estándar)' },
-      convenio:  { nombre: turnoCard.convenioNombre!,       monto: '$0' },
+      convenio:  { nombre: etiquetaConvenio({ nombre: turnoCard.convenioNombre, establecimiento: turnoCard.convenioEstablecimiento }), monto: '$0' },
     }
   }
   if (tieneConvenio && !tieneComercial) {
     // CASO 2: asesor convenio datea él mismo
     return {
       comercial: null,
-      convenio:  { nombre: turnoCard.convenioNombre!, monto: '$0' },
+      convenio:  { nombre: etiquetaConvenio({ nombre: turnoCard.convenioNombre, establecimiento: turnoCard.convenioEstablecimiento }), monto: '$0' },
     }
   }
   if (tieneComercial && !tieneConvenio) {
@@ -1874,6 +1876,9 @@ function hydrateTurnoCard(turno: Record<string, unknown>) {
   const convenioFromTurno = turno.convenio as Record<string, unknown> | undefined
   turnoCard.convenioNombre =
     (convenioFromDateo?.nombre ?? convenioFromTurno?.nombre ?? turno.convenioNombre ?? null) as string | null
+  // El negocio sale del mismo objeto que dio el nombre (turno.convenioNombre plano no lo trae)
+  const convenioOrigen = convenioFromDateo?.nombre ? convenioFromDateo : convenioFromTurno?.nombre ? convenioFromTurno : null
+  turnoCard.convenioEstablecimiento = (convenioOrigen?.establecimiento ?? null) as string | null
 
   if (form.placa && !esServicioSimplificado.value) syncPlacaWithTurno()
 

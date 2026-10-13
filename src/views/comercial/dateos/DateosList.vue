@@ -123,7 +123,7 @@
   </v-autocomplete>
 </v-col>
           <v-col cols="12" sm="6" md="4">
-            <v-autocomplete v-model="filters.convenioId" :items="conveniosVisibles" item-title="nombre" item-value="id" label="Convenio" variant="outlined" density="compact" hide-details clearable :loading="conveniosLoading" />
+            <v-autocomplete v-model="filters.convenioId" :items="conveniosVisibles" :item-title="etiquetaConvenio" :custom-filter="filtroConvenio" item-value="id" label="Convenio" variant="outlined" density="compact" hide-details clearable :loading="conveniosLoading" />
           </v-col>
           <v-col cols="6" sm="4" md="2">
             <v-select v-model="filters.resultado" :items="resultadoItems" label="Estado" variant="outlined" density="compact" hide-details clearable />
@@ -306,7 +306,7 @@
         <!-- Convenio -->
         <template #item.convenio="{ item }">
           <v-chip v-if="item.convenio?.nombre" size="small" variant="flat">
-            {{ item.convenio.nombre }}
+            {{ etiquetaConvenio(item.convenio) }}
           </v-chip>
           <span v-else class="text-medium-emphasis">—</span>
         </template>
@@ -1094,7 +1094,7 @@ import {
   type HistoricoImportarResponse,
 } from '@/services/dateosService'
 import { formatCOP } from '@/services/comisionesService'
-import { listConveniosAsignados } from '@/services/conveniosService'
+import { listConveniosAsignados, etiquetaConvenio, filtroConvenio } from '@/services/conveniosService'
 import { ClientesService } from '@/services/clientes_service'
 import { calcularReservaCountdown } from '@/composables/useReservaCountdown'
 import { CaptacionDateosService } from '@/services/captacion_dateos_service'

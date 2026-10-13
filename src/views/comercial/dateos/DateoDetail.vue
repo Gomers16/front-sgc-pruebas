@@ -117,7 +117,8 @@
                   v-if="editando && can.gestionarDateos()"
                   v-model="form.convenio_id"
                   :items="conveniosAll"
-                  item-title="nombre"
+                  :item-title="etiquetaConvenio"
+                  :custom-filter="filtroConvenio"
                   item-value="id"
                   label="Convenio"
                   variant="outlined"
@@ -127,7 +128,7 @@
                   :loading="conveniosLoading"
                 />
                 <div v-else class="text-caption text-sm-body-2">
-                  <strong>Convenio:</strong> {{ dateo?.convenio?.nombre || '—' }}
+                  <strong>Convenio:</strong> {{ etiquetaConvenio(dateo?.convenio) || '—' }}
                 </div>
               </v-col>
 
@@ -609,7 +610,7 @@ import {
   type ResultadoDateo,
   type DocumentoInformativoTicket,
 } from '@/services/dateosService'
-import { listAgentesCaptacion } from '@/services/conveniosService'
+import { listAgentesCaptacion, etiquetaConvenio, filtroConvenio } from '@/services/conveniosService'
 import { uploadImage, type UploadImageResponse } from '@/services/uploadsService'
 import descuentosService from '@/services/descuentosService'
 import type { Descuento } from '@/services/descuentosService'

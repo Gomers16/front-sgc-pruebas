@@ -866,6 +866,7 @@ import {
   type CanalAtrib,
   type MedioEntero,
 } from './canalCaptacion'
+import { etiquetaConvenioConCodigo } from '@/services/conveniosService'
 
 /** ===== Parámetros de búsqueda ===== **/
 const PLACA_REGEX = /^(?:[A-Z]{3}\d{3}|[A-Z]{3}\d{2}[A-Z]?|\d{3}[A-Z]{3})$/
@@ -898,7 +899,7 @@ interface VehiculoDTO {
 interface ClienteDTO { id?: number; nombre?: string; telefono?: string; email?: string }
 
 interface AgenteDTO { id: number; nombre: string; tipo: AgenteTipo }
-interface ConvenioDTO { id: number; nombre: string; codigo: string | null }
+interface ConvenioDTO { id: number; nombre: string; codigo: string | null; establecimiento?: string | null }
 interface DateoRecienteDTO {
   id: number; canal: CanalAtrib; agente: AgenteDTO | null;
   placa: string | null; telefono: string | null; origen: string | null;
@@ -1153,9 +1154,7 @@ const reservaBloqueaHasta = computed(() => {
 })
 
 function formatConvenioChip(c?: ConvenioDTO | null): string {
-  if (!c) return ''
-  const code = (c.codigo || '').toUpperCase()
-  return code && code !== 'SIN-COD' ? `${code} — ${c.nombre}` : `${c.nombre}`
+  return etiquetaConvenioConCodigo(c)
 }
 
 /** ===== Snackbar ===== **/

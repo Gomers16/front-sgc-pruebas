@@ -268,7 +268,8 @@
           <v-autocomplete
             v-model="dlgAsignar.convenioId"
             :items="conveniosOpciones"
-            item-title="nombre"
+            :item-title="etiquetaConvenio"
+            :custom-filter="filtroConvenio"
             item-value="id"
             label="Convenio"
             :loading="conveniosOpcionesLoading"
@@ -298,7 +299,8 @@
           <v-autocomplete
             v-model="dlgRetirar.convenioId"
             :items="dlgRetirar.convenios"
-            item-title="nombre"
+            :item-title="etiquetaConvenio"
+            :custom-filter="filtroConvenio"
             item-value="id"
             label="Convenio a retirar"
             variant="outlined"
@@ -319,7 +321,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import asesoresApi, { type Agente } from '@/services/asesoresService'
-import { listConvenios, asignarAsesorConvenio, retirarAsesorConvenio } from '@/services/conveniosService'
+import {
+  listConveniosLight,
+  asignarAsesorConvenio,
+  retirarAsesorConvenio,
+  etiquetaConvenio,
+  filtroConvenio,
+} from '@/services/conveniosService'
 import { get } from '@/services/http'
 
 const API = '/api'
@@ -350,6 +358,7 @@ const { listAsesores, listConveniosDelAsesor } = asesoresApi as unknown as Aseso
 type ConvenioLite = {
   id: number
   nombre: string
+  establecimiento?: string | null
   vigencia_desde?: string | null
   vigencia_hasta?: string | null
 }
@@ -619,11 +628,11 @@ function openAsignar(asesor: Agente) {
   conveniosOpcionesLoading.value = true
   Promise.all([
     listConveniosDelAsesor(asesor.id),
-    listConvenios({ perPage: 500, activo: 1 }),
+    listConveniosLight(),
   ])
     .then(([asignados, catalogo]) => {
       const ya = new Set((asignados as ConvenioLite[]).map((c) => c.id))
-      conveniosOpciones.value = (catalogo.data as ConvenioLite[]).filter((c) => !ya.has(c.id))
+      conveniosOpciones.value = (catalogo as ConvenioLite[]).filter((c) => !ya.has(c.id))
     })
     .catch((e: unknown) => {
       const error = e as Error
