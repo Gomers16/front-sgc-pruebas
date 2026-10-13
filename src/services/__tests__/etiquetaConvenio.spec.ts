@@ -25,6 +25,24 @@ describe('etiquetaConvenio', () => {
     )
   })
 
+  it('oculta el negocio si el nombre ya lo contiene, sin tildes ni mayúsculas', () => {
+    expect(
+      etiquetaConvenio({
+        nombre: 'ALVARO SANCHEZ / PARQUEADERO DAWTAWN',
+        establecimiento: 'PARQUEADERO DAWTAWN',
+      })
+    ).toBe('ALVARO SANCHEZ / PARQUEADERO DAWTAWN')
+    expect(
+      etiquetaConvenio({ nombre: 'Taller Mecánico El Sol - Pedro', establecimiento: 'TALLER MECANICO el  sol' })
+    ).toBe('Taller Mecánico El Sol - Pedro')
+  })
+
+  it('si el negocio solo coincide en parte, se muestra completo', () => {
+    expect(
+      etiquetaConvenio({ nombre: 'ALVARO SANCHEZ / PARQUEADERO', establecimiento: 'PARQUEADERO DAWTAWN' })
+    ).toBe('ALVARO SANCHEZ / PARQUEADERO · PARQUEADERO DAWTAWN')
+  })
+
   it('sin convenio devuelve cadena vacía; sin nombre usa el negocio', () => {
     expect(etiquetaConvenio(null)).toBe('')
     expect(etiquetaConvenio(undefined)).toBe('')

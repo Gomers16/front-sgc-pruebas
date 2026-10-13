@@ -173,14 +173,18 @@ export interface ConvenioEtiquetable {
 
 /**
  * Texto único para mostrar un convenio en toda la app: "NOMBRE · NEGOCIO".
- * Sin negocio (o si repite el nombre) queda solo el nombre, sin separador colgando.
+ * Sin negocio, o si el nombre ya lo contiene (sin tildes ni mayúsculas, p. ej.
+ * "ALVARO SANCHEZ / PARQUEADERO DAWTAWN" con negocio "PARQUEADERO DAWTAWN"),
+ * queda solo el nombre, sin separador colgando.
  */
 export function etiquetaConvenio(c?: ConvenioEtiquetable | null): string {
   if (!c) return ''
   const nombre = String(c.nombre ?? '').trim()
   const negocio = String(c.establecimiento ?? '').trim()
-  if (!negocio || negocio.toUpperCase() === nombre.toUpperCase()) return nombre
+  if (!negocio) return nombre
   if (!nombre) return negocio
+  const comparable = (s: string) => normalizarBusqueda(s).replace(/\s+/g, ' ')
+  if (comparable(nombre).includes(comparable(negocio))) return nombre
   return `${nombre} · ${negocio}`
 }
 
