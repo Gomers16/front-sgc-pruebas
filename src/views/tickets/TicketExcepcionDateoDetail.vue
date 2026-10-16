@@ -90,15 +90,7 @@
           <template v-if="ticket.estado === 'APROBADO'">
             <v-alert type="success" variant="tonal" density="compact">
               Aprobado por {{ nombreUsuario(detalle.aprobadoPor) }} el {{ formatDateTime(detalle.aprobadoAt) }}
-              <template v-if="detalle.conComision === false">
-                · Aprobado <strong>sin comisión</strong>
-              </template>
-              <template v-else-if="detalle.conComision === true">
-                · Aprobado <strong>con comisión</strong>
-              </template>
-              <template v-else>
-                · Comisión completa (dentro de ventana)
-              </template>
+              · <strong>{{ TEXTO_RESOLUCION_COMISION[resolucionComision(detalle)] }}</strong>
             </v-alert>
           </template>
           <template v-else-if="ticket.estado === 'RECHAZADO'">
@@ -282,6 +274,7 @@ import {
 } from '@/services/ticketsService'
 import { formatDateTime } from '@/services/dateosService'
 import { HttpError } from '@/services/http'
+import { resolucionComision, TEXTO_RESOLUCION_COMISION } from './resolucionTicket'
 
 const props = defineProps<{ id: string | number }>()
 const auth = useAuthStore()

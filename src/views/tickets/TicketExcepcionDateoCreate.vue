@@ -22,8 +22,90 @@
           density="compact"
           class="mb-4"
           :loading="loadingAgentes"
+          :disabled="!!intento?.agente_id"
+          :hint="intento?.agente_id ? 'Es el asesor que intentó el dateo' : undefined"
+          :persistent-hint="!!intento?.agente_id"
           required
         />
+
+        <!-- Datos del dateo: los que el backend validó al rechazar el dateo
+             (409 REQUIERE_TICKET_DATEO). Solo lectura: con ellos se crea el
+             dateo al aprobar el ticket. -->
+        <v-card v-if="intento" variant="outlined" class="mb-4 rounded-lg">
+          <v-card-title class="text-subtitle-2 font-weight-bold py-2">Datos del dateo</v-card-title>
+          <v-table density="compact">
+            <tbody>
+              <tr>
+                <td class="text-medium-emphasis">Asesor</td>
+                <td>
+                  {{ intento.agente_nombre ?? '—' }}
+                  <span class="text-medium-emphasis">({{ etiquetaCanalIntento(intento.canal) }})</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="text-medium-emphasis">Convenio</td>
+                <td>
+                  <template v-if="intento.convenio_id">
+                    {{ etiquetaConvenio({ nombre: intento.convenio_nombre ?? '—', establecimiento: intento.convenio_establecimiento }) }}
+                  </template>
+                  <template v-else>Sin convenio (nuevo directo)</template>
+                </td>
+              </tr>
+              <tr>
+                <td class="text-medium-emphasis">Servicio</td>
+                <td>{{ intento.servicio_nombre ?? '—' }}</td>
+              </tr>
+              <tr v-if="intento.descuento_id">
+                <td class="text-medium-emphasis">{{ intento.es_avance ? 'Avance' : 'Descuento' }}</td>
+                <td>{{ intento.descuento_nombre ?? '—' }}</td>
+              </tr>
+              <tr v-if="intento.telefono">
+                <td class="text-medium-emphasis">Teléfono</td>
+                <td>{{ intento.telefono }}</td>
+              </tr>
+            </tbody>
+          </v-table>
+        </v-card>
+
+        <!-- Sin datos del dateo (se entró por URL): se pide el convenio a mano. -->
+        <template v-else>
+          <v-alert type="info" variant="tonal" density="compact" class="mb-3">
+            No llegaron los datos del dateo. Indica si el cliente vino por un
+            convenio; si no, queda como nuevo directo.
+          </v-alert>
+          <v-alert
+            v-if="comercialEsAsesorConvenio"
+            type="info"
+            variant="outlined"
+            density="compact"
+            class="mb-3"
+          >
+            Es asesor convenio: el dateo queda con su propio convenio.
+          </v-alert>
+          <v-autocomplete
+            v-else
+            v-model="convenioFallbackId"
+            :items="conveniosFallback"
+            :item-title="etiquetaConvenio"
+            item-value="id"
+            label="Convenio"
+            placeholder="Sin convenio (nuevo directo)"
+            variant="outlined"
+            density="compact"
+            class="mb-2"
+            :loading="loadingConvenios"
+            clearable
+            hint="Solo los convenios asignados a este asesor"
+            persistent-hint
+          />
+          <v-text-field
+            v-model="telefonoFallback"
+            label="Teléfono del cliente (opcional)"
+            variant="outlined"
+            density="compact"
+            class="mb-4"
+          />
+        </template>
 
         <v-textarea
           v-model="observacion"
@@ -87,7 +169,21 @@
           <v-progress-linear v-if="evidencias[slot.key].uploading" indeterminate color="primary" class="mt-1" />
         </div>
 
-        <v-alert v-if="errorMsg" type="error" variant="tonal" density="compact" class="mb-3">
+        <!-- Segunda vez: el backend responde 409 TURNO_SEGUNDA_VEZ (p. ej. si
+             se llegó acá por URL); no hay ticket posible para ese turno. -->
+        <v-alert
+          v-if="esSegundaVez"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+          title="Este turno es una segunda vez gratuita"
+        >
+          La reinspección gratuita no lleva dateo ni comisión, así que tampoco
+          admite un ticket de Excepción de Dateo. No hace falta registrar nada
+          para este turno.
+        </v-alert>
+        <v-alert v-else-if="errorMsg" type="error" variant="tonal" density="compact" class="mb-3">
           {{ errorMsg }}
         </v-alert>
 
@@ -96,7 +192,7 @@
           <v-btn
             color="primary"
             :loading="enviando"
-            :disabled="!puedeEnviar"
+            :disabled="!puedeEnviar || esSegundaVez"
             @click="enviar"
           >
             Crear ticket
@@ -112,13 +208,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/AuthStore'
 import { crearTicketExcepcionDateo } from '@/services/ticketsService'
 import { uploadImage } from '@/services/uploadsService'
-import { listAgentesCaptacion } from '@/services/conveniosService'
+import {
+  listAgentesCaptacion,
+  listConveniosAsignados,
+  etiquetaConvenio,
+  type ConvenioSimple,
+} from '@/services/conveniosService'
 import { HttpError } from '@/services/http'
+import { getMiFicha } from '@/services/asesoresService'
+import {
+  leerIntentoDeHistorial,
+  camposIntentoParaTicket,
+  camposFallbackParaTicket,
+  etiquetaCanalIntento,
+  esConflictoSegundaVez,
+} from './intentoDateo'
 
 interface AgenteLight { id: number; nombre: string; tipo?: string }
 
@@ -134,13 +243,47 @@ const turnoId = computed(() => {
 const placa = computed(() => String(route.query.placa ?? ''))
 
 const puedeElegirComercial = computed(() => auth.hasAnyRole(['SUPER_ADMIN', 'GERENCIA']))
-const comercialId = ref<number | null>(null)
 const agentes = ref<AgenteLight[]>([])
 const loadingAgentes = ref(false)
+
+// Intento de dateo que dejó DateoCreate.vue en history.state.
+const intento = leerIntentoDeHistorial(window.history.state)
+const comercialId = ref<number | null>(intento?.agente_id ?? null)
+
+// Fallback sin intento: convenio (de los asignados al asesor) y teléfono.
+const convenioFallbackId = ref<number | null>(null)
+const telefonoFallback = ref('')
+const conveniosFallback = ref<ConvenioSimple[]>([])
+const loadingConvenios = ref(false)
+// COMERCIAL: su propio agente (GET /agentes-captacion/me), solo para el fallback.
+const miAgente = ref<{ id: number; tipo?: string } | null>(null)
+const agenteDelTicket = computed(() =>
+  puedeElegirComercial.value
+    ? (agentes.value.find((a) => a.id === comercialId.value) ?? null)
+    : miAgente.value
+)
+const agenteDelTicketId = computed(() => agenteDelTicket.value?.id ?? null)
+const comercialEsAsesorConvenio = computed(() => agenteDelTicket.value?.tipo === 'ASESOR_CONVENIO')
+
+async function cargarConveniosFallback() {
+  convenioFallbackId.value = null
+  conveniosFallback.value = []
+  if (intento || !agenteDelTicketId.value) return
+  loadingConvenios.value = true
+  try {
+    conveniosFallback.value = await listConveniosAsignados(agenteDelTicketId.value)
+  } catch (err) {
+    console.error('Error cargando convenios asignados:', err)
+  } finally {
+    loadingConvenios.value = false
+  }
+}
+watch(agenteDelTicketId, cargarConveniosFallback)
 
 const observacion = ref('')
 const enviando = ref(false)
 const errorMsg = ref<string | null>(null)
+const esSegundaVez = ref(false)
 const snackbar = ref<{ show: boolean; text: string; color: 'success' | 'error' }>({
   show: false,
   text: '',
@@ -247,10 +390,21 @@ async function enviar() {
       evidencia_grupo_whatsapp_url: evidencias.whatsapp.url!,
       evidencia_bloqueo_url: evidencias.bloqueo.url!,
       evidencia_calamidad_url: evidencias.calamidad.url,
+      ...(intento
+        ? camposIntentoParaTicket(intento)
+        : camposFallbackParaTicket(
+            comercialEsAsesorConvenio.value ? null : convenioFallbackId.value,
+            telefonoFallback.value
+          )),
     })
     router.push({ name: 'TicketDetalle', params: { id: ticket.id } }).catch(() => {})
   } catch (err) {
-    const data = err instanceof HttpError ? (err.data as { message?: string } | undefined) : undefined
+    const data =
+      err instanceof HttpError ? (err.data as { message?: string; code?: string } | undefined) : undefined
+    if (esConflictoSegundaVez(data)) {
+      esSegundaVez.value = true
+      return
+    }
     errorMsg.value = data?.message || (err instanceof Error ? err.message : 'Error al crear el ticket')
   } finally {
     enviando.value = false
@@ -259,6 +413,14 @@ async function enviar() {
 
 onMounted(async () => {
   window.addEventListener('paste', onPaste)
+  if (!intento && !puedeElegirComercial.value) {
+    try {
+      const yo = await getMiFicha()
+      miAgente.value = { id: yo.id, tipo: yo.tipo ?? undefined }
+    } catch (err) {
+      console.error('Error cargando el agente del usuario:', err)
+    }
+  }
   if (puedeElegirComercial.value) {
     loadingAgentes.value = true
     try {

@@ -63,6 +63,14 @@ export interface TicketDetalleExcepcionDateo {
   placa: string
   comercialId: number
   convenioId: number | null
+  /** Convenio con el que se pidió el ticket (si gerencia lo corrige, convenioId cambia). */
+  convenioIdOriginal: number | null
+  /** Intento de dateo; null en tickets anteriores a 2026-10. */
+  canal: string | null
+  servicioId: number | null
+  descuentoId: number | null
+  esAvance: boolean | number
+  telefono: string | null
   horaIngreso: string
   horaIntentoDateo: string
   minutosTotales: number
@@ -115,12 +123,20 @@ export function agregarComentario(ticketId: number, mensaje: string) {
 export interface CrearTicketExcepcionDateoPayload {
   turno_id: number
   comercial_id?: number
-  convenio_id?: number | null
   observacion: string
   evidencia_chat_url: string
   evidencia_grupo_whatsapp_url: string
   evidencia_bloqueo_url: string
   evidencia_calamidad_url?: string | null
+  // Intento de dateo (409 REQUIERE_TICKET_DATEO → history.state). El backend
+  // lo vuelve a validar con la misma regla del dateo.
+  canal?: string | null
+  convenio_id?: number | null
+  servicio_id?: number | null
+  descuento_id?: number | null
+  es_avance?: boolean
+  comprobante_avance_url?: string | null
+  telefono?: string | null
 }
 
 export function crearTicketExcepcionDateo(payload: CrearTicketExcepcionDateoPayload) {

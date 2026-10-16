@@ -510,12 +510,12 @@
           </div>
           <div class="text-caption text-sm-body-1 text-medium-emphasis mb-3">
             <template v-if="requiereTicketInfo.dentroVentana">
-              Debes registrar un ticket, pero no tendrá penalización — todavía
-              estás dentro de la ventana permitida.
+              Debes registrar un ticket. Estás dentro de la ventana permitida,
+              así que al aprobarse se paga la comisión completa.
             </template>
             <template v-else>
-              El plazo para registrarlo directamente ya venció. Este ticket
-              quedará sujeto a penalización.
+              Ya pasó la ventana permitida. Al revisar el ticket, gerencia
+              decide si se paga la comisión.
             </template>
           </div>
 
@@ -551,7 +551,7 @@
           <div class="text-caption text-medium-emphasis mt-3">
             Para registrar este dateo hay que crear un ticket de "Excepción de
             Dateo" — gerencia lo revisa
-            <template v-if="!requiereTicketInfo.dentroVentana">y aplica la penalización correspondiente</template>.
+            <template v-if="!requiereTicketInfo.dentroVentana">y decide la comisión</template>.
           </div>
         </v-card-text>
         <v-card-actions class="justify-center pb-4 pb-sm-6 gap-2">
@@ -594,6 +594,11 @@ import {
 } from '@/services/conveniosService'
 import { uploadImage, type UploadImageResponse } from '@/services/uploadsService'
 import { listConveniosLight } from '@/services/dateosService'
+import {
+  normalizarIntentoDateo,
+  intentoParaHistorial,
+  type IntentoDateo,
+} from '@/views/tickets/intentoDateo'
 import descuentosService from '@/services/descuentosService'
 import type { Descuento } from '@/services/descuentosService'
 import serviciosService from '@/services/Servicios_service'
@@ -670,11 +675,12 @@ const excepcionDateoActivoMensaje = ref<string | null>(null)
 /* ===== 🆕 REQUIERE_TICKET_DATEO — todo turno walk-in sin dateo requiere
  * ticket, sin excepción. Sin "Continuar de todos modos": no hay
  * excepción/override para esta regla, solo la vía del ticket "Excepción de
- * Dateo". dentroVentana solo cambia el tono del mensaje (con/sin
- * penalización), no la obligación de crear el ticket. ===== */
+ * Dateo". dentroVentana solo cambia el tono del mensaje (comisión completa
+ * o decisión de gerencia), no la obligación de crear el ticket. ===== */
 const showRequiereTicketDialog = ref(false)
 const requiereTicketInfo = ref<{
   turnoId: number
+  intento: IntentoDateo | null
   horaIngreso: string
   horaIntento: string
   minutosTranscurridos: number
@@ -1235,6 +1241,7 @@ async function handleSubmit() {
             minutosExceso?: number
             dentroVentana?: boolean
             minutosVentana?: number
+            intento?: unknown
           } | undefined)
         : undefined
     const code = data?.code
@@ -1248,6 +1255,7 @@ async function handleSubmit() {
     } else if (code === 'REQUIERE_TICKET_DATEO' && data?.turnoId) {
       requiereTicketInfo.value = {
         turnoId: data.turnoId,
+        intento: normalizarIntentoDateo(data.intento),
         horaIngreso: data.horaIngreso ?? '—',
         horaIntento: new Intl.DateTimeFormat('es-CO', {
           timeZone: 'America/Bogota',
@@ -1311,9 +1319,11 @@ async function confirmarExcepcionDateoActivo() {
   }
 }
 
-/** 🆕 Turno walk-in sin dateo — no hay excepción posible acá (con o sin
- * penalización, siempre se crea el ticket), se navega a crear el ticket
- * "Excepción de Dateo" con el turno/placa ya identificados. */
+/** 🆕 Turno walk-in sin dateo — no hay excepción posible acá (siempre se
+ * crea el ticket), se navega a crear el ticket "Excepción de Dateo" con el
+ * turno/placa y el intento de dateo (convenio, agente, servicio, descuento,
+ * avance, teléfono) que validó el backend. El intento va por history.state,
+ * no por la URL. */
 function irACrearTicketExcepcionDateo() {
   showRequiereTicketDialog.value = false
   const info = requiereTicketInfo.value
@@ -1322,6 +1332,7 @@ function irACrearTicketExcepcionDateo() {
     .push({
       name: 'TicketExcepcionDateoCreate',
       query: { turno_id: String(info.turnoId), placa: form.value.placa || '' },
+      state: info.intento ? { intento: intentoParaHistorial(info.intento) } : undefined,
     })
     .catch(() => {})
 }
