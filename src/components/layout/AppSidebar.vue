@@ -52,7 +52,14 @@
         :to="{ name: 'TicketsList' }"
         link
         class="nav-item"
-      />
+      >
+        <!-- Pendientes por resolver: solo gerencia (GET /tickets/pendientes/contador). -->
+        <template v-if="can.verEstadisticasTickets() && pendientesTickets" #append>
+          <v-chip size="x-small" color="warning" variant="flat" class="font-weight-bold">
+            {{ pendientesTickets }}
+          </v-chip>
+        </template>
+      </v-list-item>
 
       <!-- Turnos -->
       <v-list-group
@@ -485,10 +492,24 @@
 import { useAuthStore } from '@/stores/AuthStore'
 import { usePermissions } from '@/composables/usePermissions'
 import { useDrawer } from '@/composables/useDrawer'
+import { useTicketsPendientes } from '@/composables/useTicketsPendientes'
+import { onMounted, onBeforeUnmount } from 'vue'
 
 const auth = useAuthStore()
 const { can } = usePermissions()
 const { drawer } = useDrawer()
+
+// Insignia de tickets pendientes (gerencia): al montar y cada 2 minutos.
+const { pendientes: pendientesTickets, refrescarPendientes } = useTicketsPendientes()
+let intervaloPendientes: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  if (!can.verEstadisticasTickets()) return
+  refrescarPendientes()
+  intervaloPendientes = setInterval(refrescarPendientes, 120_000)
+})
+onBeforeUnmount(() => {
+  if (intervaloPendientes) clearInterval(intervaloPendientes)
+})
 </script>
 
 <style scoped>

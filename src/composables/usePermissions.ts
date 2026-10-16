@@ -201,6 +201,13 @@ export function usePermissions() {
         'GERENCIA'
       ]),
 
+      // Estadísticas, exportación y contador de pendientes de tickets
+      // (refuerzo server-side: 403 en /tickets/estadisticas|exportar|pendientes/contador)
+      verEstadisticasTickets: () => auth.hasAnyRole([
+        'SUPER_ADMIN',
+        'GERENCIA'
+      ]),
+
       // ==================== COMISIONES ====================
       verComisiones: () => auth.hasAnyRole([
         'SUPER_ADMIN',
