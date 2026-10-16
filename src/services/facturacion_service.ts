@@ -13,6 +13,8 @@ export interface DescuentoAplicadoDTO {
   nombre: string
   montoAplicado: number
   autorizadoPor: { id: number; nombre: string } | null
+  /** 🆕 Consecutivo del descuento digitado por caja */
+  consecutivoDescuento?: string | null
 }
 
 export interface FacturacionTicket {
@@ -106,6 +108,9 @@ export interface FacturacionTicket {
   autorizado_por_id: number | null
   /** 🆕 Nota de la cajera sobre por qué aplicó este descuento (opcional) */
   descuento_observacion: string | null
+  /** 🆕 Consecutivo del descuento (lo digita caja; único entre tickets CONFIRMADA) */
+  consecutivo_descuento?: string | null
+  consecutivoDescuento?: string | null
 
   // 🆕 DTO enriquecido del descuento (viene del getById)
   descuentoAplicado?: DescuentoAplicadoDTO | null
@@ -173,6 +178,25 @@ export interface TicketUpdatePayload {
   total_sin_descuento?: number
   /** 🆕 Nota de la cajera sobre por qué aplicó este descuento (opcional) */
   descuento_observacion?: string | null
+  /** 🆕 Consecutivo del descuento: mayúsculas, solo [A-Z0-9-], máx. 30 */
+  consecutivo_descuento?: string | null
+}
+
+/** 🆕 Respuesta de la verificación en vivo del consecutivo del descuento */
+export interface VerificacionConsecutivoDescuento {
+  valor: string | null
+  valido: boolean
+  /** Existe en algún otro ticket (cualquier estado) */
+  exists: boolean
+  /** Existe en un ticket CONFIRMADA: no se podrá confirmar con este valor */
+  bloqueante: boolean
+  tickets: Array<{
+    id: number
+    estado: FactEstado
+    placa: string | null
+    confirmado_at: string | null
+    created_at: string | null
+  }>
 }
 
 /* =============================== Endpoints =============================== */
@@ -221,6 +245,23 @@ export const FacturacionService = {
    */
   checkDuplicados(args: { placa: string; total: number; fecha_pago_iso: string }) {
     return get<{ possible: boolean; count: number }>(`${base}/duplicados`, { params: args })
+  },
+
+  /** 🆕 Verificación en vivo del consecutivo del descuento (excluir_id = ticket en curso) */
+  verificarConsecutivoDescuento(valor: string, excluirId?: number | null) {
+    const params: Record<string, string | number> = { valor }
+    if (excluirId) params.excluir_id = excluirId
+    return get<VerificacionConsecutivoDescuento>(`${base}/consecutivo-descuento/verificar`, {
+      params,
+    })
+  },
+
+  /** 🆕 Corrige el consecutivo del descuento de un ticket CONFIRMADA (solo SUPER_ADMIN/GERENCIA) */
+  corregirConsecutivoDescuento(id: number | string, consecutivo: string, motivo?: string) {
+    return patch<{ message: string; ticket: { id: number; consecutivoDescuento: string } }>(
+      `${base}/${id}/consecutivo-descuento`,
+      { consecutivo_descuento: consecutivo, motivo: motivo || undefined }
+    )
   },
 
   /**

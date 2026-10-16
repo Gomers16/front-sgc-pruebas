@@ -563,6 +563,8 @@ export interface DetalleDescuento {
   descuento_monto_aplicado: number
   descuento_codigo: string
   descuento_nombre: string
+  /** 🆕 Consecutivo del descuento (facturacion_tickets.consecutivo_descuento) */
+  consecutivo_descuento: string | null
   agente_comercial_nombre: string | null
   asesor_convenio_nombre: string | null
   convenio_nombre: string | null

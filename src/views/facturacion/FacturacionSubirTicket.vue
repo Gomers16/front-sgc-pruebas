@@ -752,6 +752,29 @@
               </v-row>
             </template>
 
+            <!-- 🆕 Consecutivo del descuento: obligatorio con descuento en uso
+                 (caso A pre-marcado y caso B en caja). Lo digita caja y no se
+                 puede repetir entre tickets confirmados. -->
+            <v-row v-if="descuentoIdEfectivo" dense class="mt-2">
+              <v-col cols="12" md="6">
+                <v-text-field
+                  :model-value="consecutivoDescuento"
+                  label="Consecutivo del descuento *"
+                  variant="outlined"
+                  density="comfortable"
+                  prepend-inner-icon="mdi-pound"
+                  placeholder="Ej: D-000123"
+                  maxlength="30"
+                  autocomplete="off"
+                  persistent-hint
+                  :loading="consecutivoDescuentoCheck.loading"
+                  :error-messages="consecutivoDescuentoError"
+                  :hint="consecutivoDescuentoHint"
+                  @update:model-value="onConsecutivoDescuentoInput"
+                />
+              </v-col>
+            </v-row>
+
             <!-- ===== DOCUMENTOS POLICIA (solo si descuento es INFORMATIVO_POLICIA) ===== -->
             <template v-if="esDescuentoPolicia">
               <v-divider class="my-3" />
@@ -879,7 +902,8 @@
             :loading="saving"
             :disabled="saving
               || (esDescuentoEnCajaActivo && !autorizadoPorId)
-              || (esDescuentoPolicia && !documentosPoliciaCompletos)"
+              || (esDescuentoPolicia && !documentosPoliciaCompletos)
+              || consecutivoDescuentoFalta"
             @click="confirmarYGuardar"
           >
             Confirmar y guardar
@@ -926,6 +950,9 @@
             </div>
             <div class="text-caption mt-1">
               <strong>Monto aplicado:</strong> {{ formatCOP(descuentoMontoAplicado) }}
+            </div>
+            <div v-if="consecutivoDescuento" class="text-caption mt-1">
+              <strong>Consecutivo del descuento:</strong> {{ consecutivoDescuento }}
             </div>
             <div class="text-caption mt-1">
               <template v-if="turnoMeta.descuentoId && !overrideDateoDescuento">
@@ -994,7 +1021,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
-import { FacturacionService } from '@/services/facturacion_service'
+import { FacturacionService, type VerificacionConsecutivoDescuento } from '@/services/facturacion_service'
 import { etiquetaConvenio } from '@/services/conveniosService'
 // ✅ FIX 1: descuentosService es default export → sin llaves, minúscula
 import descuentosService from '@/services/descuentosService'
@@ -1108,6 +1135,82 @@ const RAZONES_RAPIDAS_DESCUENTO = [
   'Asesor no puso descuento',
   'Cliente pide en caja el descuento',
 ] as const
+
+// 🆕 Consecutivo del descuento: lo digita caja; mayúsculas, solo [A-Z0-9-],
+// máx. 30. El backend lo exige al confirmar con descuento en uso y rechaza
+// (409) uno ya registrado en otro ticket CONFIRMADA.
+const CONSECUTIVO_DESCUENTO_RE = /^[A-Z0-9-]{1,30}$/
+const consecutivoDescuento = ref<string>('')
+const consecutivoDescuentoCheck = reactive({
+  loading: false,
+  /** Valor al que corresponde el resultado (descarta respuestas viejas) */
+  verificado: '',
+  exists: false,
+  bloqueante: false,
+  tickets: [] as VerificacionConsecutivoDescuento['tickets'],
+})
+let consecutivoDescuentoTimer: ReturnType<typeof setTimeout> | null = null
+
+function resetConsecutivoDescuento() {
+  if (consecutivoDescuentoTimer) clearTimeout(consecutivoDescuentoTimer)
+  consecutivoDescuento.value = ''
+  Object.assign(consecutivoDescuentoCheck, {
+    loading: false, verificado: '', exists: false, bloqueante: false, tickets: [],
+  })
+}
+
+function onConsecutivoDescuentoInput(v: string | null) {
+  consecutivoDescuento.value = String(v ?? '').toUpperCase().replace(/\s+/g, '')
+  if (consecutivoDescuentoTimer) clearTimeout(consecutivoDescuentoTimer)
+  Object.assign(consecutivoDescuentoCheck, {
+    loading: false, verificado: '', exists: false, bloqueante: false, tickets: [],
+  })
+  const valor = consecutivoDescuento.value
+  if (!CONSECUTIVO_DESCUENTO_RE.test(valor)) return
+
+  consecutivoDescuentoCheck.loading = true
+  consecutivoDescuentoTimer = setTimeout(async () => {
+    try {
+      const r = await FacturacionService.verificarConsecutivoDescuento(valor, currentTicketId.value)
+      if (consecutivoDescuento.value !== valor) return
+      Object.assign(consecutivoDescuentoCheck, {
+        verificado: valor, exists: r.exists, bloqueante: r.bloqueante, tickets: r.tickets,
+      })
+    } catch (err) {
+      console.warn('No se pudo verificar el consecutivo del descuento:', err)
+    } finally {
+      if (consecutivoDescuento.value === valor) consecutivoDescuentoCheck.loading = false
+    }
+  }, 400)
+}
+
+const consecutivoDescuentoValido = computed(() =>
+  CONSECUTIVO_DESCUENTO_RE.test(consecutivoDescuento.value)
+)
+const consecutivoDescuentoVerificado = computed(() =>
+  consecutivoDescuentoCheck.verificado === consecutivoDescuento.value
+)
+
+const consecutivoDescuentoError = computed((): string => {
+  const v = consecutivoDescuento.value
+  if (v && !consecutivoDescuentoValido.value) return 'Solo letras, números y guion (-), máximo 30.'
+  if (consecutivoDescuentoVerificado.value && consecutivoDescuentoCheck.bloqueante) {
+    const t = consecutivoDescuentoCheck.tickets.find(x => x.estado === 'CONFIRMADA')
+    return `Ya registrado en el ticket #${t?.id ?? '—'}${t?.placa ? ` (placa ${t.placa})` : ''}, confirmado.`
+  }
+  return ''
+})
+
+const consecutivoDescuentoHint = computed((): string => {
+  if (!consecutivoDescuento.value) return 'Obligatorio cuando hay descuento. No se puede repetir.'
+  if (consecutivoDescuentoCheck.loading) return 'Verificando…'
+  if (!consecutivoDescuentoVerificado.value) return ''
+  if (consecutivoDescuentoCheck.exists) {
+    const t = consecutivoDescuentoCheck.tickets[0]
+    return `⚠️ Aparece en el ticket #${t?.id ?? '—'} (${t?.estado ?? '—'}, sin confirmar). Revisa antes de seguir.`
+  }
+  return '✓ Disponible'
+})
 
 /* ===================== OCR (cliente y backend) ===================== */
 type OCRStatus = 'idle' | 'running' | 'done'
@@ -1585,6 +1688,15 @@ const descuentoIdEfectivo = computed(() => {
   if (turnoMeta.descuentoId && !overrideDateoDescuento.value) return turnoMeta.descuentoId
   return descuentoIdEnCaja.value
 })
+
+// 🆕 Con descuento en uso no se confirma sin consecutivo válido, ni con uno ya
+// confirmado en otro ticket (el backend igual lo valida y responde 409).
+const consecutivoDescuentoFalta = computed(() =>
+  !!descuentoIdEfectivo.value && (
+    !consecutivoDescuentoValido.value
+    || (consecutivoDescuentoVerificado.value && consecutivoDescuentoCheck.bloqueante)
+  )
+)
 
 const esDescuentoPolicia = computed(() => {
   if (!descuentoIdEfectivo.value) return false
@@ -2262,6 +2374,7 @@ function resetAll() {
   autorizadoPorId.value = null
   descuentoMontoAplicado.value = 0
   descuentoObservacion.value = ''
+  resetConsecutivoDescuento()
   pinAmbiguo.value = false
 }
 
@@ -2281,6 +2394,7 @@ function openConfirm() {
   autorizadoPorId.value = null
   descuentoMontoAplicado.value = 0
   descuentoObservacion.value = ''
+  resetConsecutivoDescuento()
   overrideDateoDescuento.value = false
   resetDocPolicia()
 }
@@ -2387,6 +2501,8 @@ async function confirmarYGuardar() {
           descuentoIdEnCaja.value && turnoMeta.dateoId && !turnoMeta.descuentoId
             ? (descuentoObservacion.value.trim() || undefined)
             : undefined,
+        // 🆕 Obligatorio con descuento en uso (casos A y B); sin descuento no se envía.
+        consecutivo_descuento: descuentoIdEfectivo.value ? consecutivoDescuento.value : undefined,
       })
     }
 

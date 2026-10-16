@@ -66,6 +66,12 @@
           {{ item?.vendedor_text ?? '—' }}
         </template>
 
+        <!-- 🆕 Consecutivo del descuento (lo digita caja) -->
+        <template #item.consecutivo_descuento="{ item }">
+          <span v-if="item.consecutivo_descuento" class="font-weight-medium">{{ item.consecutivo_descuento }}</span>
+          <span v-else class="text-medium-emphasis">—</span>
+        </template>
+
         <template #item.acciones="{ item }">
           <v-btn size="small" variant="tonal" prepend-icon="mdi-eye" @click.stop="openDetailById(item.id)">
             Ver
@@ -336,6 +342,23 @@
   </div>
 </v-col>
 
+                    <!-- 🆕 Consecutivo del descuento -->
+                    <v-col cols="12" md="6">
+                      <div class="label-desc">Consecutivo del descuento</div>
+                      <div class="value-desc d-flex align-center" style="gap:8px">
+                        {{ consecutivoDescuentoDetalle ?? '—' }}
+                        <v-btn
+                          v-if="puedeCorregirConsecutivo"
+                          size="x-small"
+                          icon="mdi-pencil"
+                          variant="text"
+                          color="orange-darken-2"
+                          title="Corregir consecutivo (queda registro)"
+                          @click="openCorregirConsecutivo"
+                        />
+                      </div>
+                    </v-col>
+
                     <!-- Total original -->
                     <v-col cols="12" md="6">
                       <div class="label-desc">Total sin descuento</div>
@@ -461,6 +484,56 @@
   </v-card>
 </v-dialog>
 
+    <!-- 🆕 DIALOG CORREGIR CONSECUTIVO DEL DESCUENTO (SUPER_ADMIN / GERENCIA) -->
+<v-dialog v-model="corregirConsecutivo.open" max-width="440" persistent>
+  <v-card>
+    <v-card-title class="d-flex align-center" style="gap:8px">
+      <v-icon color="orange-darken-2">mdi-pound</v-icon>
+      Corregir consecutivo del descuento
+    </v-card-title>
+    <v-divider />
+    <v-card-text>
+      <div class="text-body-2 text-medium-emphasis mb-3">
+        Ticket #{{ dialog.item?.id }} — {{ dialog.item?.placa }} · actual:
+        <strong>{{ consecutivoDescuentoDetalle ?? 'sin consecutivo' }}</strong>
+      </div>
+      <v-text-field
+        :model-value="corregirConsecutivo.valor"
+        label="Nuevo consecutivo"
+        variant="outlined"
+        density="compact"
+        maxlength="30"
+        autocomplete="off"
+        autofocus
+        :error-messages="corregirConsecutivoError"
+        @update:model-value="(v: string | null) => corregirConsecutivo.valor = String(v ?? '').toUpperCase().replace(/\s+/g, '')"
+      />
+      <v-text-field
+        v-model="corregirConsecutivo.motivo"
+        label="Motivo (opcional)"
+        variant="outlined"
+        density="compact"
+        maxlength="255"
+        hint="Queda registrado quién y cuándo hizo la corrección"
+        persistent-hint
+      />
+    </v-card-text>
+    <v-card-actions>
+      <v-spacer />
+      <v-btn variant="text" @click="corregirConsecutivo.open = false">Cancelar</v-btn>
+      <v-btn
+        color="orange-darken-2"
+        variant="tonal"
+        :loading="corregirConsecutivo.saving"
+        :disabled="!!corregirConsecutivoError || !corregirConsecutivo.valor"
+        @click="saveCorregirConsecutivo"
+      >
+        Guardar
+      </v-btn>
+    </v-card-actions>
+  </v-card>
+</v-dialog>
+
 <v-snackbar v-model="snack.show" :timeout="3000">{{ snack.text }}</v-snackbar>
   </v-container>
 </template>
@@ -470,6 +543,7 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FacturacionService, type FacturacionTicket, type Paginated } from '@/services/facturacion_service'
 import { etiquetaConvenio } from '@/services/conveniosService'
+import { authSetStore } from '@/stores/AuthStore'
 
 const route = useRoute()
 const router = useRouter()
@@ -481,6 +555,7 @@ interface DescuentoAplicadoDTO {
   nombre: string
   montoAplicado: number
   autorizadoPor: { id: number; nombre: string } | null
+  consecutivoDescuento?: string | null
 }
 
 interface ExtendedFacturacionTicket {
@@ -552,6 +627,9 @@ interface ExtendedFacturacionTicket {
   autorizado_por_id?: number | null
   autorizadoPorId?: number | null
   descuentoAplicado?: DescuentoAplicadoDTO | null
+  // 🆕 Consecutivo del descuento
+  consecutivoDescuento?: string | null
+  consecutivo_descuento?: string | null
 
   // Confirmación
   confirmedById?: number | null
@@ -589,6 +667,7 @@ const headers = [
   { title: 'Servicio', key: 'servicioNombre', width: 240 },
   { title: 'Sede', key: 'sedeNombre', width: 200 },
   { title: 'Vendedor', key: 'vendedor_text', width: 220 },
+  { title: 'Consec. descuento', key: 'consecutivo_descuento', width: 160 },
   { title: 'Acciones', key: 'acciones', width: 120 },
 ]
 
@@ -909,6 +988,57 @@ async function saveDescuentoMonto() {
     snack.show = true
   } finally {
     editingDescuento.value = false
+  }
+}
+
+/* ===== 🆕 Consecutivo del descuento ===== */
+const authStore = authSetStore()
+const CONSECUTIVO_DESCUENTO_RE = /^[A-Z0-9-]{1,30}$/
+
+const consecutivoDescuentoDetalle = computed((): string | null => {
+  const i = dialog.item
+  if (!i) return null
+  return i.consecutivoDescuento ?? i.consecutivo_descuento ?? i.descuentoAplicado?.consecutivoDescuento ?? null
+})
+
+// Tras confirmar, solo SUPER_ADMIN/GERENCIA lo corrige (el backend registra el cambio).
+const puedeCorregirConsecutivo = computed(() =>
+  authStore.hasAnyRole(['SUPER_ADMIN', 'GERENCIA']) && dialog.item?.estado === 'CONFIRMADA'
+)
+
+const corregirConsecutivo = reactive({ open: false, valor: '', motivo: '', saving: false })
+const corregirConsecutivoError = computed((): string => {
+  const v = corregirConsecutivo.valor
+  if (v && !CONSECUTIVO_DESCUENTO_RE.test(v)) return 'Solo letras, números y guion (-), máximo 30.'
+  if (v && v === consecutivoDescuentoDetalle.value) return 'Es el mismo consecutivo actual.'
+  return ''
+})
+
+function openCorregirConsecutivo() {
+  Object.assign(corregirConsecutivo, {
+    open: true, valor: consecutivoDescuentoDetalle.value ?? '', motivo: '', saving: false,
+  })
+}
+
+async function saveCorregirConsecutivo() {
+  if (!dialog.item?.id) return
+  corregirConsecutivo.saving = true
+  try {
+    await FacturacionService.corregirConsecutivoDescuento(
+      dialog.item.id, corregirConsecutivo.valor, corregirConsecutivo.motivo.trim()
+    )
+    corregirConsecutivo.open = false
+    snack.text = '✅ Consecutivo del descuento corregido'
+    snack.show = true
+    const updated = await FacturacionService.getById(dialog.item.id)
+    dialog.item = updated as ExtendedFacturacionTicket
+    await fetchList()
+  } catch (err) {
+    console.error('Error corrigiendo consecutivo del descuento:', err)
+    snack.text = `❌ ${err instanceof Error ? err.message : 'No se pudo corregir el consecutivo'}`
+    snack.show = true
+  } finally {
+    corregirConsecutivo.saving = false
   }
 }
 

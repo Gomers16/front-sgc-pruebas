@@ -259,6 +259,7 @@
             <template #item.tipo_vehiculo="{ item }">{{ item.tipo_vehiculo ?? '—' }}</template>
             <template #item.asesor="{ item }">{{ nombreAsesorConvenio(item) }}</template>
             <template #item.descuento_nombre="{ item }">{{ item.descuento_nombre }}</template>
+            <template #item.consecutivo_descuento="{ item }">{{ item.consecutivo_descuento ?? '—' }}</template>
             <template #item.descuento_monto_aplicado="{ item }">{{ formatCOP(item.descuento_monto_aplicado) }}</template>
             <template #item.total_sin_descuento="{ item }">{{ formatCOP(item.total_sin_descuento) }}</template>
             <template #item.autorizador_nombre="{ item }">{{ item.autorizador_nombre ?? '—' }}</template>
@@ -272,7 +273,7 @@
 
             <template #body.append v-if="dialogDetalle.detalle.length">
               <tr class="fila-totales">
-                <td colspan="11" class="font-weight-bold">
+                <td colspan="12" class="font-weight-bold">
                   {{ dialogDetalle.totalVehiculos }} vehículos — {{ formatCOP(dialogDetalle.totalDescuentos) }} total descuentos
                 </td>
               </tr>
@@ -413,6 +414,7 @@ const headersDialogDescuento = [
   { title: 'Canal', key: 'canal' },
   { title: 'Asesor/Convenio', key: 'asesor' },
   { title: 'Tipo Descuento', key: 'descuento_nombre' },
+  { title: 'Consecutivo Descuento', key: 'consecutivo_descuento' },
   { title: 'Monto Descuento', key: 'descuento_monto_aplicado' },
   { title: 'Valor Original', key: 'total_sin_descuento' },
   { title: 'Autorizador', key: 'autorizador_nombre' },
@@ -608,7 +610,8 @@ function onClickAutorizadorRow(_e: unknown, { item }: { item: DescuentoPorAutori
 function exportarDialogDetalle() {
   const encabezados = [
     'Placa', 'Fecha', 'Tipo Vehículo', 'Canal', 'Asesor/Convenio',
-    'Tipo Descuento', 'Monto Descuento', 'Valor Original', 'Autorizador', 'Cliente', 'Documento',
+    'Tipo Descuento', 'Consecutivo Descuento', 'Monto Descuento', 'Valor Original', 'Autorizador',
+    'Cliente', 'Documento',
   ]
 
   const filas = dialogDetalle.detalle.map((d) => [
@@ -618,6 +621,7 @@ function exportarDialogDetalle() {
     canalDetalle(d),
     nombreAsesorConvenio(d),
     d.descuento_nombre,
+    d.consecutivo_descuento ?? '—',
     d.descuento_monto_aplicado,
     d.total_sin_descuento,
     d.autorizador_nombre ?? '—',
@@ -626,7 +630,7 @@ function exportarDialogDetalle() {
   ])
 
   if (dialogDetalle.detalle.length) {
-    filas.push(['', '', '', '', '', '', '', '', '', 'Totales', String(dialogDetalle.totalVehiculos)])
+    filas.push(['', '', '', '', '', '', '', '', '', '', 'Totales', String(dialogDetalle.totalVehiculos)])
   }
 
   const nombreBase = `DetalleDescuentos_${sanitizeFilename(dialogDetalle.titulo)}`
