@@ -560,6 +560,10 @@
                   >
                     {{ item.descuento?.nombre || (item.es_avance ? 'AVANCE' : '—') }}
                   </v-chip>
+                  <!-- 🆕 Consecutivo del descuento (del ticket del turno) -->
+                  <div class="text-caption text-medium-emphasis mt-1">
+                    Consec.: {{ item.consecutivo_descuento ?? '—' }}
+                  </div>
                 </template>
                 <span v-else class="text-medium-emphasis text-caption">—</span>
               </template>
@@ -2480,6 +2484,9 @@ function exportCsv(soloExitosos: boolean) {
     telefono: d.telefono || '',
     tipo_cliente: getTipoClienteParaDateo(d).label,
     descuento: d.descuento?.nombre || (d.es_avance ? 'AVANCE' : ''),
+    // 🆕 Consecutivo del descuento (del ticket); "—" si hay descuento sin consecutivo
+    consecutivo_descuento:
+      d.consecutivo_descuento ?? (d.descuento?.nombre || d.es_avance ? '—' : ''),
     convenio: d.convenio?.nombre || 'Sin convenio',
     estado: isExitoso(d) ? 'EXITOSO' : textoResultado(d.resultado),
     monto_comision: d.monto_comision ?? 0,
@@ -2488,11 +2495,11 @@ function exportCsv(soloExitosos: boolean) {
   }))
 
   const headersDisplay = [
-    'ID', 'Placa', 'Teléfono', 'Tipo cliente', 'Descuento', 'Convenio',
+    'ID', 'Placa', 'Teléfono', 'Tipo cliente', 'Descuento', 'Consecutivo descuento', 'Convenio',
     'Estado', 'Monto Comisión (COP)', 'Estado Pago', 'Fecha de Creación',
   ]
   const headersKeys = [
-    'id', 'placa', 'telefono', 'tipo_cliente', 'descuento', 'convenio',
+    'id', 'placa', 'telefono', 'tipo_cliente', 'descuento', 'consecutivo_descuento', 'convenio',
     'estado', 'monto_comision', 'estado_comision', 'fecha_creacion',
   ]
 

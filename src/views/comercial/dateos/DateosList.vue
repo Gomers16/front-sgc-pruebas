@@ -1511,6 +1511,13 @@ const headers = [
   { title: 'Estado', key: 'resultado', sortable: true },
   { title: 'Descuento', key: 'descuento', sortable: false },
   { title: 'Descuento en caja', key: 'descuento_caja', sortable: false },
+  // 🆕 Consecutivo del descuento (del ticket del turno); "—" si aún no se factura o es anterior
+  {
+    title: 'Consec. descuento',
+    key: 'consecutivo_descuento',
+    sortable: false,
+    value: (item: Dateo) => item.consecutivo_descuento ?? '—',
+  },
   { title: 'Turno', key: 'turnoInfo', sortable: false, align: 'center' as const },
   { title: 'Exclusividad', key: 'exclusividad', sortable: false, align: 'center' as const },
   { title: 'Acciones', key: 'acciones', sortable: false, align: 'end' as const },

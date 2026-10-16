@@ -845,6 +845,10 @@
                   <v-chip v-if="item.tuvo_descuento" size="small" color="amber-darken-2" variant="tonal">
                     Sí: {{ item.descuento_nombre ?? 'Descuento' }} -{{ formatMoney(item.descuento_monto) }}
                   </v-chip>
+                  <!-- 🆕 Consecutivo del descuento (del ticket) -->
+                  <div v-if="item.tuvo_descuento" class="text-caption text-medium-emphasis">
+                    Consec.: {{ item.consecutivo_descuento ?? '—' }}
+                  </div>
                   <v-chip v-else size="small" color="grey" variant="tonal">No</v-chip>
                 </template>
                 <template #item.acumulado="{ item }">{{ formatMoney(item.acumulado) }}</template>
@@ -1345,6 +1349,12 @@ const headersDialogDescuento = [
   { title: 'Turno/Placa', key: 'placa' },
   { title: 'Tipo Captación', key: 'tipo_captacion' },
   { title: 'Monto Descuento', key: 'descuento_monto' },
+  // 🆕 Consecutivo del descuento (del ticket); "—" en tickets anteriores
+  {
+    title: 'Consecutivo Descuento',
+    key: 'consecutivo_descuento',
+    value: (item: { consecutivo_descuento?: string | null }) => item.consecutivo_descuento ?? '—',
+  },
   { title: 'Total Factura', key: 'ingreso_real' },
 ]
 

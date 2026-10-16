@@ -290,6 +290,15 @@
                 />
               </v-col>
 
+              <!-- 🆕 Consecutivo del descuento (del ticket CONFIRMADA del turno; solo lectura) -->
+              <v-col
+                v-if="!editando && (dateo?.descuento_id || dateo?.descuento_caja_id || dateo?.consecutivo_descuento)"
+                cols="12"
+              >
+                <div class="text-caption text-medium-emphasis">Consecutivo del descuento</div>
+                <div class="text-body-2 font-weight-medium">{{ dateo?.consecutivo_descuento ?? '—' }}</div>
+              </v-col>
+
               <!-- ++ AVANCE: Comprobante (solo si descuento AVANCE + COMERCIAL + editando) ++ -->
               <v-col v-if="debeSubirComprobante && editando" cols="12">
                 <v-file-input
@@ -463,6 +472,7 @@
             >
               <div class="text-caption text-medium-emphasis mb-2">
                 Ticket #{{ ticket.ticketId }} — {{ ticket.descuentoCodigo || '—' }}
+                · Consecutivo: {{ ticket.consecutivoDescuento ?? '—' }}
               </div>
               <v-row dense>
                 <v-col

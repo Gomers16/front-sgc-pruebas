@@ -486,6 +486,7 @@
                                 <th>Convenio</th>
                                 <th>Fecha</th>
                                 <th class="text-right">Monto descuento</th>
+                                <th>Consec. descuento</th>
                                 <th>Comisión resultante</th>
                               </tr>
                             </thead>
@@ -502,6 +503,7 @@
                                 <td>{{ p.convenio_nombre ?? '—' }}</td>
                                 <td>{{ formatDate(p.fecha_pago) }}</td>
                                 <td class="text-right">{{ formatCOP(p.monto_descuento) }}</td>
+                                <td>{{ p.consecutivo_descuento ?? '—' }}</td>
                                 <td>
                                   <div v-if="p.tiene_comision" class="d-flex align-center gap-1 flex-wrap">
                                     <v-chip :color="estadoColor(p.comision_estado)" size="x-small" variant="flat">{{ p.comision_estado }}</v-chip>
@@ -525,7 +527,7 @@
                                 </td>
                               </tr>
                               <tr v-if="!liquidacionDetalleFilas('descuentos', i).length">
-                                <td colspan="7" class="text-center text-medium-emphasis">Sin placas en este período</td>
+                                <td colspan="8" class="text-center text-medium-emphasis">Sin placas en este período</td>
                               </tr>
                             </tbody>
                           </v-table>
@@ -2542,6 +2544,11 @@
                 <strong>Confirmado por:</strong><br />
                 {{ detailDialog.item.descuento_aplicado_por.nombre }}
               </v-col>
+              <!-- 🆕 Consecutivo del descuento (del ticket) -->
+              <v-col cols="12" md="4">
+                <strong>Consecutivo del descuento:</strong><br />
+                {{ detailDialog.item.consecutivo_descuento ?? '—' }}
+              </v-col>
             </v-row>
             <template v-if="detailDialog.item.es_avance">
               <v-divider class="my-2" />
@@ -3728,6 +3735,13 @@ const headers = [
   { title: 'Convenio', key: 'convenio', sortable: false },
   { title: 'Descuento', key: 'descuento', sortable: false },
   { title: 'Descuento en caja', key: 'descuento_caja', sortable: false },
+  // 🆕 Consecutivo del descuento (del ticket); "—" si no hay ticket o es anterior a la función
+  {
+    title: 'Consec. descuento',
+    key: 'consecutivo_descuento',
+    sortable: false,
+    value: (item: ComisionListItemExtended) => item.consecutivo_descuento ?? '—',
+  },
   { title: 'Dateo', key: 'valor_unitario', sortable: true },
   { title: 'Incentivo', key: 'valor_cliente', sortable: false },
   { title: 'Total', key: 'valor_total', sortable: true },

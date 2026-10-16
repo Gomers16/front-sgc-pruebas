@@ -34,6 +34,8 @@ export interface DateoImagenMeta {
 export interface DocumentoInformativoTicket {
   ticketId: number
   descuentoCodigo: string | null
+  /** 🆕 Consecutivo del descuento del ticket (solo si quedó CONFIRMADA) */
+  consecutivoDescuento?: string | null
   docCarnetPath: string | null
   docTarjetaPropiedadPath: string | null
   docCedulaPath: string | null
@@ -80,6 +82,8 @@ export interface Dateo extends DateoImagenMeta {
   descuento_caja_aplicado_at?: string | null
   /** Monto del descuento en caja, resuelto desde la comisión asociada al dateo */
   descuento_caja_monto?: number | null
+  /** 🆕 Consecutivo del descuento, leído del ticket CONFIRMADA del turno consumido */
+  consecutivo_descuento?: string | null
   servicio_id?: number | null
   servicio?: { id: number; codigoServicio: string; nombreServicio: string } | null
   es_avance?: boolean

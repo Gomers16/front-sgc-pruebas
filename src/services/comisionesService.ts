@@ -175,6 +175,9 @@ export interface ComisionListItem {
    * monto ya viene en descuento_monto_aplicado. */
   descuento_codigo_aplicado?: string | null
   descuento_observacion_caja?: string | null
+
+  /** 🆕 Consecutivo del descuento, leído del ticket CONFIRMADA (null = sin ticket o ticket anterior) */
+  consecutivo_descuento?: string | null
 }
 
 export interface ComisionDetail extends ComisionListItem {
@@ -517,6 +520,9 @@ function mapComisionToListItem(api: unknown): ComisionListItem {
     descuento_observacion_caja: (a.descuento_observacion_caja ??
       a.descuentoObservacionCaja ??
       null) as string | null,
+    consecutivo_descuento: (a.consecutivo_descuento ?? a.consecutivoDescuento ?? null) as
+      | string
+      | null,
   }
 }
 

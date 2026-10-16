@@ -182,6 +182,11 @@
                 <div class="text-caption text-medium-emphasis text-uppercase mb-1">Autorizado por</div>
                 <div class="text-body-2 font-weight-medium">{{ comision.descuento_autorizado_por.nombre }}</div>
               </v-col>
+              <!-- 🆕 Consecutivo del descuento (del ticket) -->
+              <v-col cols="12" md="4">
+                <div class="text-caption text-medium-emphasis text-uppercase mb-1">Consecutivo del descuento</div>
+                <div class="text-body-2 font-weight-medium">{{ comision.consecutivo_descuento ?? '—' }}</div>
+              </v-col>
               <v-col cols="12">
                 <v-divider class="my-2" />
                 <v-alert

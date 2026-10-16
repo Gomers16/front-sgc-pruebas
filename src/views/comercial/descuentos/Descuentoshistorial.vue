@@ -157,6 +157,10 @@
           <div v-if="item.descuento" class="text-caption text-medium-emphasis mt-1">
             Código: {{ item.descuento.codigo }}
           </div>
+          <!-- 🆕 Consecutivo del descuento (lo digita caja; "—" en tickets anteriores) -->
+          <div v-if="item.descuento" class="text-caption text-medium-emphasis">
+            Consecutivo: {{ item.consecutivo_descuento ?? '—' }}
+          </div>
         </template>
 
         <!-- Origen -->
@@ -290,6 +294,10 @@
                   <div v-if="detailDialog.item.descuento_monto_aplicado != null" class="text-body-2">
                     <strong>Monto descontado:</strong>
                     {{ formatCOP(detailDialog.item.descuento_monto_aplicado) }}
+                  </div>
+                  <div class="text-body-2">
+                    <strong>Consecutivo del descuento:</strong>
+                    {{ detailDialog.item.consecutivo_descuento ?? '—' }}
                   </div>
                   <div class="text-caption text-medium-emphasis mt-1">
                     🏷️ Efecto: la comisión se calculó con valor básico de recurrencia
@@ -491,6 +499,7 @@ interface HistorialRow {
   tipo_vehiculo:            string | null
   descuento:                DescuentoLight | null
   descuento_monto_aplicado: number | null
+  consecutivo_descuento?:   string | null
   origen:                   'dateo' | 'caja'
   comercial:                PersonaLight | null
   dateo_id:                 number | null
