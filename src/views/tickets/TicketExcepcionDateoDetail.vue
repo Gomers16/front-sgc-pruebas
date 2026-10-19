@@ -8,7 +8,7 @@
         <v-card-title
           class="py-4 px-4 px-sm-6 d-flex align-center justify-space-between flex-wrap gap-2"
         >
-          <div class="text-h5 font-weight-bold">🎫 {{ ticket.titulo }}</div>
+          <div class="text-h5 font-weight-bold titulo">🎫 {{ ticket.titulo }}</div>
           <v-chip
             :color="colorPorEstado(ticket.estado)"
             variant="flat"
@@ -86,25 +86,28 @@
             </v-col>
             <v-col cols="12" sm="4">
               <div class="text-caption text-medium-emphasis">Minutos transcurridos</div>
-              <div class="font-weight-600" :class="dentroVentana ? '' : 'text-error'">
-                {{ detalle.minutosTotales }} min
-                <template v-if="!dentroVentana"
-                  >({{ detalle.minutosExceso }} min de exceso)</template
+              <div class="d-flex align-center flex-wrap ga-2">
+                <span class="font-weight-600">
+                  {{ detalle.minutosTotales }} min
+                  <template v-if="!dentroVentana"
+                    >({{ detalle.minutosExceso }} min de exceso)</template
+                  >
+                </span>
+                <!-- Solo informa: la decisión de comisión se toma dentro y fuera de ventana. -->
+                <v-chip
+                  size="x-small"
+                  variant="tonal"
+                  :color="dentroVentana ? 'success' : 'warning'"
+                  :prepend-icon="
+                    dentroVentana ? 'mdi-clock-check-outline' : 'mdi-clock-alert-outline'
+                  "
+                  data-test="chip-ventana"
                 >
+                  {{ dentroVentana ? 'Dentro de ventana' : 'Fuera de ventana' }}
+                </v-chip>
               </div>
             </v-col>
           </v-row>
-
-          <v-alert
-            :type="dentroVentana ? 'success' : 'warning'"
-            :icon="dentroVentana ? 'mdi-clock-check-outline' : 'mdi-clock-alert-outline'"
-            variant="tonal"
-            density="compact"
-            class="mb-2"
-          >
-            <!-- Solo informa: la decisión de comisión se toma dentro y fuera de ventana. -->
-            <strong>{{ dentroVentana ? 'Dentro de ventana' : 'Fuera de ventana' }}</strong>
-          </v-alert>
 
           <v-divider class="my-3" />
 
@@ -172,33 +175,79 @@
               />
             </div>
 
-            <div class="text-caption text-medium-emphasis mb-3">
-              <template v-if="casoEfectivo === 'CONVENIO_COMERCIAL'">
-                Decide si cobran el asesor y/o el convenio.
-              </template>
-              <template v-else-if="casoEfectivo === 'CONVENIO_SELF'">
-                El asesor convenio es el convenio, así que es con o sin comisión.
-              </template>
-              <template v-else>Decide si el asesor cobra (no hay convenio).</template>
-            </div>
-            <div class="d-flex gap-2 flex-wrap">
-              <v-btn
-                v-for="op in opciones"
-                :key="op.clave"
-                :color="op.color"
-                :loading="aprobando"
-                :disabled="corregirConvenio && convenioCorregidoId === undefined"
-                @click="pedirConfirmacion(op)"
+            <v-card
+              variant="outlined"
+              class="decision pa-3 pa-sm-4 mb-3"
+              data-test="decision-comision"
+            >
+              <div class="text-subtitle-2 font-weight-bold">Decisión de comisión</div>
+              <div
+                v-if="casoEfectivo === 'CONVENIO_SELF'"
+                class="text-caption text-medium-emphasis mt-1"
               >
-                {{ op.texto }}
-              </v-btn>
+                El asesor convenio y el convenio son la misma persona: esta decisión aplica a ambos.
+              </div>
+              <div
+                v-else-if="casoEfectivo === 'SIN_CONVENIO'"
+                class="text-caption text-medium-emphasis mt-1"
+              >
+                Sin convenio: solo se decide la comisión del asesor.
+              </div>
+
+              <div class="mt-3">
+                <div v-for="i in interruptores" :key="i.clave" class="interruptor">
+                  <span class="text-body-2 font-weight-medium">{{ i.etiqueta }}</span>
+                  <v-btn-toggle
+                    :model-value="i.cobra ? 'cobra' : 'no'"
+                    mandatory
+                    divided
+                    density="compact"
+                    variant="outlined"
+                    rounded="lg"
+                    :color="i.cobra ? 'success' : 'error'"
+                    :data-test="`interruptor-${i.clave}`"
+                    @update:model-value="(v: string) => i.cambiar(v === 'cobra')"
+                  >
+                    <v-btn value="cobra" prepend-icon="mdi-check" size="small">Cobra</v-btn>
+                    <v-btn value="no" prepend-icon="mdi-close" size="small">No cobra</v-btn>
+                  </v-btn-toggle>
+                </div>
+              </div>
+
+              <v-alert
+                :color="COLOR_NIVEL[decision.nivel]"
+                :icon="
+                  decision.nivel === 'todos' ? 'mdi-account-check-outline' : 'mdi-alert-outline'
+                "
+                variant="tonal"
+                density="compact"
+                class="mt-3"
+                data-test="resumen-decision"
+              >
+                {{ decision.resumen }}
+              </v-alert>
+            </v-card>
+
+            <div class="acciones">
               <v-btn
                 color="error"
-                variant="tonal"
+                variant="outlined"
                 :loading="rechazando"
+                :disabled="aprobando"
                 @click="mostrarRechazo = true"
               >
                 Rechazar
+              </v-btn>
+              <v-btn
+                color="success"
+                variant="flat"
+                prepend-icon="mdi-check"
+                :loading="aprobando"
+                :disabled="corregirConvenio && convenioCorregidoId === undefined"
+                data-test="btn-aprobar"
+                @click="confirmando = true"
+              >
+                Aprobar
               </v-btn>
             </div>
           </template>
@@ -297,12 +346,10 @@
 
     <!-- Confirmar aprobación (un solo diálogo; el texto dice quién pierde la comisión) -->
     <v-dialog v-model="confirmando" max-width="460">
-      <v-card v-if="opcionElegida">
-        <v-card-title class="text-subtitle-1 font-weight-bold">{{
-          opcionElegida.titulo
-        }}</v-card-title>
+      <v-card>
+        <v-card-title class="text-subtitle-1 font-weight-bold">{{ decision.titulo }}</v-card-title>
         <v-card-text>
-          {{ opcionElegida.mensaje }}
+          {{ decision.mensaje }}
           <div v-if="corregirConvenio" class="mt-2">
             <strong>Convenio:</strong> {{ etiquetaConvenioCorregido }} (el original queda
             registrado).
@@ -310,7 +357,11 @@
         </v-card-text>
         <v-card-actions class="justify-end">
           <v-btn variant="text" @click="confirmando = false">Cancelar</v-btn>
-          <v-btn :color="opcionElegida.color" :loading="aprobando" @click="aprobar"
+          <v-btn
+            :color="decision.nivel === 'todos' ? 'success' : COLOR_NIVEL[decision.nivel]"
+            variant="flat"
+            :loading="aprobando"
+            @click="aprobar"
             >Confirmar</v-btn
           >
         </v-card-actions>
@@ -389,9 +440,9 @@ import {
 } from './convenioTicket'
 import {
   casoConConvenioCorregido,
+  COLOR_NIVEL,
+  decisionAprobacion,
   mensajeErrorResolucion,
-  opcionesAprobacion,
-  type OpcionAprobacion,
 } from './decisionComision'
 
 const props = defineProps<{ id: string | number }>()
@@ -407,7 +458,6 @@ const errorCarga = ref<string | null>(null)
 const aprobando = ref(false)
 const rechazando = ref(false)
 const confirmando = ref(false)
-const opcionElegida = ref<OpcionAprobacion | null>(null)
 const mostrarRechazo = ref(false)
 const motivoRechazo = ref('')
 
@@ -521,7 +571,38 @@ const casoEfectivo = computed<CasoComision | null>(() =>
     corregirConvenio.value ? convenioCorregidoId.value : undefined,
   ),
 )
-const opciones = computed(() => opcionesAprobacion(casoEfectivo.value))
+
+/* ═══════════ Decisión de comisión: interruptores Cobra / No cobra ═══════════ */
+const cobraAsesor = ref(true)
+const cobraConvenio = ref(true)
+// Si cambia el caso (p. ej. al corregir el convenio), se vuelve a "Cobra".
+watch(casoEfectivo, () => {
+  cobraAsesor.value = true
+  cobraConvenio.value = true
+})
+const decision = computed(() =>
+  decisionAprobacion(casoEfectivo.value, cobraAsesor.value, cobraConvenio.value),
+)
+const interruptores = computed(() => {
+  const caso = casoEfectivo.value
+  const lista = [
+    {
+      clave: 'asesor',
+      etiqueta: caso === 'CONVENIO_SELF' ? 'Comisión del asesor convenio' : 'Comisión del asesor',
+      cobra: cobraAsesor.value,
+      cambiar: (v: boolean) => (cobraAsesor.value = v),
+    },
+  ]
+  if (caso === 'CONVENIO_COMERCIAL') {
+    lista.push({
+      clave: 'convenio',
+      etiqueta: 'Comisión del convenio',
+      cobra: cobraConvenio.value,
+      cambiar: (v: boolean) => (cobraConvenio.value = v),
+    })
+  }
+  return lista
+})
 
 /* ═══════════ Línea de tiempo ═══════════ */
 const EVENTO: Record<TipoEventoTicket, { texto: string; icono: string; color: string }> = {
@@ -623,16 +704,11 @@ async function cargar() {
   }
 }
 
-function pedirConfirmacion(op: OpcionAprobacion) {
-  opcionElegida.value = op
-  confirmando.value = true
-}
-
 async function aprobar() {
-  if (!ticket.value || !opcionElegida.value) return
+  if (!ticket.value) return
   aprobando.value = true
   try {
-    const body = { ...opcionElegida.value.body }
+    const body = { ...decision.value.body }
     if (corregirConvenio.value && convenioCorregidoId.value !== undefined) {
       body.convenio_id = convenioCorregidoId.value
     }
@@ -700,6 +776,44 @@ onMounted(cargar)
 </script>
 
 <style scoped>
+.decision {
+  border-radius: 12px;
+}
+.interruptor {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 6px 0;
+}
+.interruptor + .interruptor {
+  border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+.acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* Móvil: el interruptor bajo su etiqueta y a lo ancho; botones a lo ancho, Aprobar arriba. */
+@media (max-width: 599px) {
+  .interruptor .v-btn-toggle {
+    width: 100%;
+  }
+  .interruptor .v-btn-toggle .v-btn {
+    flex: 1 1 0;
+  }
+  .acciones {
+    flex-direction: column-reverse;
+  }
+  .acciones .v-btn {
+    width: 100%;
+  }
+}
+.titulo {
+  white-space: normal;
+  word-break: break-word;
+}
 .evidencia-thumb {
   display: block;
   width: 140px;

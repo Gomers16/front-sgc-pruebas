@@ -1,62 +1,65 @@
 import { describe, expect, it } from 'vitest'
 import {
   casoConConvenioCorregido,
+  COLOR_NIVEL,
+  decisionAprobacion,
   mensajeErrorResolucion,
-  opcionesAprobacion,
 } from '../decisionComision'
 
-const claves = (o: { clave: string }[]) => o.map((x) => x.clave)
+const combos = [
+  [true, true],
+  [false, true],
+  [true, false],
+  [false, false],
+] as const
 
-describe('opcionesAprobacion', () => {
-  it('la ventana no cambia los botones: siempre se decide la comisión según el caso', () => {
-    expect(claves(opcionesAprobacion('SIN_CONVENIO'))).toEqual(['con', 'sin'])
-    expect(claves(opcionesAprobacion('CONVENIO_SELF'))).toEqual(['con', 'sin'])
-    expect(claves(opcionesAprobacion('CONVENIO_COMERCIAL'))).toEqual([
-      'con',
-      'sin_asesor',
-      'sin_convenio',
-      'sin_ninguno',
+describe('decisionAprobacion (interruptores Cobra / No cobra)', () => {
+  it('Caso 3: las 4 combinaciones, mismo body que antes, resumen y riesgo', () => {
+    const r = combos.map(([a, c]) => decisionAprobacion('CONVENIO_COMERCIAL', a, c))
+    expect(r.map((x) => x.body)).toEqual([
+      { con_comision_asesor: true, con_comision_convenio: true },
+      { con_comision_asesor: false, con_comision_convenio: true },
+      { con_comision_asesor: true, con_comision_convenio: false },
+      { con_comision_asesor: false, con_comision_convenio: false },
     ])
-    // Ningún botón manda body vacío: la decisión queda siempre guardada.
-    for (const caso of ['SIN_CONVENIO', 'CONVENIO_SELF', 'CONVENIO_COMERCIAL'] as const) {
-      for (const o of opcionesAprobacion(caso))
-        expect(o.body.con_comision_asesor).toBeTypeOf('boolean')
+    expect(r.map((x) => x.resumen)).toEqual([
+      'El asesor y el convenio cobran normal',
+      'El asesor pierde su comisión; el convenio cobra normal',
+      'El convenio pierde su comisión; el asesor cobra normal',
+      'Ni el asesor ni el convenio cobran',
+    ])
+    expect(r.map((x) => x.nivel)).toEqual(['todos', 'parcial', 'parcial', 'ninguno'])
+    expect(r.map((x) => COLOR_NIVEL[x.nivel])).toEqual(['blue-grey', 'warning', 'warning', 'error'])
+  })
+
+  it('Caso 2: un solo interruptor manda los dos flags iguales (el de convenio se ignora)', () => {
+    for (const [a, c] of combos) {
+      const d = decisionAprobacion('CONVENIO_SELF', a, c)
+      expect(d.body).toEqual({ con_comision_asesor: a, con_comision_convenio: a })
+      expect(d.nivel).toBe(a ? 'todos' : 'ninguno')
+    }
+    expect(decisionAprobacion('CONVENIO_SELF', false, true).resumen).toContain(
+      'como asesor y como convenio',
+    )
+  })
+
+  it('Caso 1 (o desconocido): solo el flag del asesor, nunca el de convenio', () => {
+    for (const caso of ['SIN_CONVENIO', null] as const) {
+      for (const [a, c] of combos) {
+        const d = decisionAprobacion(caso, a, c)
+        expect(d.body).toEqual({ con_comision_asesor: a })
+        expect(d.nivel).toBe(a ? 'todos' : 'ninguno')
+      }
     }
   })
 
-  it('Caso 1: con / sin, solo con el flag del asesor', () => {
-    const o = opcionesAprobacion('SIN_CONVENIO')
-    expect(claves(o)).toEqual(['con', 'sin'])
-    expect(o.map((x) => x.body)).toEqual([
-      { con_comision_asesor: true },
-      { con_comision_asesor: false },
-    ])
-    expect(o[1].mensaje).toContain('ASESOR pierde')
-  })
-
-  it('Caso 2: con / sin, con los dos flags iguales', () => {
-    const o = opcionesAprobacion('CONVENIO_SELF')
-    expect(claves(o)).toEqual(['con', 'sin'])
-    for (const x of o) expect(x.body.con_comision_asesor).toBe(x.body.con_comision_convenio)
-    expect(o[1].mensaje).toContain('misma persona')
-  })
-
-  it('Caso 3: las 4 combinaciones y cada diálogo dice quién pierde', () => {
-    const o = opcionesAprobacion('CONVENIO_COMERCIAL')
-    expect(claves(o)).toEqual(['con', 'sin_asesor', 'sin_convenio', 'sin_ninguno'])
-    expect(o.map((x) => [x.body.con_comision_asesor, x.body.con_comision_convenio])).toEqual([
-      [true, true],
-      [false, true],
-      [true, false],
-      [false, false],
-    ])
-    expect(o[1].mensaje).toContain('ASESOR pierde')
-    expect(o[2].mensaje).toContain('CONVENIO pierde')
-    expect(o[3].mensaje).toContain('ASESOR y el CONVENIO pierden')
-  })
-
-  it('caso desconocido se trata como Caso 1 (nunca manda flag de convenio)', () => {
-    expect(opcionesAprobacion(null).every((x) => !('con_comision_convenio' in x.body))).toBe(true)
+  it('el diálogo repite el resumen; con pérdida cambia el título', () => {
+    const con = decisionAprobacion('CONVENIO_COMERCIAL', true, true)
+    const sin = decisionAprobacion('CONVENIO_COMERCIAL', true, false)
+    expect(con.titulo).toBe('Aprobar con comisión')
+    expect(sin.titulo).toBe('Aprobar con pérdida de comisión')
+    expect(sin.mensaje.startsWith(sin.resumen)).toBe(true)
+    expect(sin.mensaje).toContain('No se puede deshacer')
   })
 })
 

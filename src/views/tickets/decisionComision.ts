@@ -2,8 +2,9 @@
 //
 // Botones de aprobación de un ticket de Excepción de Dateo según el caso de
 // comisión que manda el backend (GET /tickets/:id → caso_comision; la regla
-// vive en decidirCasoComision() del backend, acá no se recalcula). Los mismos
-// botones dentro y fuera de ventana (la ventana solo informa):
+// vive en decidirCasoComision() del backend, acá no se recalcula). La misma
+// decisión dentro y fuera de ventana (la ventana solo informa), con
+// interruptores "Cobra / No cobra":
 //  - Caso 1 (SIN_CONVENIO): con / sin comisión del asesor
 //  - Caso 2 (CONVENIO_SELF): con / sin comisión — el asesor convenio es el
 //    convenio, los dos flags van iguales
@@ -11,98 +12,77 @@
 
 import type { AprobarTicketBody, CasoComision } from '@/services/ticketsService'
 
-export interface OpcionAprobacion {
-  clave: 'con' | 'sin' | 'sin_asesor' | 'sin_convenio' | 'sin_ninguno'
-  texto: string
-  color: 'success' | 'warning' | 'error'
+/** Riesgo de la decisión: todos cobran, uno pierde, nadie cobra. */
+export type NivelDecision = 'todos' | 'parcial' | 'ninguno'
+
+export interface DecisionAprobacion {
   body: AprobarTicketBody
-  /** Título y mensaje del diálogo de confirmación: dicen quién pierde la comisión. */
+  /** Línea resumen: quién cobra y quién pierde. */
+  resumen: string
+  nivel: NivelDecision
+  /** Título del diálogo de confirmación. */
   titulo: string
+  /** Mensaje del diálogo: repite el resumen y avisa qué se crea. */
   mensaje: string
 }
 
 const AVISO =
   'Se crea el dateo y, si Facturación ya está confirmada, la comisión. No se puede deshacer.'
 
-export function opcionesAprobacion(caso: CasoComision | null): OpcionAprobacion[] {
+/** Color (Vuetify) del resumen según el riesgo. */
+export const COLOR_NIVEL: Record<NivelDecision, string> = {
+  todos: 'blue-grey',
+  parcial: 'warning',
+  ninguno: 'error',
+}
+
+/**
+ * Decisión a partir de los interruptores "Cobra / No cobra". El body es el
+ * mismo que el backend espera por caso:
+ *  - Caso 1: solo con_comision_asesor (no hay convenio)
+ *  - Caso 2: un solo interruptor; los dos flags iguales (asesor = convenio)
+ *  - Caso 3: los dos flags
+ */
+export function decisionAprobacion(
+  caso: CasoComision | null,
+  cobraAsesor: boolean,
+  cobraConvenio: boolean,
+): DecisionAprobacion {
+  let body: AprobarTicketBody
+  let resumen: string
+  let nivel: NivelDecision
   if (caso === 'CONVENIO_COMERCIAL') {
-    return [
-      {
-        clave: 'con',
-        texto: 'Con comisión (asesor y convenio)',
-        color: 'success',
-        body: { con_comision_asesor: true, con_comision_convenio: true },
-        titulo: 'Aprobar con comisión para el asesor y el convenio',
-        mensaje: `Nadie pierde la comisión: el asesor y el convenio cobran su parte normal. ${AVISO}`,
-      },
-      {
-        clave: 'sin_asesor',
-        texto: 'Sin comisión para el asesor',
-        color: 'warning',
-        body: { con_comision_asesor: false, con_comision_convenio: true },
-        titulo: 'Aprobar sin comisión para el asesor',
-        mensaje: `El ASESOR pierde su comisión (queda en $0). El convenio cobra su parte normal. ${AVISO}`,
-      },
-      {
-        clave: 'sin_convenio',
-        texto: 'Sin comisión para el convenio',
-        color: 'warning',
-        body: { con_comision_asesor: true, con_comision_convenio: false },
-        titulo: 'Aprobar sin comisión para el convenio',
-        mensaje: `El CONVENIO pierde su comisión (queda en $0). El asesor cobra su parte normal. ${AVISO}`,
-      },
-      {
-        clave: 'sin_ninguno',
-        texto: 'Sin comisión para ninguno',
-        color: 'error',
-        body: { con_comision_asesor: false, con_comision_convenio: false },
-        titulo: 'Aprobar sin comisión para nadie',
-        mensaje: `El ASESOR y el CONVENIO pierden la comisión (ambos en $0). ${AVISO}`,
-      },
-    ]
+    body = { con_comision_asesor: cobraAsesor, con_comision_convenio: cobraConvenio }
+    nivel =
+      cobraAsesor && cobraConvenio ? 'todos' : cobraAsesor || cobraConvenio ? 'parcial' : 'ninguno'
+    resumen =
+      cobraAsesor && cobraConvenio
+        ? 'El asesor y el convenio cobran normal'
+        : cobraConvenio
+          ? 'El asesor pierde su comisión; el convenio cobra normal'
+          : cobraAsesor
+            ? 'El convenio pierde su comisión; el asesor cobra normal'
+            : 'Ni el asesor ni el convenio cobran'
+  } else if (caso === 'CONVENIO_SELF') {
+    body = { con_comision_asesor: cobraAsesor, con_comision_convenio: cobraAsesor }
+    nivel = cobraAsesor ? 'todos' : 'ninguno'
+    resumen = cobraAsesor
+      ? 'El asesor convenio cobra normal'
+      : 'El asesor convenio pierde su comisión (como asesor y como convenio)'
+  } else {
+    body = { con_comision_asesor: cobraAsesor }
+    nivel = cobraAsesor ? 'todos' : 'ninguno'
+    resumen = cobraAsesor
+      ? 'El asesor cobra normal (no hay convenio)'
+      : 'El asesor pierde su comisión (no hay convenio)'
   }
-
-  // Caso 2: un solo beneficiario (el asesor convenio es el convenio).
-  if (caso === 'CONVENIO_SELF') {
-    return [
-      {
-        clave: 'con',
-        texto: 'Aprobar con comisión',
-        color: 'success',
-        body: { con_comision_asesor: true, con_comision_convenio: true },
-        titulo: 'Aprobar con comisión',
-        mensaje: `El asesor convenio cobra su comisión normal. ${AVISO}`,
-      },
-      {
-        clave: 'sin',
-        texto: 'Aprobar sin comisión',
-        color: 'warning',
-        body: { con_comision_asesor: false, con_comision_convenio: false },
-        titulo: 'Aprobar sin comisión',
-        mensaje: `El ASESOR CONVENIO pierde la comisión (queda en $0): como asesor y como convenio son la misma persona. ${AVISO}`,
-      },
-    ]
+  return {
+    body,
+    resumen,
+    nivel,
+    titulo: nivel === 'todos' ? 'Aprobar con comisión' : 'Aprobar con pérdida de comisión',
+    mensaje: `${resumen}. ${AVISO}`,
   }
-
-  // Caso 1 (o caso desconocido): solo el asesor, sin flag de convenio.
-  return [
-    {
-      clave: 'con',
-      texto: 'Aprobar con comisión',
-      color: 'success',
-      body: { con_comision_asesor: true },
-      titulo: 'Aprobar con comisión',
-      mensaje: `El asesor cobra su comisión normal (sin convenio). ${AVISO}`,
-    },
-    {
-      clave: 'sin',
-      texto: 'Aprobar sin comisión',
-      color: 'warning',
-      body: { con_comision_asesor: false },
-      titulo: 'Aprobar sin comisión',
-      mensaje: `El ASESOR pierde su comisión (queda en $0). El ticket no tiene convenio. ${AVISO}`,
-    },
-  ]
 }
 
 /**
