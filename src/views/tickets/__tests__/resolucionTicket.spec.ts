@@ -91,9 +91,37 @@ describe('resolucionComision', () => {
     expect(resolucionComision({ ...fuera, conComision: 1 })).toBe('CON_COMISION')
   })
 
-  it('dentro de ventana → comisión completa', () => {
+  it('dentro de ventana sin decisión guardada (aprobado antes) → comisión completa', () => {
     expect(resolucionComision({ dentroVentana: 1, conComision: null })).toBe('DENTRO_VENTANA')
     expect(resolucionComision({ dentroVentana: true, conComision: null })).toBe('DENTRO_VENTANA')
+  })
+
+  it('dentro de ventana con decisión guardada → manda la decisión', () => {
+    const dentro = { dentroVentana: 1, convenioId: 40 }
+    expect(
+      resolucionComision({
+        ...dentro,
+        conComision: 1,
+        conComisionAsesor: 1,
+        conComisionConvenio: 0,
+      }),
+    ).toBe('SIN_COMISION_CONVENIO')
+    expect(
+      resolucionComision({
+        ...dentro,
+        conComision: 0,
+        conComisionAsesor: 0,
+        conComisionConvenio: 0,
+      }),
+    ).toBe('SIN_COMISION_NINGUNO')
+    expect(
+      resolucionComision({
+        ...dentro,
+        conComision: 1,
+        conComisionAsesor: 1,
+        conComisionConvenio: 1,
+      }),
+    ).toBe('CON_COMISION')
   })
 
   it('fuera de ventana sin ningún flag → régimen anterior, nunca "comisión completa"', () => {

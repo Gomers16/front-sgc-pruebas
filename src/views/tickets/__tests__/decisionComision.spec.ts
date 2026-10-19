@@ -8,16 +8,24 @@ import {
 const claves = (o: { clave: string }[]) => o.map((x) => x.clave)
 
 describe('opcionesAprobacion', () => {
-  it('dentro de ventana: un solo "Aprobar" con body vacío, sea cual sea el caso', () => {
+  it('la ventana no cambia los botones: siempre se decide la comisión según el caso', () => {
+    expect(claves(opcionesAprobacion('SIN_CONVENIO'))).toEqual(['con', 'sin'])
+    expect(claves(opcionesAprobacion('CONVENIO_SELF'))).toEqual(['con', 'sin'])
+    expect(claves(opcionesAprobacion('CONVENIO_COMERCIAL'))).toEqual([
+      'con',
+      'sin_asesor',
+      'sin_convenio',
+      'sin_ninguno',
+    ])
+    // Ningún botón manda body vacío: la decisión queda siempre guardada.
     for (const caso of ['SIN_CONVENIO', 'CONVENIO_SELF', 'CONVENIO_COMERCIAL'] as const) {
-      const o = opcionesAprobacion(caso, true)
-      expect(claves(o)).toEqual(['aprobar'])
-      expect(o[0].body).toEqual({})
+      for (const o of opcionesAprobacion(caso))
+        expect(o.body.con_comision_asesor).toBeTypeOf('boolean')
     }
   })
 
   it('Caso 1: con / sin, solo con el flag del asesor', () => {
-    const o = opcionesAprobacion('SIN_CONVENIO', false)
+    const o = opcionesAprobacion('SIN_CONVENIO')
     expect(claves(o)).toEqual(['con', 'sin'])
     expect(o.map((x) => x.body)).toEqual([
       { con_comision_asesor: true },
@@ -27,14 +35,14 @@ describe('opcionesAprobacion', () => {
   })
 
   it('Caso 2: con / sin, con los dos flags iguales', () => {
-    const o = opcionesAprobacion('CONVENIO_SELF', false)
+    const o = opcionesAprobacion('CONVENIO_SELF')
     expect(claves(o)).toEqual(['con', 'sin'])
     for (const x of o) expect(x.body.con_comision_asesor).toBe(x.body.con_comision_convenio)
     expect(o[1].mensaje).toContain('misma persona')
   })
 
   it('Caso 3: las 4 combinaciones y cada diálogo dice quién pierde', () => {
-    const o = opcionesAprobacion('CONVENIO_COMERCIAL', false)
+    const o = opcionesAprobacion('CONVENIO_COMERCIAL')
     expect(claves(o)).toEqual(['con', 'sin_asesor', 'sin_convenio', 'sin_ninguno'])
     expect(o.map((x) => [x.body.con_comision_asesor, x.body.con_comision_convenio])).toEqual([
       [true, true],
@@ -48,9 +56,7 @@ describe('opcionesAprobacion', () => {
   })
 
   it('caso desconocido se trata como Caso 1 (nunca manda flag de convenio)', () => {
-    expect(opcionesAprobacion(null, false).every((x) => !('con_comision_convenio' in x.body))).toBe(
-      true,
-    )
+    expect(opcionesAprobacion(null).every((x) => !('con_comision_convenio' in x.body))).toBe(true)
   })
 })
 

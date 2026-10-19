@@ -102,13 +102,8 @@
             density="compact"
             class="mb-2"
           >
-            <strong>
-              <template v-if="dentroVentana">Dentro de ventana — comisión completa</template>
-              <template v-else-if="ticket.estado === 'PENDIENTE'"
-                >Fuera de ventana — requiere decisión de gerencia</template
-              >
-              <template v-else>Fuera de ventana</template>
-            </strong>
+            <!-- Solo informa: la decisión de comisión se toma dentro y fuera de ventana. -->
+            <strong>{{ dentroVentana ? 'Dentro de ventana' : 'Fuera de ventana' }}</strong>
           </v-alert>
 
           <v-divider class="my-3" />
@@ -178,18 +173,13 @@
             </div>
 
             <div class="text-caption text-medium-emphasis mb-3">
-              <template v-if="dentroVentana">
-                Dentro de ventana: se aprueba con comisión completa, sin decisión de gerencia.
-              </template>
-              <template v-else-if="casoEfectivo === 'CONVENIO_COMERCIAL'">
-                Fuera de ventana: decide si cobran el asesor y/o el convenio.
+              <template v-if="casoEfectivo === 'CONVENIO_COMERCIAL'">
+                Decide si cobran el asesor y/o el convenio.
               </template>
               <template v-else-if="casoEfectivo === 'CONVENIO_SELF'">
-                Fuera de ventana: el asesor convenio es el convenio, así que es con o sin comisión.
+                El asesor convenio es el convenio, así que es con o sin comisión.
               </template>
-              <template v-else
-                >Fuera de ventana: decide si el asesor cobra (no hay convenio).</template
-              >
+              <template v-else>Decide si el asesor cobra (no hay convenio).</template>
             </div>
             <div class="d-flex gap-2 flex-wrap">
               <v-btn
@@ -531,7 +521,7 @@ const casoEfectivo = computed<CasoComision | null>(() =>
     corregirConvenio.value ? convenioCorregidoId.value : undefined,
   ),
 )
-const opciones = computed(() => opcionesAprobacion(casoEfectivo.value, dentroVentana.value))
+const opciones = computed(() => opcionesAprobacion(casoEfectivo.value))
 
 /* ═══════════ Línea de tiempo ═══════════ */
 const EVENTO: Record<TipoEventoTicket, { texto: string; icono: string; color: string }> = {

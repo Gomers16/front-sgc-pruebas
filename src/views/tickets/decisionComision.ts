@@ -2,8 +2,8 @@
 //
 // Botones de aprobación de un ticket de Excepción de Dateo según el caso de
 // comisión que manda el backend (GET /tickets/:id → caso_comision; la regla
-// vive en decidirCasoComision() del backend, acá no se recalcula):
-//  - dentro de ventana: un solo "Aprobar" (comisión completa, body vacío)
+// vive en decidirCasoComision() del backend, acá no se recalcula). Los mismos
+// botones dentro y fuera de ventana (la ventana solo informa):
 //  - Caso 1 (SIN_CONVENIO): con / sin comisión del asesor
 //  - Caso 2 (CONVENIO_SELF): con / sin comisión — el asesor convenio es el
 //    convenio, los dos flags van iguales
@@ -12,7 +12,7 @@
 import type { AprobarTicketBody, CasoComision } from '@/services/ticketsService'
 
 export interface OpcionAprobacion {
-  clave: 'aprobar' | 'con' | 'sin' | 'sin_asesor' | 'sin_convenio' | 'sin_ninguno'
+  clave: 'con' | 'sin' | 'sin_asesor' | 'sin_convenio' | 'sin_ninguno'
   texto: string
   color: 'success' | 'warning' | 'error'
   body: AprobarTicketBody
@@ -24,23 +24,7 @@ export interface OpcionAprobacion {
 const AVISO =
   'Se crea el dateo y, si Facturación ya está confirmada, la comisión. No se puede deshacer.'
 
-export function opcionesAprobacion(
-  caso: CasoComision | null,
-  dentroVentana: boolean,
-): OpcionAprobacion[] {
-  if (dentroVentana) {
-    return [
-      {
-        clave: 'aprobar',
-        texto: 'Aprobar',
-        color: 'success',
-        body: {},
-        titulo: 'Aprobar con comisión completa',
-        mensaje: `El ticket está dentro de ventana: nadie pierde la comisión. ${AVISO}`,
-      },
-    ]
-  }
-
+export function opcionesAprobacion(caso: CasoComision | null): OpcionAprobacion[] {
   if (caso === 'CONVENIO_COMERCIAL') {
     return [
       {

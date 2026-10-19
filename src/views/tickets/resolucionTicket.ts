@@ -28,12 +28,12 @@ export function resolucionComision(d: {
   dentroVentana: Flag
   convenioId?: number | null
 }): ResolucionComision {
-  if (Boolean(d.dentroVentana)) return 'DENTRO_VENTANA'
-
   const nuevasVacias = vacio(d.conComisionAsesor) && vacio(d.conComisionConvenio)
   const asesor = vacio(d.conComisionAsesor) ? d.conComision : d.conComisionAsesor
-  // Fuera de ventana sin decisión guardada: aprobado antes de que existiera.
-  if (vacio(asesor)) return 'REGIMEN_ANTERIOR'
+  // Sin decisión guardada (aprobado antes de que se decidiera siempre): dentro
+  // de ventana era comisión completa; fuera, el régimen anterior. Con decisión
+  // guardada manda la decisión, dentro o fuera.
+  if (vacio(asesor)) return Boolean(d.dentroVentana) ? 'DENTRO_VENTANA' : 'REGIMEN_ANTERIOR'
 
   let convenio: Flag = d.conComisionConvenio
   if (nuevasVacias) convenio = d.convenioId === null ? null : 1
