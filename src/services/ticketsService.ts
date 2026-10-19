@@ -185,6 +185,26 @@ export function listTickets(params: ListTicketsParams = {}) {
   return get<{ data: Ticket[]; meta: MetaPaginacion }>('/api/tickets', { params })
 }
 
+export interface AsesorTicket {
+  id: number
+  nombre: string
+  tipo: string
+  activo?: boolean
+}
+
+/**
+ * Asesores de un tipo (activos e inactivos) para el filtro "Asesor" y para
+ * saber qué filas de las estadísticas son de asesores comerciales: un asesor
+ * inactivo puede tener tickets en el rango.
+ */
+export async function listAsesoresTickets(tipo: 'ASESOR_COMERCIAL' | 'ASESOR_CONVENIO') {
+  const r = await get<{ data?: AsesorTicket[] } | AsesorTicket[]>('/api/agentes-captacion/light', {
+    params: { activos: 0, select: 'id,nombre,tipo', tipo },
+  })
+  const lista = Array.isArray(r) ? r : (r?.data ?? [])
+  return [...lista].sort((a, b) => a.nombre.localeCompare(b.nombre))
+}
+
 /** GET /tickets/pendientes/contador (SUPER_ADMIN, GERENCIA). */
 export function getContadorPendientesTickets() {
   return get<{ pendientes: number; por_tipo: Record<string, number> }>(

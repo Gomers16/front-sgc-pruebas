@@ -1,6 +1,6 @@
 <!-- src/views/tickets/TicketsList.vue -->
 <template>
-  <v-container class="py-6">
+  <v-container class="py-6" style="max-width: 1600px">
     <v-card elevation="8" class="rounded-xl">
       <v-card-title
         class="py-4 px-4 px-sm-6 d-flex align-center justify-space-between flex-wrap gap-3"
@@ -128,14 +128,16 @@
         </v-expansion-panel>
       </v-expansion-panels>
 
-      <!-- Vista: bandeja / estadísticas (solo gerencia) -->
+      <!-- Vista: estadísticas (por defecto para gerencia) / bandeja -->
       <v-tabs v-if="puedeVerGerencia" v-model="vista" class="px-4 px-sm-6" color="primary">
+        <v-tab value="estadisticas" prepend-icon="mdi-chart-box-outline"
+          >Estadísticas por asesor</v-tab
+        >
         <v-tab value="bandeja" prepend-icon="mdi-inbox">Bandeja</v-tab>
-        <v-tab value="estadisticas" prepend-icon="mdi-chart-box-outline">Estadísticas</v-tab>
       </v-tabs>
 
       <v-card-text class="px-4 px-sm-6 pt-3">
-        <!-- Filtros (compartidos: estadísticas usa fecha, asesor y convenio) -->
+        <!-- Filtros: fecha, asesor, estado y ventana aplican también a estadísticas -->
         <v-row dense>
           <v-col cols="6" sm="4" md="2">
             <v-text-field
@@ -162,54 +164,40 @@
           <v-col cols="12" sm="4" md="4">
             <v-autocomplete
               v-model="filtros.comercial_id"
-              :items="asesoresItems"
-              item-title="nombre"
+              :items="asesoresComerciales"
+              :item-title="nombreAsesor"
               item-value="id"
-              label="Asesor"
+              label="Asesor comercial"
               variant="outlined"
               density="compact"
               hide-details
               clearable
-              :loading="asesoresLoading"
+              :loading="comercialesLoading"
             />
           </v-col>
-          <v-col cols="12" sm="6" md="4">
-            <v-autocomplete
-              v-model="filtros.convenio_id"
-              :items="conveniosItems"
-              :item-title="etiquetaConvenio"
-              item-value="id"
-              label="Convenio"
+          <v-col cols="6" sm="3" md="2">
+            <v-select
+              v-model="filtros.estado"
+              :items="estadoItems"
+              label="Estado"
               variant="outlined"
               density="compact"
               hide-details
               clearable
-              :custom-filter="filtroConvenio"
+            />
+          </v-col>
+          <v-col cols="6" sm="3" md="2">
+            <v-select
+              v-model="filtros.ventana"
+              :items="ventanaItems"
+              label="Ventana"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
             />
           </v-col>
           <template v-if="vista === 'bandeja'">
-            <v-col cols="6" sm="3" md="2">
-              <v-select
-                v-model="filtros.estado"
-                :items="estadoItems"
-                label="Estado"
-                variant="outlined"
-                density="compact"
-                hide-details
-                clearable
-              />
-            </v-col>
-            <v-col cols="6" sm="3" md="2">
-              <v-select
-                v-model="filtros.ventana"
-                :items="ventanaItems"
-                label="Ventana"
-                variant="outlined"
-                density="compact"
-                hide-details
-                clearable
-              />
-            </v-col>
             <v-col cols="6" sm="3" md="2">
               <v-text-field
                 v-model="placaInput"
@@ -304,6 +292,24 @@
             </template>
           </v-alert>
 
+          <div
+            v-if="resumenEstados"
+            class="d-flex align-center flex-wrap gap-2 mb-2 text-body-2"
+            data-test="resumen-bandeja"
+          >
+            <span class="text-medium-emphasis">Con estos filtros:</span>
+            <v-chip
+              v-for="e in ESTADOS_RESUMEN"
+              :key="e"
+              size="small"
+              variant="tonal"
+              :color="COLORES_ESTADO[e]"
+              @click="filtrarEstado(e)"
+            >
+              {{ resumenEstados[e] }} {{ ETIQUETAS_RESUMEN[e] }}
+            </v-chip>
+          </div>
+
           <v-data-table-server
             :headers="headers"
             :items="tickets"
@@ -387,7 +393,11 @@
           </v-data-table-server>
         </template>
 
-        <TicketsEstadisticas v-else :params="paramsEstadisticas" />
+        <TicketsEstadisticas
+          v-else
+          :params="paramsEstadisticas"
+          :comerciales-ids="comercialesIds"
+        />
       </v-card-text>
     </v-card>
 
@@ -435,19 +445,16 @@ import {
   getVentanaTicketAsesores,
   setVentanaTicketAsesor,
   deleteVentanaTicketAsesor,
+  listAsesoresTickets,
+  type AsesorTicket,
   type ListTicketsParams,
   type Ticket,
   type TicketEstado,
   type TipoTicketLight,
   type VentanaTicketAsesorRow,
 } from '@/services/ticketsService'
-import { formatDateTime, listConveniosLight } from '@/services/dateosService'
-import {
-  listAgentesCaptacion,
-  etiquetaConvenio,
-  filtroConvenio,
-  type ConvenioLight,
-} from '@/services/conveniosService'
+import { formatDateTime } from '@/services/dateosService'
+import { listAgentesCaptacion, etiquetaConvenio } from '@/services/conveniosService'
 import { HttpError } from '@/services/http'
 import { usePermissions } from '@/composables/usePermissions'
 import { useTicketsPendientes } from '@/composables/useTicketsPendientes'
@@ -458,11 +465,14 @@ import {
   filtrosAParams,
   filtrosAQuery,
   filtrosDesdeQuery,
+  filtrosEstadisticasAParams,
   filtrosVacios,
+  FILTROS_ESTADISTICAS,
   quitarFiltro,
   type FiltrosBandeja,
 } from './filtrosTickets'
 import { turnoVisible } from './turnoVisible'
+import { conteosPorEstado, type ConteosEstado } from './estadisticasPorAsesor'
 import TicketsEstadisticas from './TicketsEstadisticas.vue'
 
 const route = useRoute()
@@ -478,8 +488,9 @@ const filtros = ref<FiltrosBandeja>(inicial.filtros)
 const page = ref(inicial.page)
 const perPage = ref(inicial.perPage)
 const tipoActivo = ref<string>(typeof route.query.tipo === 'string' ? route.query.tipo : 'TODOS')
+// Gerencia abre en "Estadísticas por asesor"; la bandeja va con ?vista=bandeja.
 const vista = ref<'bandeja' | 'estadisticas'>(
-  route.query.vista === 'estadisticas' && can.verEstadisticasTickets() ? 'estadisticas' : 'bandeja',
+  can.verEstadisticasTickets() && route.query.vista !== 'bandeja' ? 'estadisticas' : 'bandeja',
 )
 
 // Placa y turno se escriben a mano: se aplican con una pausa corta.
@@ -501,7 +512,7 @@ watch([placaInput, turnoInput], () => {
 function queryActual(nuevaPagina = page.value) {
   const q: Record<string, string> = filtrosAQuery(filtros.value, nuevaPagina, perPage.value)
   if (tipoActivo.value !== 'TODOS') q.tipo = tipoActivo.value
-  if (vista.value === 'estadisticas') q.vista = 'estadisticas'
+  if (puedeVerGerencia.value && vista.value === 'bandeja') q.vista = 'bandeja'
   return q
 }
 function sincronizarUrl(nuevaPagina = page.value) {
@@ -534,7 +545,11 @@ watch(
 const tipos = ref<TipoTicketLight[]>([])
 const asesoresItems = ref<{ id: number; nombre: string; tipo: string }[]>([])
 const asesoresLoading = ref(false)
-const conveniosItems = ref<ConvenioLight[]>([])
+// Filtro "Asesor" y filas de estadísticas: solo asesores comerciales.
+const asesoresComerciales = ref<AsesorTicket[]>([])
+const comercialesLoading = ref(false)
+const comercialesIds = computed(() => asesoresComerciales.value.map((a) => a.id))
+const nombreAsesor = (a: AsesorTicket) => (a.activo === false ? `${a.nombre} (inactivo)` : a.nombre)
 const pendientesPorTipo = ref<Record<string, number>>({})
 
 const estadoItems = (Object.keys(ETIQUETAS_ESTADO) as TicketEstado[]).map((value) => ({
@@ -547,14 +562,11 @@ const ventanaItems = [
 ]
 const decisionItems = Object.entries(ETIQUETAS_DECISION).map(([value, title]) => ({ title, value }))
 
+// En estadísticas solo se muestran los chips de los filtros que la afectan.
 const chips = computed(() =>
   chipsFiltros(filtros.value, {
-    comercial: (id) => asesoresItems.value.find((a) => a.id === id)?.nombre,
-    convenio: (id) => {
-      const c = conveniosItems.value.find((x) => x.id === id)
-      return c ? etiquetaConvenio(c) : undefined
-    },
-  }),
+    comercial: (id) => asesoresComerciales.value.find((a) => a.id === id)?.nombre,
+  }).filter((c) => vista.value === 'bandeja' || FILTROS_ESTADISTICAS.includes(c.clave)),
 )
 function quitar(clave: keyof FiltrosBandeja) {
   filtros.value = quitarFiltro(filtros.value, clave)
@@ -565,6 +577,9 @@ function limpiar() {
   filtros.value = filtrosVacios()
   placaInput.value = ''
   turnoInput.value = ''
+}
+function filtrarEstado(estado: TicketEstado) {
+  filtros.value = { ...filtros.value, estado }
 }
 function verPendientes() {
   vista.value = 'bandeja'
@@ -595,21 +610,45 @@ function params(): ListTicketsParams {
   if (tipo) p.tipo_ticket_id = tipo.id
   return p
 }
-const paramsEstadisticas = computed<ListTicketsParams>(() => {
-  const p = filtrosAParams(filtros.value)
-  return {
-    fecha_desde: p.fecha_desde,
-    fecha_hasta: p.fecha_hasta,
-    comercial_id: p.comercial_id,
-    convenio_id: p.convenio_id,
+const paramsEstadisticas = computed<ListTicketsParams>(() =>
+  filtrosEstadisticasAParams(filtros.value),
+)
+
+/* Línea resumen de la bandeja: conteos por estado con los filtros actuales
+   (GET /tickets con per_page=1; respeta la visibilidad del rol). */
+const ESTADOS_RESUMEN: TicketEstado[] = ['PENDIENTE', 'APROBADO', 'RECHAZADO']
+const ETIQUETAS_RESUMEN: Record<TicketEstado, string> = {
+  PENDIENTE: 'pendientes',
+  APROBADO: 'aprobados',
+  RECHAZADO: 'rechazados',
+}
+const resumenEstados = ref<ConteosEstado | null>(null)
+let claveResumen = ''
+async function cargarResumen() {
+  const p = params()
+  const clave = JSON.stringify(p)
+  if (clave === claveResumen) return
+  claveResumen = clave
+  try {
+    const conteos = await conteosPorEstado(p.estado ?? null, async (estado) => {
+      const r = await listTickets({ ...p, estado, page: 1, per_page: 1 })
+      return r.meta.total
+    })
+    if (clave === claveResumen) resumenEstados.value = conteos
+  } catch {
+    if (clave === claveResumen) {
+      resumenEstados.value = null
+      claveResumen = ''
+    }
   }
-})
+}
 
 let solicitud = 0
 async function cargar() {
   const mia = ++solicitud
   loading.value = true
   errorCarga.value = null
+  cargarResumen()
   try {
     const r = await listTickets({ ...params(), page: page.value, per_page: perPage.value })
     if (mia !== solicitud) return
@@ -853,7 +892,11 @@ async function doEliminarVentanaAsesor() {
 
 onMounted(async () => {
   loadAsesores()
-  listConveniosLight().then((c) => (conveniosItems.value = c))
+  comercialesLoading.value = true
+  listAsesoresTickets('ASESOR_COMERCIAL')
+    .then((a) => (asesoresComerciales.value = a))
+    .catch(() => (asesoresComerciales.value = []))
+    .finally(() => (comercialesLoading.value = false))
   try {
     tipos.value = await listTiposTicket()
   } catch (err) {

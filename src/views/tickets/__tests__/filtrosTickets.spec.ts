@@ -5,6 +5,7 @@ import {
   filtrosAParams,
   filtrosAQuery,
   filtrosDesdeQuery,
+  filtrosEstadisticasAParams,
   filtrosVacios,
   quitarFiltro,
 } from '../filtrosTickets'
@@ -14,7 +15,6 @@ const lleno = {
   fecha_desde: '2026-10-01',
   fecha_hasta: '2026-10-16',
   comercial_id: 7,
-  convenio_id: 40,
   estado: 'APROBADO' as const,
   ventana: 'fuera' as const,
   placa: ' abc123 ',
@@ -33,7 +33,6 @@ describe('filtros ↔ params / query', () => {
       fecha_desde: '2026-10-01',
       fecha_hasta: '2026-10-16',
       comercial_id: 7,
-      convenio_id: 40,
       estado: 'APROBADO',
       ventana: 'fuera',
       placa: 'ABC123',
@@ -59,11 +58,24 @@ describe('filtros ↔ params / query', () => {
       fecha_desde: '16/10/2026',
       comercial_id: 'abc',
       page: '-2',
-      // Formato anterior del filtro (id interno): ya no se lee.
+      // Filtros que ya no existen (enlaces viejos): turno por id interno y convenio.
       turno_id: '1425',
+      convenio_id: '40',
     })
     expect(filtros).toEqual(filtrosVacios())
     expect(page).toBe(1)
+  })
+})
+
+describe('estadísticas', () => {
+  it('solo fecha, asesor, ventana y estado; placa, turno y decisión son de la bandeja', () => {
+    expect(filtrosEstadisticasAParams(lleno)).toEqual({
+      fecha_desde: '2026-10-01',
+      fecha_hasta: '2026-10-16',
+      comercial_id: 7,
+      estado: 'APROBADO',
+      ventana: 'fuera',
+    })
   })
 })
 
@@ -77,12 +89,11 @@ describe('estados de la bandeja', () => {
 
 describe('chips', () => {
   it('un chip por filtro activo, con nombres resueltos', () => {
-    const chips = chipsFiltros(lleno, { comercial: () => 'ANA', convenio: () => 'TALLER' })
+    const chips = chipsFiltros(lleno, { comercial: () => 'ANA' })
     expect(chips.map((c) => c.clave)).toEqual([
       'fecha_desde',
       'fecha_hasta',
       'comercial_id',
-      'convenio_id',
       'estado',
       'ventana',
       'placa',

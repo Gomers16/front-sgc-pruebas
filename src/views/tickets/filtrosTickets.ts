@@ -10,7 +10,6 @@ export interface FiltrosBandeja {
   fecha_desde: string | null
   fecha_hasta: string | null
   comercial_id: number | null
-  convenio_id: number | null
   estado: TicketEstado | null
   ventana: 'dentro' | 'fuera' | null
   placa: string
@@ -23,7 +22,6 @@ export const filtrosVacios = (): FiltrosBandeja => ({
   fecha_desde: null,
   fecha_hasta: null,
   comercial_id: null,
-  convenio_id: null,
   estado: null,
   ventana: null,
   placa: '',
@@ -79,7 +77,6 @@ export function filtrosDesdeQuery(q: Query): {
       fecha_desde: fecha('fecha_desde'),
       fecha_hasta: fecha('fecha_hasta'),
       comercial_id: entero(q.comercial_id),
-      convenio_id: entero(q.convenio_id),
       estado: estado && ESTADOS.includes(estado) ? estado : null,
       ventana: ventana === 'dentro' || ventana === 'fuera' ? ventana : null,
       placa: uno(q.placa)?.toUpperCase() ?? '',
@@ -97,7 +94,6 @@ export function filtrosAParams(f: FiltrosBandeja): ListTicketsParams {
   if (f.fecha_desde) p.fecha_desde = f.fecha_desde
   if (f.fecha_hasta) p.fecha_hasta = f.fecha_hasta
   if (f.comercial_id) p.comercial_id = f.comercial_id
-  if (f.convenio_id) p.convenio_id = f.convenio_id
   if (f.estado) p.estado = f.estado
   if (f.ventana) p.ventana = f.ventana
   if (f.placa.trim()) p.placa = f.placa.trim().toUpperCase()
@@ -120,13 +116,10 @@ export interface ChipFiltro {
   texto: string
 }
 
-/** Chips de los filtros activos; `nombres` resuelve asesor/convenio por id. */
+/** Chips de los filtros activos; `nombres` resuelve el asesor por id. */
 export function chipsFiltros(
   f: FiltrosBandeja,
-  nombres: {
-    comercial?: (id: number) => string | undefined
-    convenio?: (id: number) => string | undefined
-  } = {},
+  nombres: { comercial?: (id: number) => string | undefined } = {},
 ): ChipFiltro[] {
   const chips: ChipFiltro[] = []
   if (f.fecha_desde) chips.push({ clave: 'fecha_desde', texto: `Desde ${f.fecha_desde}` })
@@ -135,12 +128,6 @@ export function chipsFiltros(
     chips.push({
       clave: 'comercial_id',
       texto: `Asesor: ${nombres.comercial?.(f.comercial_id) ?? `#${f.comercial_id}`}`,
-    })
-  }
-  if (f.convenio_id) {
-    chips.push({
-      clave: 'convenio_id',
-      texto: `Convenio: ${nombres.convenio?.(f.convenio_id) ?? `#${f.convenio_id}`}`,
     })
   }
   if (f.estado) chips.push({ clave: 'estado', texto: `Estado: ${ETIQUETAS_ESTADO[f.estado]}` })
@@ -155,6 +142,23 @@ export function chipsFiltros(
   if (f.turno_numero) chips.push({ clave: 'turno_numero', texto: `Turno N° ${f.turno_numero}` })
   if (f.decision) chips.push({ clave: 'decision', texto: ETIQUETAS_DECISION[f.decision] })
   return chips
+}
+
+/** Filtros que también aplican a la pestaña de estadísticas (el resto es solo de la bandeja). */
+export const FILTROS_ESTADISTICAS: (keyof FiltrosBandeja)[] = [
+  'fecha_desde',
+  'fecha_hasta',
+  'comercial_id',
+  'ventana',
+  'estado',
+]
+
+/** Params de GET /tickets/estadisticas: solo los filtros que aplican a estadísticas. */
+export function filtrosEstadisticasAParams(f: FiltrosBandeja): ListTicketsParams {
+  const todos = filtrosAParams(f)
+  return Object.fromEntries(
+    Object.entries(todos).filter(([k]) => (FILTROS_ESTADISTICAS as string[]).includes(k)),
+  ) as ListTicketsParams
 }
 
 /** Quita un filtro (el que cierra su chip). */
