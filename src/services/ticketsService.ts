@@ -1,7 +1,8 @@
 // src/services/ticketsService.ts
 import { get, post, patch, del, download } from '@/services/http'
 
-export type TicketEstado = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'RESUELTO' | 'CERRADO'
+// RESUELTO y CERRADO existen en el ENUM de la BD pero ningún flujo los asigna.
+export type TicketEstado = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'
 
 export interface TipoTicketLight {
   id: number
@@ -9,7 +10,6 @@ export interface TipoTicketLight {
   nombre: string
   rolesCreador?: string[]
   rolesResuelve?: string[]
-  requiereAprobacionFinanciera?: boolean
   /** El rol puede crear este tipo (roles_creador). */
   puedeCrear?: boolean
   /** El rol puede resolverlo (roles_resuelve o SUPER_ADMIN/GERENCIA). */
@@ -46,14 +46,11 @@ export interface Ticket {
   titulo: string
   estado: TicketEstado
   creadoPorId: number
-  asignadoAId: number | null
   moduloRelacionado: string | null
   createdAt: string
   resueltoAt: string | null
-  cerradoAt: string | null
   tipoTicket?: TipoTicketLight | null
   creadoPor?: UsuarioLight | null
-  asignadoA?: UsuarioLight | null
   comentarios?: TicketComentario[]
   detalle?: TicketDetalleExcepcionDateo | null
   /** Solo en GET /tickets/:id de EXCEPCION_DATEO: caso que aplica (o aplicó) aprobar(). */
@@ -71,7 +68,13 @@ export type DecisionComision = 'con' | 'sin_asesor' | 'sin_convenio' | 'sin_ning
 /** Fila de la bandeja: datos del detalle sin cargar el ticket completo. */
 export interface ResumenTicket {
   placa: string | null
+  /** Id interno (turnos_rtms.id). */
   turnoId: number | null
+  /** Número visible del turno (el del día, se repite cada día). */
+  turnoNumero: number | null
+  /** YYYY-MM-DD */
+  turnoFecha: string | null
+  servicioCodigo: string | null
   comercialId: number | null
   comercialNombre: string | null
   convenioId: number | null
@@ -134,11 +137,20 @@ export interface TicketDetalleExcepcionDateo {
   motivoRechazo: string | null
   rechazadoPorId: number | null
   rechazadoAt: string | null
-  turno?: Record<string, unknown> | null
+  turno?: TurnoDelTicket | null
   comercial?: { id: number; nombre: string; tipo: string } | null
   convenio?: { id: number; nombre: string; establecimiento?: string | null } | null
   aprobadoPor?: UsuarioLight | null
   rechazadoPor?: UsuarioLight | null
+}
+
+/** Turno del detalle (GET /tickets/:id), con su servicio. */
+export interface TurnoDelTicket {
+  id: number
+  turnoNumero: number | null
+  fecha: string | null
+  servicio?: { codigoServicio: string; nombreServicio?: string } | null
+  [key: string]: unknown
 }
 
 /** Query params de GET /tickets, /estadisticas y /exportar (ver filtrosTickets.ts). */
@@ -153,6 +165,8 @@ export interface ListTicketsParams {
   ventana?: 'dentro' | 'fuera'
   placa?: string
   turno_id?: number
+  /** Número visible del turno; combinarlo con fecha_desde/fecha_hasta. */
+  turno_numero?: number
   decision?: DecisionComision
   page?: number
   per_page?: number

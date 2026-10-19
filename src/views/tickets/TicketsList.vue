@@ -223,7 +223,7 @@
             <v-col cols="6" sm="3" md="2">
               <v-text-field
                 v-model="turnoInput"
-                label="Turno (id)"
+                label="N° de turno (del día)"
                 type="number"
                 variant="outlined"
                 density="compact"
@@ -329,6 +329,14 @@
             <template #item.placa="{ item }">
               <div class="font-weight-600">{{ item.resumen?.placa ?? '—' }}</div>
               <div class="text-caption text-medium-emphasis">{{ item.tipoTicket?.nombre }}</div>
+            </template>
+            <template #item.turno="{ item }">
+              <template v-if="item.resumen?.turnoId">
+                <div class="font-weight-600">{{ turnoDeFila(item).principal }}</div>
+                <div v-if="turnoDeFila(item).secundario" class="text-caption text-medium-emphasis">
+                  {{ turnoDeFila(item).secundario }}
+                </div>
+              </template>
             </template>
             <template #item.asesor="{ item }">{{
               item.resumen?.comercialNombre ?? nombreCreador(item)
@@ -454,6 +462,7 @@ import {
   quitarFiltro,
   type FiltrosBandeja,
 } from './filtrosTickets'
+import { turnoVisible } from './turnoVisible'
 import TicketsEstadisticas from './TicketsEstadisticas.vue'
 
 const route = useRoute()
@@ -475,7 +484,7 @@ const vista = ref<'bandeja' | 'estadisticas'>(
 
 // Placa y turno se escriben a mano: se aplican con una pausa corta.
 const placaInput = ref(filtros.value.placa)
-const turnoInput = ref<string>(filtros.value.turno_id ? String(filtros.value.turno_id) : '')
+const turnoInput = ref<string>(filtros.value.turno_numero ? String(filtros.value.turno_numero) : '')
 let pausa: ReturnType<typeof setTimeout> | null = null
 watch([placaInput, turnoInput], () => {
   if (pausa) clearTimeout(pausa)
@@ -484,7 +493,7 @@ watch([placaInput, turnoInput], () => {
     filtros.value = {
       ...filtros.value,
       placa: (placaInput.value ?? '').toUpperCase(),
-      turno_id: Number.isInteger(turno) && turno > 0 ? turno : null,
+      turno_numero: Number.isInteger(turno) && turno > 0 ? turno : null,
     }
   }, 400)
 })
@@ -550,7 +559,7 @@ const chips = computed(() =>
 function quitar(clave: keyof FiltrosBandeja) {
   filtros.value = quitarFiltro(filtros.value, clave)
   if (clave === 'placa') placaInput.value = ''
-  if (clave === 'turno_id') turnoInput.value = ''
+  if (clave === 'turno_numero') turnoInput.value = ''
 }
 function limpiar() {
   filtros.value = filtrosVacios()
@@ -572,6 +581,7 @@ const headers = [
   { title: '#', key: 'id', sortable: false },
   { title: 'Creado', key: 'creado', sortable: false },
   { title: 'Placa', key: 'placa', sortable: false },
+  { title: 'Turno', key: 'turno', sortable: false },
   { title: 'Asesor', key: 'asesor', sortable: false },
   { title: 'Convenio', key: 'convenio', sortable: false },
   { title: 'Ventana', key: 'ventana', sortable: false },
@@ -644,11 +654,18 @@ const COLORES_ESTADO: Record<TicketEstado, string> = {
   PENDIENTE: '#F59E0B',
   APROBADO: '#16A34A',
   RECHAZADO: '#DC2626',
-  RESUELTO: '#2563EB',
-  CERRADO: '#6B7280',
 }
 function colorPorEstado(estado: TicketEstado) {
   return COLORES_ESTADO[estado] ?? '#6B7280'
+}
+function turnoDeFila(t: Ticket) {
+  const r = t.resumen
+  return turnoVisible({
+    turnoId: r?.turnoId ?? null,
+    turnoNumero: r?.turnoNumero ?? null,
+    servicioCodigo: r?.servicioCodigo ?? null,
+    fecha: r?.turnoFecha ?? null,
+  })
 }
 function nombreCreador(t: Ticket) {
   const u = t.creadoPor

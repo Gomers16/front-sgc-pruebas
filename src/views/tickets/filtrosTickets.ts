@@ -14,7 +14,8 @@ export interface FiltrosBandeja {
   estado: TicketEstado | null
   ventana: 'dentro' | 'fuera' | null
   placa: string
-  turno_id: number | null
+  /** Número visible del turno (el del día), no el id interno. */
+  turno_numero: number | null
   decision: DecisionComision | null
 }
 
@@ -26,7 +27,7 @@ export const filtrosVacios = (): FiltrosBandeja => ({
   estado: null,
   ventana: null,
   placa: '',
-  turno_id: null,
+  turno_numero: null,
   decision: null,
 })
 
@@ -34,8 +35,6 @@ export const ETIQUETAS_ESTADO: Record<TicketEstado, string> = {
   PENDIENTE: 'Pendiente',
   APROBADO: 'Aprobado',
   RECHAZADO: 'Rechazado',
-  RESUELTO: 'Resuelto',
-  CERRADO: 'Cerrado',
 }
 
 export const ETIQUETAS_DECISION: Record<DecisionComision, string> = {
@@ -84,7 +83,7 @@ export function filtrosDesdeQuery(q: Query): {
       estado: estado && ESTADOS.includes(estado) ? estado : null,
       ventana: ventana === 'dentro' || ventana === 'fuera' ? ventana : null,
       placa: uno(q.placa)?.toUpperCase() ?? '',
-      turno_id: entero(q.turno_id),
+      turno_numero: entero(q.turno_numero),
       decision: decision && DECISIONES.includes(decision) ? decision : null,
     },
     page: entero(q.page) ?? 1,
@@ -102,7 +101,7 @@ export function filtrosAParams(f: FiltrosBandeja): ListTicketsParams {
   if (f.estado) p.estado = f.estado
   if (f.ventana) p.ventana = f.ventana
   if (f.placa.trim()) p.placa = f.placa.trim().toUpperCase()
-  if (f.turno_id) p.turno_id = f.turno_id
+  if (f.turno_numero) p.turno_numero = f.turno_numero
   if (f.decision) p.decision = f.decision
   return p
 }
@@ -153,7 +152,7 @@ export function chipsFiltros(
   }
   if (f.placa.trim())
     chips.push({ clave: 'placa', texto: `Placa: ${f.placa.trim().toUpperCase()}` })
-  if (f.turno_id) chips.push({ clave: 'turno_id', texto: `Turno #${f.turno_id}` })
+  if (f.turno_numero) chips.push({ clave: 'turno_numero', texto: `Turno N° ${f.turno_numero}` })
   if (f.decision) chips.push({ clave: 'decision', texto: ETIQUETAS_DECISION[f.decision] })
   return chips
 }

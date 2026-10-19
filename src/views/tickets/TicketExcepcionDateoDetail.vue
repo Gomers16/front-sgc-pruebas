@@ -32,7 +32,12 @@
             </v-col>
             <v-col cols="6" sm="3">
               <div class="text-caption text-medium-emphasis">Turno</div>
-              <div class="font-weight-600">#{{ detalle.turnoId }}</div>
+              <div class="font-weight-600">{{ turno.principal }}</div>
+              <div class="text-caption text-medium-emphasis">
+                <template v-if="turno.secundario">{{ turno.secundario }} · </template>id interno #{{
+                  detalle.turnoId
+                }}
+              </div>
             </v-col>
             <v-col cols="12" sm="6">
               <div class="text-caption text-medium-emphasis">Asesor</div>
@@ -383,6 +388,7 @@ import { HttpError } from '@/services/http'
 import { usePermissions } from '@/composables/usePermissions'
 import { useTicketsPendientes } from '@/composables/useTicketsPendientes'
 import { resolucionComision, textoResolucion } from './resolucionTicket'
+import { turnoVisible } from './turnoVisible'
 import {
   casoConConvenioCorregido,
   mensajeErrorResolucion,
@@ -420,15 +426,11 @@ const ESTADO_LABEL: Record<TicketEstado, string> = {
   PENDIENTE: 'Pendiente',
   APROBADO: 'Aprobado',
   RECHAZADO: 'Rechazado',
-  RESUELTO: 'Resuelto',
-  CERRADO: 'Cerrado',
 }
 const ESTADO_COLOR: Record<TicketEstado, string> = {
   PENDIENTE: 'warning',
   APROBADO: 'success',
   RECHAZADO: 'error',
-  RESUELTO: 'info',
-  CERRADO: 'grey',
 }
 function estadoLabel(e: TicketEstado) {
   return ESTADO_LABEL[e] ?? e
@@ -450,6 +452,17 @@ const ETIQUETA_CASO: Record<CasoComision, string> = {
 function etiquetaCaso(c: CasoComision | null) {
   return c ? ETIQUETA_CASO[c] : '—'
 }
+
+// Número visible del turno (el del día) con su servicio; el id interno va aparte.
+const turno = computed(() => {
+  const t = detalle.value?.turno
+  return turnoVisible({
+    turnoId: detalle.value?.turnoId ?? null,
+    turnoNumero: t?.turnoNumero ?? null,
+    servicioCodigo: t?.servicio?.codigoServicio ?? null,
+    fecha: t?.fecha ? String(t.fecha).slice(0, 10) : null,
+  })
+})
 
 // TINYINT(1): 0/1 → Boolean(), nunca === true.
 const dentroVentana = computed(() => Boolean(detalle.value?.dentroVentana))

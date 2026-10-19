@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   chipsFiltros,
+  ETIQUETAS_ESTADO,
   filtrosAParams,
   filtrosAQuery,
   filtrosDesdeQuery,
@@ -17,7 +18,7 @@ const lleno = {
   estado: 'APROBADO' as const,
   ventana: 'fuera' as const,
   placa: ' abc123 ',
-  turno_id: 99,
+  turno_numero: 12,
   decision: 'sin_asesor' as const,
 }
 
@@ -36,7 +37,7 @@ describe('filtros ↔ params / query', () => {
       estado: 'APROBADO',
       ventana: 'fuera',
       placa: 'ABC123',
-      turno_id: 99,
+      turno_numero: 12,
       decision: 'sin_asesor',
     })
   })
@@ -58,9 +59,19 @@ describe('filtros ↔ params / query', () => {
       fecha_desde: '16/10/2026',
       comercial_id: 'abc',
       page: '-2',
+      // Formato anterior del filtro (id interno): ya no se lee.
+      turno_id: '1425',
     })
     expect(filtros).toEqual(filtrosVacios())
     expect(page).toBe(1)
+  })
+})
+
+describe('estados de la bandeja', () => {
+  it('solo los que asigna algún flujo; RESUELTO/CERRADO de la URL se ignoran', () => {
+    expect(Object.keys(ETIQUETAS_ESTADO)).toEqual(['PENDIENTE', 'APROBADO', 'RECHAZADO'])
+    expect(filtrosDesdeQuery({ estado: 'resuelto' }).filtros.estado).toBeNull()
+    expect(filtrosDesdeQuery({ estado: 'CERRADO' }).filtros.estado).toBeNull()
   })
 })
 
@@ -75,11 +86,12 @@ describe('chips', () => {
       'estado',
       'ventana',
       'placa',
-      'turno_id',
+      'turno_numero',
       'decision',
     ])
     expect(chips.find((c) => c.clave === 'comercial_id')?.texto).toBe('Asesor: ANA')
     expect(chips.find((c) => c.clave === 'decision')?.texto).toBe('Sin comisión asesor')
+    expect(chips.find((c) => c.clave === 'turno_numero')?.texto).toBe('Turno N° 12')
   })
 
   it('cerrar un chip quita solo ese filtro', () => {
