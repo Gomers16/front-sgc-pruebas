@@ -20,6 +20,158 @@
       </v-card-title>
     </v-card>
 
+    <!-- 🆕 FILTROS (en la URL: se conservan al recargar o volver) -->
+    <v-card elevation="8" class="rounded-xl mb-4" data-test="filtros-historial">
+      <v-card-text class="px-4 px-sm-6 pt-4">
+        <v-row dense>
+          <v-col cols="6" sm="4" md="2">
+            <v-text-field
+              v-model="filtros.fecha_desde"
+              type="date"
+              label="Fecha pago desde"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+            />
+          </v-col>
+          <v-col cols="6" sm="4" md="2">
+            <v-text-field
+              v-model="filtros.fecha_hasta"
+              type="date"
+              label="Fecha pago hasta"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+            />
+          </v-col>
+          <v-col cols="6" sm="4" md="2">
+            <v-text-field
+              v-model="placaInput"
+              label="Placa"
+              placeholder="Parte de la placa"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+            />
+          </v-col>
+          <v-col cols="6" sm="6" md="3">
+            <v-text-field
+              v-model="vendedorInput"
+              label="Vendedor"
+              placeholder="Parte del nombre"
+              variant="outlined"
+              density="compact"
+              hide-details="auto"
+              clearable
+              :hint="vendedorCorto ? `Escribe al menos ${VENDEDOR_MIN} letras` : ''"
+              persistent-hint
+            />
+          </v-col>
+          <v-col cols="12" sm="6" md="3">
+            <v-select
+              v-model="filtros.descuento"
+              :items="descuentoItems"
+              label="Descuento"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+            />
+          </v-col>
+          <v-col cols="12" sm="6" md="4">
+            <div class="d-flex align-center" style="gap:8px">
+              <v-text-field
+                v-model="consecutivoInput"
+                label="Consecutivo del descuento"
+                variant="outlined"
+                density="compact"
+                hide-details
+                clearable
+              />
+              <v-checkbox
+                v-model="filtros.consecutivo_exacto"
+                label="Exacto"
+                density="compact"
+                hide-details
+                class="flex-grow-0"
+              />
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3" md="2">
+            <v-select
+              v-model="filtros.estado"
+              :items="estadoItems"
+              label="Estado"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+            />
+          </v-col>
+          <v-col cols="6" sm="3" md="3">
+            <v-select
+              v-model="filtros.servicio_id"
+              :items="servicioItems"
+              label="Servicio"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+            />
+          </v-col>
+        </v-row>
+
+        <div class="d-flex align-center flex-wrap mt-3" style="gap:8px">
+          <v-chip
+            v-for="chip in chips"
+            :key="chip.clave"
+            size="small"
+            closable
+            color="primary"
+            variant="tonal"
+            @click:close="quitar(chip.clave)"
+          >
+            {{ chip.texto }}
+          </v-chip>
+          <v-btn
+            v-if="chips.length"
+            size="small"
+            variant="text"
+            prepend-icon="mdi-filter-remove"
+            @click="limpiar"
+          >
+            Limpiar
+          </v-btn>
+          <v-spacer />
+          <v-btn
+            size="small"
+            color="success"
+            variant="tonal"
+            prepend-icon="mdi-microsoft-excel"
+            :loading="exportando"
+            @click="exportar"
+          >
+            Exportar a Excel
+          </v-btn>
+        </div>
+
+        <div
+          v-if="resumen"
+          class="d-flex align-center flex-wrap mt-3 text-body-2"
+          style="gap:6px 16px"
+          data-test="resumen-historial"
+        >
+          <span><strong>{{ resumen.cantidad.toLocaleString('es-CO') }}</strong> {{ resumen.cantidad === 1 ? 'resultado' : 'resultados' }}</span>
+          <span>Total facturado: <strong>{{ fmtCOP(resumen.total_facturado) }}</strong></span>
+          <span>Descuento aplicado: <strong class="text-orange-darken-2">{{ fmtCOP(resumen.total_descuento) }}</strong></span>
+          <span v-if="!filtros.estado" class="text-caption text-medium-emphasis">(todos los estados)</span>
+        </div>
+      </v-card-text>
+    </v-card>
+
     <!-- TABLA -->
     <v-card elevation="8" class="rounded-xl">
       <v-data-table-server
@@ -87,18 +239,18 @@
                 </div>
                 <div class="d-flex align-center" style="gap:10px">
                   <v-select
-                    v-model="pagination.itemsPerPage"
-                    :items="[10,20,50,100]"
+                    :model-value="pagination.itemsPerPage"
+                    :items="POR_PAGINA"
                     density="compact"
                     style="max-width:120px"
                     label="Por página"
-                    @update:model-value="refresh"
+                    @update:model-value="cambiarPorPagina"
                   />
                   <v-pagination
-                    v-model="pagination.page"
+                    :model-value="pagination.page"
                     :length="pages"
                     :total-visible="7"
-                    @update:model-value="refresh"
+                    @update:model-value="sincronizarUrl"
                   />
                 </div>
               </div>
@@ -539,9 +691,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FacturacionService, type FacturacionTicket, type Paginated } from '@/services/facturacion_service'
+import {
+  FacturacionService,
+  type FacturacionTicket,
+  type ResumenHistorial,
+} from '@/services/facturacion_service'
+import descuentosService from '@/services/descuentosService'
+import TurnosDelDiaService from '@/services/turnosdeldiaService'
+import { HttpError } from '@/services/http'
+import {
+  chipsFiltros,
+  ETIQUETAS_ESTADO,
+  filtrosAParams,
+  filtrosAQuery,
+  filtrosDesdeQuery,
+  filtrosVacios,
+  nombreExcel,
+  normalizarCodigo,
+  POR_PAGINA,
+  quitarFiltro,
+  VENDEDOR_MIN,
+  type ClaveChip,
+  type FiltrosHistorial,
+} from './filtrosHistorico'
 import { etiquetaConvenio } from '@/services/conveniosService'
 import { authSetStore } from '@/stores/AuthStore'
 
@@ -647,13 +821,138 @@ interface ExtendedFacturacionTicket {
   } | null
 }
 
+/* ===== Filtros: la URL es la fuente de verdad (filtros y página) ===== */
+const inicial = filtrosDesdeQuery(route.query)
+const filtros = ref<FiltrosHistorial>(inicial.filtros)
+
+// Placa, vendedor y consecutivo se escriben a mano: se aplican con una pausa corta.
+const placaInput = ref(filtros.value.placa)
+const vendedorInput = ref(filtros.value.vendedor)
+const consecutivoInput = ref(filtros.value.consecutivo)
+const vendedorCorto = computed(() => {
+  const n = (vendedorInput.value ?? '').trim().length
+  return n > 0 && n < VENDEDOR_MIN
+})
+let pausa: ReturnType<typeof setTimeout> | null = null
+watch([placaInput, vendedorInput, consecutivoInput], () => {
+  if (pausa) clearTimeout(pausa)
+  pausa = setTimeout(() => {
+    filtros.value = {
+      ...filtros.value,
+      placa: normalizarCodigo(placaInput.value),
+      vendedor: (vendedorInput.value ?? '').trim(),
+      consecutivo: normalizarCodigo(consecutivoInput.value),
+    }
+  }, 400)
+})
+
+function sincronizarUrl(nuevaPagina = pagination.value.page) {
+  // Conserva ?focus (deep link al detalle) si todavía está en la URL.
+  const q: Record<string, string> = filtrosAQuery(filtros.value, nuevaPagina, pagination.value.itemsPerPage)
+  const focus = route.query?.focus
+  if (typeof focus === 'string') q.focus = focus
+  router.replace({ query: q }).catch(() => {})
+}
+function cambiarPorPagina(n: number) {
+  pagination.value.itemsPerPage = n
+  sincronizarUrl(1)
+}
+
+// Cambió un filtro → primera página.
+watch(
+  filtros,
+  () => sincronizarUrl(1),
+  { deep: true },
+)
+
+// La URL cambió (filtros, página o por página) → recargar.
+watch(
+  () => route.fullPath,
+  () => {
+    if (route.name !== 'FacturacionHistorico') return
+    const leido = filtrosDesdeQuery(route.query)
+    pagination.value.page = leido.page
+    pagination.value.itemsPerPage = leido.perPage
+    fetchList()
+  },
+)
+
+/* Catálogos de los desplegables */
+const descuentosCatalogo = ref<{ id: number; nombre: string }[]>([])
+const serviciosCatalogo = ref<{ id: number; nombre: string }[]>([])
+const descuentoItems = computed(() => [
+  { title: 'Sin descuento', value: 'ninguno' as const },
+  ...descuentosCatalogo.value.map((d) => ({ title: d.nombre, value: d.id })),
+])
+const servicioItems = computed(() => serviciosCatalogo.value.map((s) => ({ title: s.nombre, value: s.id })))
+const estadoItems = (Object.keys(ETIQUETAS_ESTADO) as Array<keyof typeof ETIQUETAS_ESTADO>).map((value) => ({
+  title: ETIQUETAS_ESTADO[value],
+  value,
+}))
+async function cargarCatalogos() {
+  const [desc, serv] = await Promise.allSettled([
+    descuentosService.getActivos(),
+    TurnosDelDiaService.obtenerServicios(),
+  ])
+  if (desc.status === 'fulfilled') {
+    const arr = Array.isArray(desc.value?.data) ? desc.value.data : []
+    descuentosCatalogo.value = arr
+      .filter((d) => typeof d.id === 'number')
+      .map((d) => ({ id: d.id as number, nombre: d.nombre }))
+  }
+  if (serv.status === 'fulfilled' && Array.isArray(serv.value)) {
+    serviciosCatalogo.value = serv.value.map((s) => ({ id: s.id, nombre: s.nombre }))
+  }
+}
+
+const chips = computed(() =>
+  chipsFiltros(filtros.value, {
+    descuento: (id) => descuentosCatalogo.value.find((d) => d.id === id)?.nombre,
+    servicio: (id) => serviciosCatalogo.value.find((s) => s.id === id)?.nombre,
+  }),
+)
+function quitar(clave: ClaveChip) {
+  filtros.value = quitarFiltro(filtros.value, clave)
+  if (clave === 'placa') placaInput.value = ''
+  if (clave === 'vendedor') vendedorInput.value = ''
+  if (clave === 'consecutivo') consecutivoInput.value = ''
+}
+function limpiar() {
+  if (pausa) clearTimeout(pausa)
+  placaInput.value = ''
+  vendedorInput.value = ''
+  consecutivoInput.value = ''
+  filtros.value = filtrosVacios()
+}
+
+/* Exportar con los filtros activos (download() lleva el Bearer) */
+const exportando = ref(false)
+async function exportar() {
+  exportando.value = true
+  try {
+    const blob = await FacturacionService.exportarExcel(filtrosAParams(filtros.value))
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = nombreExcel(filtros.value)
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    snack.text = err instanceof HttpError ? `❌ No se pudo exportar: ${err.message}` : '❌ No se pudo exportar'
+    snack.show = true
+  } finally {
+    exportando.value = false
+  }
+}
+
 /* ===== Tabla (server) ===== */
 const loading = ref(false)
 const rows = ref<FacturacionTicket[]>([])
 const total = ref(0)
+const resumen = ref<ResumenHistorial | null>(null)
 const pagination = ref({
-  page: 1,
-  itemsPerPage: 20,
+  page: inicial.page,
+  itemsPerPage: inicial.perPage,
   sortBy: [] as Array<{ key: string; order?: 'asc'|'desc' }>
 })
 const pages = computed(() => Math.max(1, Math.ceil(total.value / pagination.value.itemsPerPage)))
@@ -671,15 +970,21 @@ const headers = [
   { title: 'Acciones', key: 'acciones', width: 120 },
 ]
 
+let consulta = 0
 async function fetchList() {
+  const actual = ++consulta
   loading.value = true
   try {
     const resp = await FacturacionService.list({
       page: pagination.value.page,
       limit: pagination.value.itemsPerPage,
-    }) as unknown as Paginated<FacturacionTicket>
+      ...filtrosAParams(filtros.value),
+    })
+    // Si llegó una respuesta vieja (filtros cambiados entre medias), se descarta.
+    if (actual !== consulta) return
     rows.value = resp.data || []
     total.value = resp.meta?.total ?? rows.value.length
+    resumen.value = resp.resumen ?? null
   } catch (err) {
     console.error('Error cargando histórico:', err)
     snack.text = '❌ Error cargando histórico'
@@ -689,11 +994,14 @@ async function fetchList() {
   }
 }
 function refresh() { fetchList() }
+// La tabla solo pagina por la URL (el watch de la ruta recarga).
 function onUpdateOptions(opts: { page?: number; itemsPerPage?: number; sortBy?: Array<{ key: string; order?: 'asc'|'desc' }>}) {
-  if (typeof opts.page === 'number') pagination.value.page = opts.page
-  if (typeof opts.itemsPerPage === 'number') pagination.value.itemsPerPage = opts.itemsPerPage
   if (opts.sortBy) pagination.value.sortBy = opts.sortBy
-  refresh()
+  if (typeof opts.itemsPerPage === 'number' && opts.itemsPerPage !== pagination.value.itemsPerPage) {
+    cambiarPorPagina(opts.itemsPerPage)
+  } else if (typeof opts.page === 'number' && opts.page !== pagination.value.page) {
+    sincronizarUrl(opts.page)
+  }
 }
 
 /* ===== Fecha pago fallback chain ===== */
@@ -1047,6 +1355,7 @@ const snack = reactive({ show: false, text: '' })
 
 /* ===== Lifecycle ===== */
 onMounted(async () => {
+  void cargarCatalogos()
   await fetchList()
   await openFocusIfAny()
 })

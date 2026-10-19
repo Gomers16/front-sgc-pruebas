@@ -1,5 +1,5 @@
 // src/services/facturacion_service.ts
-import { get, upload, post, patch } from './http'
+import { get, upload, post, patch, download } from './http'
 
 /* =========================== Tipos del dominio =========================== */
 
@@ -138,6 +138,29 @@ export interface Paginated<T> {
   data: T[]
 }
 
+/** 🆕 Historial: línea resumen con los filtros actuales (sin paginar). */
+export interface ResumenHistorial {
+  cantidad: number
+  total_facturado: number
+  total_descuento: number
+}
+
+/** 🆕 Filtros del historial (se suman a los de siempre del listado). */
+export interface FiltrosListaParams {
+  /** YYYY-MM-DD, hora de Bogotá, sobre la "Fecha pago" que muestra la tabla */
+  fecha_pago_desde?: string
+  fecha_pago_hasta?: string
+  /** Parcial, sin importar mayúsculas ni espacios */
+  placa_contiene?: string
+  /** Parcial (mín. 2 letras) */
+  vendedor?: string
+  /** Id del descuento o "ninguno" */
+  descuento_id?: number | 'ninguno'
+  consecutivo_descuento?: string
+  consecutivo_descuento_exacto?: 1
+  servicio_id?: number
+}
+
 export interface TicketUpdatePayload {
   placa?: string | null
   total?: number | null
@@ -219,14 +242,19 @@ export const FacturacionService = {
     dateo_id?: number
     page?: number
     limit?: number
-  }) {
+  } & FiltrosListaParams) {
     const p: Record<string, string | number> = {}
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         if (v !== undefined && v !== null && v !== '') p[k] = v as string | number
       })
     }
-    return get<Paginated<FacturacionTicket>>(base, { params: p })
+    return get<Paginated<FacturacionTicket> & { resumen?: ResumenHistorial }>(base, { params: p })
+  },
+
+  /** 🆕 Excel del historial con los mismos filtros (requiere Bearer: va por download()). */
+  exportarExcel(params: { estado?: FactEstado } & FiltrosListaParams = {}) {
+    return download(`${base}/exportar`, params as Record<string, string | number>)
   },
 
   /** Detalle por id (incluye preloads en backend) */
