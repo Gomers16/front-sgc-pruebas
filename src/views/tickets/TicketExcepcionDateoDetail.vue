@@ -61,9 +61,7 @@
                 <template v-else>Sin convenio (nuevo directo)</template>
               </div>
               <div v-if="convenioFueCorregido" class="text-caption text-warning">
-                Corregido por gerencia al aprobar (se pidió con el convenio #{{
-                  detalle.convenioIdOriginal ?? '—'
-                }}).
+                {{ textoConvenioCorregido(detalle.convenioIdOriginal ?? null, nombresConvenio) }}
               </div>
             </v-col>
             <v-col cols="12" sm="6">
@@ -383,12 +381,22 @@ import {
   type UsuarioLight,
 } from '@/services/ticketsService'
 import { formatDateTime } from '@/services/dateosService'
-import { etiquetaConvenio, listConveniosAsignados } from '@/services/conveniosService'
+import {
+  etiquetaConvenio,
+  getConvenio,
+  listConveniosAsignados,
+  listConveniosLight,
+} from '@/services/conveniosService'
 import { HttpError } from '@/services/http'
 import { usePermissions } from '@/composables/usePermissions'
 import { useTicketsPendientes } from '@/composables/useTicketsPendientes'
 import { resolucionComision, textoResolucion } from './resolucionTicket'
 import { turnoVisible } from './turnoVisible'
+import {
+  idsConvenioPorNombrar,
+  textoConvenioCorregido,
+  textoEventoConvenioCorregido,
+} from './convenioTicket'
 import {
   casoConConvenioCorregido,
   mensajeErrorResolucion,
@@ -552,8 +560,11 @@ function detalleEvento(e: EventoTicket): string {
   }
   if (e.tipo === 'RECHAZADO') return d.motivo ? `Motivo: ${d.motivo}` : ''
   if (e.tipo === 'CONVENIO_CORREGIDO') {
-    const nombre = (id: unknown) => (id ? `#${id}` : 'sin convenio')
-    return `De ${nombre(d.convenio_anterior_id)} a ${nombre(d.convenio_nuevo_id)}`
+    return textoEventoConvenioCorregido(
+      d.convenio_anterior_id,
+      d.convenio_nuevo_id,
+      nombresConvenio.value,
+    )
   }
   if (e.tipo === 'COMENTARIO') {
     const c = ticket.value?.comentarios?.find((x) => x.id === Number(d.comentario_id))
@@ -574,6 +585,33 @@ const evidenciasList = computed(() => {
   return list
 })
 
+/* ═══════════ Nombres de los convenios del ticket (original y corrección) ═══════════ */
+const nombresConvenio = ref<Map<number, string>>(new Map())
+async function cargarNombresConvenio() {
+  const d = detalle.value
+  const nombres = new Map<number, string>()
+  if (d?.convenio) nombres.set(d.convenio.id, etiquetaConvenio(d.convenio))
+  const faltan = idsConvenioPorNombrar(
+    d?.convenioIdOriginal ?? null,
+    ticket.value?.eventos ?? [],
+  ).filter((id) => !nombres.has(id))
+  if (faltan.length) {
+    // GET /convenios/:id trae también los inactivos (gerencia/contabilidad); si no
+    // hay permiso, la lista de activos; si tampoco está, queda "convenio #id".
+    let activos: Awaited<ReturnType<typeof listConveniosLight>> | null = null
+    for (const id of faltan) {
+      try {
+        nombres.set(id, etiquetaConvenio(await getConvenio(id)))
+      } catch {
+        activos ??= await listConveniosLight().catch(() => [])
+        const c = activos.find((x) => x.id === id)
+        if (c) nombres.set(id, etiquetaConvenio(c))
+      }
+    }
+  }
+  nombresConvenio.value = nombres
+}
+
 async function cargar() {
   loading.value = true
   errorCarga.value = null
@@ -581,6 +619,7 @@ async function cargar() {
     const data = await getTicket(Number(props.id))
     ticket.value = data
     detalle.value = data.detalle ?? null
+    cargarNombresConvenio()
   } catch (err) {
     ticket.value = null
     errorCarga.value =

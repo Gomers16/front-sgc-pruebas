@@ -43,6 +43,16 @@ export const ETIQUETAS_DECISION: Record<DecisionComision, string> = {
   regimen_anterior: 'Régimen anterior',
 }
 
+/**
+ * Etiqueta de la decisión en la bandeja. En el Caso 2 (asesor convenio que se
+ * datea a sí mismo) asesor y convenio son la misma persona: cualquier "sin
+ * comisión" es simplemente "Sin comisión" (mismo criterio que textoResolucion()).
+ */
+export function etiquetaDecision(decision: DecisionComision, esAsesorConvenio: boolean): string {
+  const sin = decision === 'sin_asesor' || decision === 'sin_convenio' || decision === 'sin_ninguno'
+  return sin && esAsesorConvenio ? 'Sin comisión' : ETIQUETAS_DECISION[decision]
+}
+
 const ESTADOS = Object.keys(ETIQUETAS_ESTADO) as TicketEstado[]
 const DECISIONES = Object.keys(ETIQUETAS_DECISION) as DecisionComision[]
 const FECHA = /^\d{4}-\d{2}-\d{2}$/

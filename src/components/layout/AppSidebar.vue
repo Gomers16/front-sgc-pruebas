@@ -55,9 +55,19 @@
       >
         <!-- Pendientes por resolver: solo gerencia (GET /tickets/pendientes/contador). -->
         <template v-if="can.verEstadisticasTickets() && pendientesTickets" #append>
-          <v-chip size="x-small" color="warning" variant="flat" class="font-weight-bold">
-            {{ pendientesTickets }}
-          </v-chip>
+          <v-tooltip text="Pendientes de todas las fechas" location="end">
+            <template #activator="{ props: tip }">
+              <v-chip
+                v-bind="tip"
+                size="x-small"
+                color="warning"
+                variant="flat"
+                class="font-weight-bold"
+              >
+                {{ pendientesTickets }}
+              </v-chip>
+            </template>
+          </v-tooltip>
         </template>
       </v-list-item>
 

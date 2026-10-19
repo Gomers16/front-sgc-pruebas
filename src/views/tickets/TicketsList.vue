@@ -7,16 +7,20 @@
       >
         <div class="d-flex align-center gap-2">
           <span class="text-h5 font-weight-bold">🎫 Tickets</span>
-          <v-chip
-            v-if="puedeVerGerencia && pendientes"
-            color="warning"
-            variant="flat"
-            size="small"
-            class="font-weight-bold"
-            @click="verPendientes"
-          >
-            {{ pendientes }} pendiente{{ pendientes === 1 ? '' : 's' }}
-          </v-chip>
+          <v-tooltip v-if="puedeVerGerencia && pendientes" text="Pendientes de todas las fechas">
+            <template #activator="{ props: tip }">
+              <v-chip
+                v-bind="tip"
+                color="warning"
+                variant="flat"
+                size="small"
+                class="font-weight-bold"
+                @click="verPendientes"
+              >
+                {{ pendientes }} pendiente{{ pendientes === 1 ? '' : 's' }}
+              </v-chip>
+            </template>
+          </v-tooltip>
         </div>
         <!-- Sin botón "Nuevo ticket": el ticket de Excepción de Dateo necesita el
              turno y nace del aviso REQUIERE_TICKET_DATEO al intentar datear. -->
@@ -382,7 +386,12 @@
             </template>
             <template #item.decision="{ item }">
               <span v-if="item.resumen?.decisionComision" class="text-caption">
-                {{ ETIQUETAS_DECISION[item.resumen.decisionComision] }}
+                {{
+                  etiquetaDecision(
+                    item.resumen.decisionComision,
+                    asesoresConvenioIds.has(Number(item.resumen.comercialId)),
+                  )
+                }}
               </span>
             </template>
             <template #no-data>
@@ -462,6 +471,7 @@ import {
   chipsFiltros,
   ETIQUETAS_DECISION,
   ETIQUETAS_ESTADO,
+  etiquetaDecision,
   filtrosAParams,
   filtrosAQuery,
   filtrosDesdeQuery,
@@ -549,6 +559,8 @@ const asesoresLoading = ref(false)
 const asesoresComerciales = ref<AsesorTicket[]>([])
 const comercialesLoading = ref(false)
 const comercialesIds = computed(() => asesoresComerciales.value.map((a) => a.id))
+// Asesores convenio: sus tickets son Caso 2 (decisión "Sin comisión" sin desglose).
+const asesoresConvenioIds = ref<Set<number>>(new Set())
 const nombreAsesor = (a: AsesorTicket) => (a.activo === false ? `${a.nombre} (inactivo)` : a.nombre)
 const pendientesPorTipo = ref<Record<string, number>>({})
 
@@ -893,6 +905,9 @@ async function doEliminarVentanaAsesor() {
 onMounted(async () => {
   loadAsesores()
   comercialesLoading.value = true
+  listAsesoresTickets('ASESOR_CONVENIO')
+    .then((a) => (asesoresConvenioIds.value = new Set(a.map((x) => x.id))))
+    .catch(() => {})
   listAsesoresTickets('ASESOR_COMERCIAL')
     .then((a) => (asesoresComerciales.value = a))
     .catch(() => (asesoresComerciales.value = []))
