@@ -171,6 +171,15 @@ export function filtrosEstadisticasAParams(f: FiltrosBandeja): ListTicketsParams
   ) as ListTicketsParams
 }
 
+/**
+ * ¿La ruta anterior (history.state.back de vue-router) es la bandeja? Así el
+ * botón "Volver" puede ir atrás y conservar filtros, pestaña y página. Un
+ * detalle (/tickets/123) u otra pantalla no cuentan.
+ */
+export function vieneDeLaBandeja(anterior: string | null | undefined): boolean {
+  return /^\/tickets\/?(\?|$)/.test(anterior ?? '')
+}
+
 /** Quita un filtro (el que cierra su chip). */
 export function quitarFiltro(f: FiltrosBandeja, clave: keyof FiltrosBandeja): FiltrosBandeja {
   return { ...f, [clave]: filtrosVacios()[clave] }

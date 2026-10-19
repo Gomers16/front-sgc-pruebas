@@ -1,6 +1,17 @@
 <!-- src/views/tickets/TicketExcepcionDateoDetail.vue -->
 <template>
   <v-container class="py-6" style="max-width: 860px">
+    <v-btn
+      variant="text"
+      color="primary"
+      prepend-icon="mdi-arrow-left"
+      class="mb-2 px-1"
+      data-test="volver-bandeja"
+      @click="volverABandeja"
+    >
+      Volver a la bandeja
+    </v-btn>
+
     <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
 
     <template v-if="ticket && detalle">
@@ -74,6 +85,19 @@
 
           <v-divider class="my-3" />
 
+          <!-- Fuera de ventana: aviso visible. Dentro: solo el chip junto a los minutos. -->
+          <v-alert
+            v-if="!dentroVentana"
+            type="warning"
+            variant="tonal"
+            icon="mdi-clock-alert-outline"
+            density="compact"
+            class="mb-3"
+            data-test="aviso-tarde"
+          >
+            <strong>Fuera de ventana: llegó {{ detalle.minutosExceso }} min tarde</strong>
+          </v-alert>
+
           <div class="text-subtitle-2 font-weight-bold mb-2">Ventana de tiempo</div>
           <v-row dense class="mb-2">
             <v-col cols="12" sm="4">
@@ -95,15 +119,14 @@
                 </span>
                 <!-- Solo informa: la decisión de comisión se toma dentro y fuera de ventana. -->
                 <v-chip
+                  v-if="dentroVentana"
                   size="x-small"
                   variant="tonal"
-                  :color="dentroVentana ? 'success' : 'warning'"
-                  :prepend-icon="
-                    dentroVentana ? 'mdi-clock-check-outline' : 'mdi-clock-alert-outline'
-                  "
+                  color="success"
+                  prepend-icon="mdi-clock-check-outline"
                   data-test="chip-ventana"
                 >
-                  {{ dentroVentana ? 'Dentro de ventana' : 'Fuera de ventana' }}
+                  Dentro de ventana
                 </v-chip>
               </div>
             </v-col>
@@ -407,6 +430,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/AuthStore'
 import {
   getTicket,
@@ -433,6 +457,7 @@ import { usePermissions } from '@/composables/usePermissions'
 import { useTicketsPendientes } from '@/composables/useTicketsPendientes'
 import { resolucionComision, textoResolucion } from './resolucionTicket'
 import { turnoVisible } from './turnoVisible'
+import { vieneDeLaBandeja } from './filtrosTickets'
 import {
   idsConvenioPorNombrar,
   textoConvenioCorregido,
@@ -446,6 +471,18 @@ import {
 } from './decisionComision'
 
 const props = defineProps<{ id: string | number }>()
+const router = useRouter()
+
+/**
+ * Vuelve a la bandeja tal como estaba (la URL guarda filtros, pestaña y
+ * página): si se llegó desde /tickets, atrás en el historial; si el ticket se
+ * abrió directo (enlace, otra pantalla), a la bandeja sin filtros.
+ */
+function volverABandeja() {
+  const anterior = (window.history.state as { back?: string | null } | null)?.back
+  if (vieneDeLaBandeja(anterior)) router.back()
+  else router.push({ name: 'TicketsList', query: { vista: 'bandeja' } })
+}
 const auth = useAuthStore()
 const { can } = usePermissions()
 const { refrescarPendientes } = useTicketsPendientes()

@@ -88,12 +88,15 @@ describe('filasPorAsesor', () => {
       asesor_real: 8640,
       convenio_real: 20000,
       asesor_proceso: 0,
+      generada: 28640,
+      por_generar: 0,
       dejado: 0,
     })
     expect(filas[0]).toMatchObject({
       rechazados: 1,
       pendientes: 1,
       asesor_proceso: 8640,
+      por_generar: 8640,
       dejado: 20000,
       dejado_convenio: 20000,
       dejado_exacto: 20000,
@@ -114,6 +117,8 @@ describe('filasPorAsesor', () => {
       asesor_real: 8640,
       asesor_proceso: 8640,
       convenio_real: 20000,
+      generada: 28640,
+      por_generar: 8640,
       dejado: 20000,
     })
     expect(totalesDeFilas([]).creados).toBe(0)

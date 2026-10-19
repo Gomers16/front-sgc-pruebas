@@ -24,7 +24,11 @@ export interface FilaAsesor {
   asesor_proceso: number
   convenio_real: number
   convenio_proceso: number
-  /** Asesor + convenio (exacto + estimado). */
+  /** Comisión generada (ya existe en Comisiones): asesor + convenio. */
+  generada: number
+  /** Comisión por generar (aprobado, Facturación sin confirmar; estimado): asesor + convenio. */
+  por_generar: number
+  /** Comisión quitada ("dejado de pagar"): asesor + convenio (exacto + estimado). */
   dejado: number
   dejado_asesor: number
   dejado_convenio: number
@@ -45,6 +49,8 @@ const CAMPOS_NUMERICOS: (keyof TotalesFilas)[] = [
   'asesor_proceso',
   'convenio_real',
   'convenio_proceso',
+  'generada',
+  'por_generar',
   'dejado',
   'dejado_asesor',
   'dejado_convenio',
@@ -68,6 +74,8 @@ function aFila(b: BloqueEstadisticasTickets, id: number, nombre: string): FilaAs
     asesor_proceso: d.en_proceso.asesor,
     convenio_real: d.comision_real.convenio,
     convenio_proceso: d.en_proceso.convenio,
+    generada: d.comision_real.asesor + d.comision_real.convenio,
+    por_generar: d.en_proceso.asesor + d.en_proceso.convenio,
     dejado: dj.asesor + dj.convenio,
     dejado_asesor: dj.asesor,
     dejado_convenio: dj.convenio,

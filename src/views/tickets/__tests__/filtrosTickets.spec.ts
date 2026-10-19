@@ -8,6 +8,7 @@ import {
   filtrosEstadisticasAParams,
   filtrosVacios,
   quitarFiltro,
+  vieneDeLaBandeja,
 } from '../filtrosTickets'
 
 const lleno = {
@@ -84,6 +85,18 @@ describe('estados de la bandeja', () => {
     expect(Object.keys(ETIQUETAS_ESTADO)).toEqual(['PENDIENTE', 'APROBADO', 'RECHAZADO'])
     expect(filtrosDesdeQuery({ estado: 'resuelto' }).filtros.estado).toBeNull()
     expect(filtrosDesdeQuery({ estado: 'CERRADO' }).filtros.estado).toBeNull()
+  })
+})
+
+describe('vieneDeLaBandeja (botón Volver)', () => {
+  it('bandeja con o sin filtros: sí; detalle, otra pantalla o entrada directa: no', () => {
+    expect(vieneDeLaBandeja('/tickets')).toBe(true)
+    expect(vieneDeLaBandeja('/tickets?vista=bandeja&estado=PENDIENTE&page=2')).toBe(true)
+    expect(vieneDeLaBandeja('/tickets/830')).toBe(false)
+    expect(vieneDeLaBandeja('/tickets-excepcion-dateo/nuevo')).toBe(false)
+    expect(vieneDeLaBandeja('/comercial/dateos')).toBe(false)
+    expect(vieneDeLaBandeja(null)).toBe(false)
+    expect(vieneDeLaBandeja(undefined)).toBe(false)
   })
 })
 

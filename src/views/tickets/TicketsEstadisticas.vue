@@ -18,8 +18,8 @@
         density="compact"
         class="mb-3"
       >
-        Hay más de {{ datos.meta.limite_calculo_por_ticket }} tickets por calcular: los montos "en
-        proceso" y lo estimado de "dejado de pagar" cubren solo los
+        Hay más de {{ datos.meta.limite_calculo_por_ticket }} tickets por calcular: la comisión "por
+        generar" y lo estimado de "quitada" cubren solo los
         {{ datos.meta.limite_calculo_por_ticket }} más recientes. Acota el rango de fechas para
         verlos completos.
       </v-alert>
@@ -34,26 +34,85 @@
         </v-col>
       </v-row>
 
-      <!-- Una fila por asesor comercial -->
+      <!-- Qué significan las columnas de plata -->
+      <div class="text-body-2 text-medium-emphasis mb-2" data-test="explicacion-plata">
+        Las columnas de plata suman asesor y convenio. <strong>Generada</strong>: ya está en
+        Comisiones. <strong>Por generar</strong>: ticket aprobado, falta que Facturación confirme
+        (estimado). <strong>Quitada</strong>: lo que no se pagó por decisiones "sin comisión". Haz
+        clic en una fila para ver asesor y convenio por separado.
+      </div>
+
+      <!-- Una fila por asesor comercial; clic = detalle -->
       <v-data-table
+        v-model:expanded="expandidas"
         :headers="headers"
         :items="filas"
-        item-value="comercial_id"
+        :item-value="(f: FilaAsesor) => String(f.comercial_id)"
         :items-per-page="-1"
         :sort-by="[{ key: 'creados', order: 'desc' }]"
         density="compact"
         hide-default-footer
+        hover
         class="tabla-asesores"
+        @click:row="alternar"
       >
+        <template #header.por_generar="{ column, isSorted, getSortIcon }">
+          <span class="d-inline-flex align-center ga-1">
+            {{ column.title }}
+            <v-tooltip location="top" max-width="300">
+              <template #activator="{ props: tip }">
+                <v-icon v-bind="tip" size="16" color="info" data-test="info-por-generar"
+                  >mdi-information-outline</v-icon
+                >
+              </template>
+              Tickets aprobados cuya Facturación todavía no se confirma: la comisión aún no existe.
+              El valor es un estimado con la configuración de comisiones vigente.
+            </v-tooltip>
+            <v-icon v-if="isSorted(column)" :icon="getSortIcon(column)" size="16" />
+          </span>
+        </template>
+        <template #item.nombre="{ item, internalItem, isExpanded }">
+          <span class="d-inline-flex align-center ga-1">
+            <v-icon size="18">{{
+              isExpanded(internalItem) ? 'mdi-chevron-down' : 'mdi-chevron-right'
+            }}</v-icon>
+            {{ item.nombre }}
+          </span>
+        </template>
         <template v-for="k in CLAVES_DINERO" :key="k" #[`item.${k}`]="{ item }">
-          <span :class="{ estimado: k.endsWith('_proceso') }">{{ cop(item[k]) }}</span>
+          {{ cop(item[k]) }}
         </template>
-        <template #item.dejado="{ item }">
-          <div>{{ cop(item.dejado) }}</div>
-          <div v-if="item.dejado" class="text-caption text-medium-emphasis">
-            A {{ cop(item.dejado_asesor) }} · C {{ cop(item.dejado_convenio) }}
-          </div>
+
+        <template #expanded-row="{ columns, item }">
+          <tr class="fila-detalle">
+            <td :colspan="columns.length">
+              <v-row dense class="py-2" data-test="detalle-fila">
+                <v-col cols="12" md="4">
+                  <div class="text-caption font-weight-bold mb-1">Comisión generada</div>
+                  <div>Asesor: {{ cop(item.asesor_real) }}</div>
+                  <div>Convenio: {{ cop(item.convenio_real) }}</div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-caption font-weight-bold mb-1">
+                    Comisión por generar <span class="text-medium-emphasis">(estimado)</span>
+                  </div>
+                  <div>Asesor: {{ cop(item.asesor_proceso) }}</div>
+                  <div>Convenio: {{ cop(item.convenio_proceso) }}</div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-caption font-weight-bold mb-1">Comisión quitada</div>
+                  <div>Asesor: {{ cop(item.dejado_asesor) }}</div>
+                  <div>Convenio: {{ cop(item.dejado_convenio) }}</div>
+                  <div v-if="item.dejado" class="text-caption text-medium-emphasis mt-1">
+                    Exacta (valor guardado al aprobar): {{ cop(item.dejado_exacto) }} · Estimada:
+                    {{ cop(item.dejado_estimado) }}
+                  </div>
+                </v-col>
+              </v-row>
+            </td>
+          </tr>
         </template>
+
         <template #no-data>
           <div class="text-center py-4 text-medium-emphasis">
             Sin tickets de asesores comerciales con estos filtros.
@@ -68,7 +127,6 @@
                 :class="c.align === 'end' ? 'text-end' : ''"
               >
                 <template v-if="c.key === 'nombre'">Total</template>
-                <template v-else-if="c.key === 'dejado'">{{ cop(total.dejado) }}</template>
                 <template v-else-if="esDinero(c.key)">{{ cop(total[c.key]) }}</template>
                 <template v-else-if="c.key">{{ total[c.key as keyof TotalesFilas] }}</template>
               </td>
@@ -77,22 +135,17 @@
         </template>
       </v-data-table>
 
-      <div class="text-caption text-medium-emphasis mt-2">
-        <strong>Real</strong> = comisión ya creada (sin ANULADA).
-        <span class="estimado">En proceso</span> = ticket aprobado con Facturación sin confirmar,
-        estimado con la configuración vigente. <strong>Dejado de pagar</strong> = lo que no se pagó
-        por las decisiones "sin comisión" (A = asesor, C = convenio).
-      </div>
-      <div v-if="ticketsFuera > 0" class="text-caption text-medium-emphasis mt-1">
-        {{ ticketsFuera }} ticket{{ ticketsFuera === 1 ? '' : 's' }} de asesores convenio (que se
-        datean a sí mismos) cuentan en las tarjetas pero no en la tabla.
+      <div v-if="ticketsFuera > 0" class="text-caption text-medium-emphasis mt-2">
+        {{ ticketsFuera }} ticket{{ ticketsFuera === 1 ? '' : 's' }} de asesores convenio (el asesor
+        convenio se datea a sí mismo) se cuentan en las tarjetas de arriba, pero no tienen fila en
+        esta tabla, que es solo de asesores comerciales.
       </div>
 
       <!-- Gráficos -->
       <v-row dense class="mt-3">
         <v-col cols="12" md="6">
           <v-card variant="outlined" class="pa-3">
-            <div class="text-subtitle-2 font-weight-bold mb-2">Dentro vs fuera de ventana</div>
+            <div class="text-subtitle-2 font-weight-bold mb-2">A tiempo vs tarde</div>
             <div class="grafico"><Doughnut :data="graficoVentana" :options="opcionesDona" /></div>
           </v-card>
         </v-col>
@@ -125,7 +178,12 @@ import {
   type ListTicketsParams,
 } from '@/services/ticketsService'
 import { HttpError } from '@/services/http'
-import { filasPorAsesor, totalesDeFilas, type TotalesFilas } from './estadisticasPorAsesor'
+import {
+  filasPorAsesor,
+  totalesDeFilas,
+  type FilaAsesor,
+  type TotalesFilas,
+} from './estadisticasPorAsesor'
 
 ChartJS.register(Tooltip, Legend, ArcElement, BarElement, CategoryScale, LinearScale)
 
@@ -146,12 +204,7 @@ const formatoCop = new Intl.NumberFormat('es-CO', {
 })
 const cop = (v: number) => formatoCop.format(v || 0)
 
-const CLAVES_DINERO = [
-  'asesor_real',
-  'asesor_proceso',
-  'convenio_real',
-  'convenio_proceso',
-] as const
+const CLAVES_DINERO = ['generada', 'por_generar', 'dejado'] as const
 const esDinero = (k: unknown): k is (typeof CLAVES_DINERO)[number] =>
   (CLAVES_DINERO as readonly unknown[]).includes(k)
 
@@ -164,52 +217,45 @@ const filas = computed(() => tabla.value.filas)
 const ticketsFuera = computed(() => tabla.value.ticketsFuera)
 const total = computed(() => totalesDeFilas(filas.value))
 
+// Filas abiertas (clic en la fila).
+const expandidas = ref<string[]>([])
+function alternar(_e: unknown, row: { item: FilaAsesor }) {
+  const id = String(row.item.comercial_id)
+  expandidas.value = expandidas.value.includes(id)
+    ? expandidas.value.filter((x) => x !== id)
+    : [...expandidas.value, id]
+}
+
 const tot = computed(() => datos.value!.totales)
 
 const tarjetas = computed(() => {
   const t = tot.value
   return [
     { titulo: 'Creados', valor: t.creados, color: 'primary' },
-    { titulo: 'Dentro de ventana', valor: t.dentro_ventana, color: 'success' },
-    { titulo: 'Fuera de ventana', valor: t.fuera_ventana, color: 'warning' },
+    { titulo: 'A tiempo', valor: t.dentro_ventana, color: 'success' },
+    { titulo: 'Tarde', valor: t.fuera_ventana, color: 'warning' },
     { titulo: 'Aprobados', valor: t.aprobados.total, color: 'success' },
     { titulo: 'Rechazados', valor: t.rechazados, color: 'error' },
     { titulo: 'Pendientes', valor: t.pendientes, color: 'amber' },
   ]
 })
 
-// Anchos fijos y títulos cortos: la tabla entera cabe en la tarjeta sin scroll lateral.
-const num = { align: 'end' as const, sortable: true, width: 76 }
-const dinero = { align: 'end' as const, sortable: true, width: 104 }
+const num = { align: 'end' as const, sortable: true }
 const headers = [
   { title: 'Asesor', key: 'nombre', sortable: true },
-  { title: 'Creados', key: 'creados', ...num },
-  { title: 'Dentro', key: 'dentro', ...num },
-  { title: 'Fuera', key: 'fuera', ...num },
-  { title: 'Aprob.', key: 'aprobados', ...num },
-  { title: 'Rech.', key: 'rechazados', ...num },
-  { title: 'Pend.', key: 'pendientes', ...num },
-  {
-    title: 'Comisión asesor',
-    align: 'center' as const,
-    children: [
-      { title: 'Real', key: 'asesor_real', ...dinero },
-      { title: 'En proceso', key: 'asesor_proceso', ...dinero },
-    ],
-  },
-  {
-    title: 'Comisión convenio',
-    align: 'center' as const,
-    children: [
-      { title: 'Real', key: 'convenio_real', ...dinero },
-      { title: 'En proceso', key: 'convenio_proceso', ...dinero },
-    ],
-  },
-  { title: 'Dejado de pagar', key: 'dejado', ...dinero, width: 150 },
+  { title: 'Tickets', key: 'creados', ...num },
+  { title: 'A tiempo', key: 'dentro', ...num },
+  { title: 'Tarde', key: 'fuera', ...num },
+  { title: 'Aprobados', key: 'aprobados', ...num },
+  { title: 'Rechazados', key: 'rechazados', ...num },
+  { title: 'Pendientes', key: 'pendientes', ...num },
+  { title: 'Comisión generada', key: 'generada', ...num },
+  { title: 'Comisión por generar', key: 'por_generar', ...num },
+  { title: 'Comisión quitada', key: 'dejado', ...num },
 ]
 
 const graficoVentana = computed(() => ({
-  labels: ['Dentro de ventana', 'Fuera de ventana'],
+  labels: ['A tiempo', 'Tarde'],
   datasets: [
     {
       data: [tot.value.dentro_ventana, tot.value.fuera_ventana],
@@ -265,27 +311,23 @@ watch(() => JSON.stringify(props.params), cargar, { immediate: true })
   position: relative;
   height: 220px;
 }
-.estimado {
-  text-decoration: underline dotted;
-}
 .tabla-asesores :deep(td),
 .tabla-asesores :deep(th) {
   padding-left: 8px !important;
   padding-right: 8px !important;
 }
+.tabla-asesores :deep(tbody tr:not(.fila-detalle)) {
+  cursor: pointer;
+}
 .tabla-asesores :deep(td) {
-  vertical-align: top;
-  padding-top: 6px !important;
-  padding-bottom: 6px !important;
   white-space: nowrap;
 }
 .tabla-asesores :deep(th) {
   white-space: nowrap;
 }
-/* El nombre del asesor puede partir en dos líneas; los números no. */
-.tabla-asesores :deep(td:first-child) {
+.tabla-asesores :deep(.fila-detalle td) {
   white-space: normal;
-  min-width: 160px;
+  background: rgba(var(--v-theme-on-surface), 0.03);
 }
 .fila-total td {
   font-weight: 700;
