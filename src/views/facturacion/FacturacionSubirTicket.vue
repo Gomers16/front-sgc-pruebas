@@ -502,8 +502,20 @@
                 </div>
               </v-alert>
 
+              <v-alert
+                v-if="premarcadoNoCargado"
+                type="error"
+                variant="tonal"
+                density="compact"
+                class="mt-3"
+                data-test="premarcado-no-cargado"
+              >
+                No se pudo cargar el descuento pre-marcado, así que no se sabe su monto.
+                Recarga la página o usa «Cambiar descuento» para elegirlo en caja.
+              </v-alert>
+
               <!-- Monto descuento - CASO A dateo pre-marcado -->
-              <v-card variant="tonal" color="orange-darken-2" class="mt-3 pa-3 rounded-lg">
+              <v-card v-else variant="tonal" color="orange-darken-2" class="mt-3 pa-3 rounded-lg">
                 <div class="text-subtitle-2 font-weight-bold mb-1 d-flex align-center" style="gap:6px">
                   <v-icon size="16">mdi-currency-usd</v-icon>
                   Descuento aplicado
@@ -534,16 +546,15 @@
                   <v-row dense align="center">
                     <v-col cols="12" md="5">
                       <v-text-field
-                        v-model.number="descuentoMontoAplicado"
+                        :model-value="descuentoMontoTexto"
                         label="Monto descuento ($)"
                         variant="outlined"
                         density="comfortable"
-                        type="number"
+                        inputmode="decimal"
                         prefix="$"
-                        :min="0"
-                        :max="descuentoMaximo"
                         hide-details
-                        @blur="clampDescuentoMonto"
+                        @update:model-value="onDescuentoMontoTexto"
+                        @blur="onDescuentoMontoBlur"
                       />
                     </v-col>
                     <v-col cols="12" md="7">
@@ -666,16 +677,15 @@
                       <v-row dense align="center">
                         <v-col cols="12" md="5">
                           <v-text-field
-                            v-model.number="descuentoMontoAplicado"
+                            :model-value="descuentoMontoTexto"
                             label="Monto descuento ($)"
                             variant="outlined"
                             density="comfortable"
-                            type="number"
+                            inputmode="decimal"
                             prefix="$"
-                            :min="0"
-                            :max="descuentoMaximo"
                             hide-details
-                            @blur="clampDescuentoMonto"
+                            @update:model-value="onDescuentoMontoTexto"
+                            @blur="onDescuentoMontoBlur"
                           />
                         </v-col>
                         <v-col cols="12" md="7">
@@ -903,10 +913,29 @@
             :disabled="saving
               || (esDescuentoEnCajaActivo && !autorizadoPorId)
               || (esDescuentoPolicia && !documentosPoliciaCompletos)
-              || consecutivoDescuentoFalta"
-            @click="confirmarYGuardar"
+              || consecutivoDescuentoFalta
+              || premarcadoNoCargado"
+            @click="confirmarYGuardar()"
           >
             Confirmar y guardar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Red de seguridad: descuento en $0 que no es intencional -->
+    <v-dialog v-model="dialogMontoCero" max-width="420">
+      <v-card data-test="dialogo-monto-cero">
+        <v-card-title class="text-subtitle-1 font-weight-bold">El descuento va en $0</v-card-title>
+        <v-card-text>
+          <strong>{{ nombreDescuentoEfectivo }}</strong> se registrará sin reducir el precio.
+          ¿Continuar?
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="dialogMontoCero = false">Revisar monto</v-btn>
+          <v-btn color="warning" variant="flat" :loading="saving" @click="confirmarYGuardar(true)">
+            Sí, continuar en $0
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -1018,13 +1047,20 @@
 </template>
 <script setup lang="ts">
 // ++ CAMBIO 1: agregar watch ++
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import { FacturacionService, type VerificacionConsecutivoDescuento } from '@/services/facturacion_service'
 import { etiquetaConvenio } from '@/services/conveniosService'
 // ✅ FIX 1: descuentosService es default export → sin llaves, minúscula
 import descuentosService from '@/services/descuentosService'
+import {
+  esMontoFijo,
+  montoMaximo,
+  parseMontoCOP,
+  pideConfirmarMontoCero,
+  resolverDescuentoPremarcado,
+} from './descuentoFacturacion'
 // ✅ FIX 2: obtenerUsuarios existe en UserService → no hace falta crear usuariosService
 import { obtenerUsuarios } from '@/services/UserService'
 
@@ -1125,7 +1161,6 @@ const descuentosActivos = ref<DescuentoItem[]>([])
 const usuariosItems = ref<UsuarioItem[]>([])
 const descuentoIdEnCaja = ref<number | null>(null)
 const autorizadoPorId = ref<number | null>(null)
-const descuentoDelDateoNombre = ref<string>('')
 // ++ override: permite a la cajera ignorar el descuento pre-marcado del dateo ++
 const overrideDateoDescuento = ref(false)
 // 🆕 Observación opcional cuando el dateo NO tenía descuento pre-marcado y
@@ -1652,6 +1687,21 @@ const turnoMeta = reactive<{
 
 const descuentoDelDateoDetalle = ref<DescuentoItem | null>(null)
 const descuentoMontoAplicado = ref<number>(0)
+// Texto del campo "Monto descuento": se interpreta con parseMontoCOP para
+// aceptar "8.000" / "8,000" (con type=number el navegador los leía como 8 o vacío).
+const descuentoMontoTexto = ref<string>('0')
+
+// Pre-marcado del dateo: si GET /descuentos/:id falló (la cajera no tiene
+// permiso), el detalle sale de los descuentos activos.
+const premarcado = computed(() =>
+  resolverDescuentoPremarcado(turnoMeta.descuentoId, descuentoDelDateoDetalle.value, descuentosActivos.value),
+)
+const detallePremarcado = computed(() => premarcado.value.detalle)
+const descuentoDelDateoNombre = computed(() => premarcado.value.nombre)
+// Pre-marcado en uso pero sin detalle: no se sabe el máximo ni si es monto fijo.
+const premarcadoNoCargado = computed(
+  () => !!turnoMeta.descuentoId && !overrideDateoDescuento.value && premarcado.value.noCargado,
+)
 
 /* ===================== DOCUMENTOS INFORMATIVO_POLICIA ===================== */
 type DocPoliciaKey = 'carnet' | 'tarjeta_propiedad' | 'cedula'
@@ -1701,8 +1751,8 @@ const consecutivoDescuentoFalta = computed(() =>
 const esDescuentoPolicia = computed(() => {
   if (!descuentoIdEfectivo.value) return false
   // Caso: dateo pre-marcado sin override
-  if (turnoMeta.descuentoId && !overrideDateoDescuento.value && descuentoDelDateoDetalle.value) {
-    return descuentoDelDateoDetalle.value.codigo === 'INFORMATIVO_POLICIA'
+  if (turnoMeta.descuentoId && !overrideDateoDescuento.value && detallePremarcado.value) {
+    return detallePremarcado.value.codigo === 'INFORMATIVO_POLICIA'
   }
   // Caso: caja manual o override
   const d = descuentosActivos.value.find(x => x.id === descuentoIdEfectivo.value)
@@ -1712,8 +1762,8 @@ const esDescuentoPolicia = computed(() => {
 // Computed para INFORMATIVO_EMPLEADO (misma lógica que esDescuentoPolicia)
 const esDescuentoEmpleado = computed(() => {
   if (!descuentoIdEfectivo.value) return false
-  if (turnoMeta.descuentoId && !overrideDateoDescuento.value && descuentoDelDateoDetalle.value)
-    return descuentoDelDateoDetalle.value.codigo === 'INFORMATIVO_EMPLEADO'
+  if (turnoMeta.descuentoId && !overrideDateoDescuento.value && detallePremarcado.value)
+    return detallePremarcado.value.codigo === 'INFORMATIVO_EMPLEADO'
   const d = descuentosActivos.value.find(x => x.id === descuentoIdEfectivo.value)
   return d?.codigo === 'INFORMATIVO_EMPLEADO'
 })
@@ -1721,8 +1771,8 @@ const esDescuentoEmpleado = computed(() => {
 // Computed para AVANCE_PROPIETARIO
 const esDescuentoAvancePropietario = computed(() => {
   if (!descuentoIdEfectivo.value) return false
-  if (turnoMeta.descuentoId && !overrideDateoDescuento.value && descuentoDelDateoDetalle.value)
-    return descuentoDelDateoDetalle.value.codigo === 'AVANCE_PROPIETARIO'
+  if (turnoMeta.descuentoId && !overrideDateoDescuento.value && detallePremarcado.value)
+    return detallePremarcado.value.codigo === 'AVANCE_PROPIETARIO'
   const d = descuentosActivos.value.find(x => x.id === descuentoIdEfectivo.value)
   return d?.codigo === 'AVANCE_PROPIETARIO'
 })
@@ -1730,8 +1780,8 @@ const esDescuentoAvancePropietario = computed(() => {
 // ++ NUEVO: INFORMATIVO_OBSEQUIO — usa slider normal, NO monto fijo ++
 const esDescuentoObsequio = computed(() => {
   if (!descuentoIdEfectivo.value) return false
-  if (turnoMeta.descuentoId && !overrideDateoDescuento.value && descuentoDelDateoDetalle.value)
-    return descuentoDelDateoDetalle.value.codigo === 'INFORMATIVO_OBSEQUIO'
+  if (turnoMeta.descuentoId && !overrideDateoDescuento.value && detallePremarcado.value)
+    return detallePremarcado.value.codigo === 'INFORMATIVO_OBSEQUIO'
   const d = descuentosActivos.value.find(x => x.id === descuentoIdEfectivo.value)
   return d?.codigo === 'INFORMATIVO_OBSEQUIO'
 })
@@ -1843,10 +1893,8 @@ const esServicioSimplificado = computed(() => {
 
 const descuentoMaximo = computed((): number => {
   // Dateo pre-marcado sin override
-  if (turnoMeta.descuentoId && !overrideDateoDescuento.value && descuentoDelDateoDetalle.value) {
-    return esVehiculoMoto.value
-      ? (descuentoDelDateoDetalle.value.valorMoto ?? 0)
-      : (descuentoDelDateoDetalle.value.valorCarro ?? 0)
+  if (turnoMeta.descuentoId && !overrideDateoDescuento.value && detallePremarcado.value) {
+    return montoMaximo(detallePremarcado.value, esVehiculoMoto.value)
   }
   // Caja manual o override
   if (descuentoIdEnCaja.value) {
@@ -1879,6 +1927,45 @@ function clampDescuentoMonto() {
   if (descuentoMontoAplicado.value < 0) descuentoMontoAplicado.value = 0
   if (descuentoMontoAplicado.value > max) descuentoMontoAplicado.value = max
 }
+
+// Escribiendo: si el texto ya es un monto, mueve el deslizador en vivo.
+function onDescuentoMontoTexto(v: string) {
+  descuentoMontoTexto.value = v
+  const n = parseMontoCOP(v)
+  if (n !== null) descuentoMontoAplicado.value = n
+}
+// Al salir del campo: quita separadores, limita al máximo y normaliza el texto.
+function onDescuentoMontoBlur() {
+  descuentoMontoAplicado.value = parseMontoCOP(descuentoMontoTexto.value) ?? 0
+  clampDescuentoMonto()
+  descuentoMontoTexto.value = String(descuentoMontoAplicado.value)
+}
+// Deslizador o reset → texto del campo (sin pisar lo que se está escribiendo).
+watch(descuentoMontoAplicado, (v) => {
+  if (parseMontoCOP(descuentoMontoTexto.value) !== v) descuentoMontoTexto.value = String(v)
+})
+
+// Monto fijo (policía, empleado, avance propietario): se envía el que muestra el modal.
+function aplicarMontoFijoSiCorresponde() {
+  if (esDescuentoPolicia.value || esDescuentoEmpleado.value || esDescuentoAvancePropietario.value) {
+    descuentoMontoAplicado.value = descuentoMaximo.value
+  }
+}
+
+const codigoDescuentoEfectivo = computed(() => {
+  if (turnoMeta.descuentoId && !overrideDateoDescuento.value) return detallePremarcado.value?.codigo ?? null
+  return descuentosActivos.value.find(d => d.id === descuentoIdEnCaja.value)?.codigo ?? null
+})
+const nombreDescuentoEfectivo = computed(() => {
+  if (turnoMeta.descuentoId && !overrideDateoDescuento.value) return descuentoDelDateoNombre.value
+  return descuentosActivos.value.find(d => d.id === descuentoIdEnCaja.value)?.nombre ?? 'El descuento'
+})
+const montoDescuentoAEnviar = computed(() => {
+  if (!descuentoIdEfectivo.value) return 0
+  if (esMontoFijo(codigoDescuentoEfectivo.value)) return descuentoMaximo.value
+  return descuentoMontoAplicado.value || 0
+})
+const dialogMontoCero = ref(false)
 
 function mapClaseToTipo(clase?: { id?: number; codigo?: string; nombre?: string } | null): string | null {
   if (!clase) return null
@@ -2120,7 +2207,6 @@ async function fetchTurnoAndHydrate() {
         const descResp = await descuentosService.getById(turnoMeta.descuentoId)
         const data = descResp?.data
         if (data && !Array.isArray(data)) {
-          descuentoDelDateoNombre.value = data.nombre ?? `Descuento #${turnoMeta.descuentoId}`
           descuentoDelDateoDetalle.value = {
             id:         data.id!,
             codigo:     data.codigo,
@@ -2128,11 +2214,9 @@ async function fetchTurnoAndHydrate() {
             valorCarro: Number(data.valorCarro ?? 0),
             valorMoto:  Number(data.valorMoto  ?? 0),
           }
-        } else {
-          descuentoDelDateoNombre.value = `Descuento #${turnoMeta.descuentoId}`
         }
       } catch {
-        descuentoDelDateoNombre.value = `Descuento #${turnoMeta.descuentoId}`
+        // Sin permiso (cajera) o error: el detalle sale de descuentosActivos.
       }
     }
   } catch (err) {
@@ -2397,11 +2481,25 @@ function openConfirm() {
   resetConsecutivoDescuento()
   overrideDateoDescuento.value = false
   resetDocPolicia()
+  aplicarMontoFijoSiCorresponde()
+  // Los watch del reset (p. ej. descuentoIdEnCaja → 0) corren después: se reaplica.
+  void nextTick(aplicarMontoFijoSiCorresponde)
 }
 
 // 🔥 FUNCIÓN CORREGIDA: confirmarYGuardar
-async function confirmarYGuardar() {
-  if (saving.value) return
+async function confirmarYGuardar(montoCeroConfirmado = false) {
+  if (saving.value || premarcadoNoCargado.value) return
+  // Red de seguridad: descuento en $0 que no es intencional → la cajera confirma.
+  if (
+    !montoCeroConfirmado
+    && !esServicioSimplificado.value
+    && descuentoIdEfectivo.value
+    && pideConfirmarMontoCero(codigoDescuentoEfectivo.value, montoDescuentoAEnviar.value, descuentoMaximo.value)
+  ) {
+    dialogMontoCero.value = true
+    return
+  }
+  dialogMontoCero.value = false
   saving.value = true
   try {
     if (!currentTicketId.value && previewBlob.value) {
@@ -2469,7 +2567,7 @@ async function confirmarYGuardar() {
       const servicioIdFinal = turnoMeta.servicioId || (ticketActual?.servicio_id as number) || (ticketActual?.servicioId as number) || undefined
 
       const totalOriginal = form.totalFactura || form.total || 0
-      const montoDesc = descuentoIdEfectivo.value ? (descuentoMontoAplicado.value || 0) : 0
+      const montoDesc = montoDescuentoAEnviar.value
       // El autorizador solo va si el descuento se originó en caja (no del dateo, o fue override)
       const esCajaOrigen = !turnoMeta.descuentoId || overrideDateoDescuento.value
 
