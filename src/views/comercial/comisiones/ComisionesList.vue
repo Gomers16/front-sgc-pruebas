@@ -1136,6 +1136,21 @@
                 />
               </v-col>
 
+              <!-- 🆕 Origen: ticket de Excepción de Dateo -->
+              <v-col cols="6" sm="6" md="3" lg="2">
+                <v-select
+                  v-model="filters.origen"
+                  :items="origenItems"
+                  item-title="label"
+                  item-value="value"
+                  label="Origen"
+                  density="comfortable"
+                  variant="outlined"
+                  hide-details
+                  data-test="filtro-origen"
+                />
+              </v-col>
+
               <!-- Tipo Vehículo -->
               <v-col cols="6" sm="6" md="3" lg="2">
                 <v-select
@@ -1761,6 +1776,9 @@
               <v-chip :color="estadoColor(item.estado)" size="small" variant="flat">
                 {{ item.estado }}
               </v-chip>
+              <div v-if="item.ticket_origen?.marca" class="mt-1">
+                <MarcaTicketComision :origen="item.ticket_origen" />
+              </div>
             </template>
 
             <template #item.tipo_vehiculo="{ item }">
@@ -2376,6 +2394,12 @@
     <!-- ══════════════════════════════════════════════════════════
      DIÁLOGO: Detalle comisión
 ══════════════════════════════════════════════════════════ -->
+<ConfirmarSinComisionDialog
+  :model-value="confirmacionSinComision.visible"
+  :conflicto="confirmacionSinComision.conflicto"
+  @responder="responderSinComision"
+/>
+
 <v-dialog v-model="detailDialog.visible" max-width="820" scrollable>
   <v-card v-if="detailDialog.item">
     <v-card-title class="text-h6 d-flex align-center justify-space-between py-3 px-5">
@@ -2401,6 +2425,38 @@
       <v-skeleton-loader v-if="detailDialog.loading" type="card, card, card" />
 
       <template v-else>
+
+        <!-- 🆕 ══ SECCIÓN: TICKET DE ORIGEN (decisión "sin comisión") ══ -->
+        <v-alert
+          v-if="detailDialog.item.ticket_origen?.marca"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-4"
+          icon="mdi-ticket-confirmation-outline"
+          data-test="detalle-ticket-origen"
+        >
+          <div class="d-flex align-center flex-wrap gap-2 mb-1">
+            <MarcaTicketComision :origen="detailDialog.item.ticket_origen" />
+          </div>
+          <div class="text-body-2">
+            Decidió {{ detailDialog.item.ticket_origen.decidido_por_nombre ?? 'gerencia' }}
+            <template v-if="detailDialog.item.ticket_origen.decidido_at">
+              el {{ formatDate(detailDialog.item.ticket_origen.decidido_at) }}
+            </template>
+            al aprobar el
+            <router-link :to="{ name: 'TicketDetalle', params: { id: detailDialog.item.ticket_origen.ticket_id } }">
+              ticket #{{ detailDialog.item.ticket_origen.ticket_id }}
+            </router-link>.
+          </div>
+          <div v-if="detailDialog.item.ticket_origen.dejado_de_pagar" class="text-body-2 mt-1">
+            <strong>Dejado de pagar:</strong>
+            {{ textoDejadoDePagar(detailDialog.item.ticket_origen.dejado_de_pagar, formatCOP) }}
+            <span v-if="!detailDialog.item.ticket_origen.dejado_de_pagar.exacto" class="text-caption">
+              (sin foto del valor calculado: se estima con la configuración vigente)
+            </span>
+          </div>
+        </v-alert>
 
         <!-- ══ SECCIÓN: INFO DEL CLIENTE ══ -->
         <div class="mb-4">
@@ -3592,6 +3648,13 @@ import {
 } from '@/services/reportesAdminService'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import AvisoCanal from '@/components/reportes/AvisoCanal.vue'
+import MarcaTicketComision from './MarcaTicketComision.vue'
+import ConfirmarSinComisionDialog from './ConfirmarSinComisionDialog.vue'
+import {
+  conConfirmacionSinComision,
+  textoDejadoDePagar,
+  type ConflictoSinComision,
+} from './ticketOrigen'
 import TurnoDetalleDialog, { type Turno as TurnoDetalle } from '@/components/rtm/TurnoDetalleDialog.vue'
 
 /* ── Extended types ── */
@@ -3660,6 +3723,8 @@ const filters = ref<{
   tipoAsesor: '' | 'ASESOR_COMERCIAL' | 'ASESOR_CONVENIO' | 'CONVENIO'
   tipoCaptacion: '' | 'NUEVO_DIRECTO' | 'CONVENIO'
   placa: string
+  /** 🆕 '' = todas · con_ticket · sin_comision_ticket */
+  origen: '' | 'con_ticket' | 'sin_comision_ticket'
 }>({
   desde: '',
   hasta: '',
@@ -3671,13 +3736,39 @@ const filters = ref<{
   tipoAsesor: '',
   tipoCaptacion: '',
   placa: '',
+  origen: '',
 })
 
 const activeFiltersCount = computed(() =>
   [filters.value.desde, filters.value.hasta, filters.value.asesorId, filters.value.convenioId,
-   filters.value.estado, filters.value.tipoVehiculo, filters.value.descuentoCodigo]
+   filters.value.estado, filters.value.tipoVehiculo, filters.value.descuentoCodigo,
+   filters.value.origen]
    .filter(Boolean).length
 )
+
+// 🆕 Filtro "Origen" (ticket de Excepción de Dateo).
+const origenItems = [
+  { label: 'Todas', value: '' },
+  { label: 'Con ticket', value: 'con_ticket' },
+  { label: 'Sin comisión por ticket', value: 'sin_comision_ticket' },
+]
+
+/* 🆕 Confirmación de montos contra la decisión de un ticket "sin comisión" */
+const confirmacionSinComision = ref<{
+  visible: boolean
+  conflicto: ConflictoSinComision | null
+  resolver: ((ok: boolean) => void) | null
+}>({ visible: false, conflicto: null, resolver: null })
+function pedirConfirmacionSinComision(c: ConflictoSinComision) {
+  return new Promise<boolean>((resolve) => {
+    confirmacionSinComision.value = { visible: true, conflicto: c, resolver: resolve }
+  })
+}
+function responderSinComision(ok: boolean) {
+  const r = confirmacionSinComision.value.resolver
+  confirmacionSinComision.value = { visible: false, conflicto: null, resolver: null }
+  r?.(ok)
+}
 
 /* ── Scroll horizontal sincronizado (barra arriba + tabla ancha) ── */
 const scrollWrapper = ref<HTMLDivElement | null>(null)
@@ -3810,6 +3901,7 @@ async function loadResumen() {
       tipoVehiculo: (filters.value.tipoVehiculo as 'MOTO' | 'VEHICULO') || undefined,
       placa: filters.value.placa || undefined,
       tipoAsesor: filters.value.tipoAsesor || undefined,
+      origen: filters.value.origen || undefined,
     })
   } catch {
     resumenComisiones.value = null
@@ -4412,15 +4504,22 @@ async function guardarEdicion() {
   if (!item) return
   editDialog.value.loading = true
   try {
-    await patchComisionEditar(item.id, {
-      asesor_id: form.asesorId,
-      convenio_id: form.convenioId,
-      monto_asesor: Number(form.montoAsesor) || 0,
-      monto_convenio: Number(form.montoConvenio) || 0,
-      tipo_cliente: form.tipoCliente,
-      descuento_id: form.descuentoId,
-      dateo_observacion: form.observacionDateo.trim() || null,
-    })
+    const hecho = await conConfirmacionSinComision(
+      (confirmar) =>
+        patchComisionEditar(item.id, {
+          asesor_id: form.asesorId,
+          convenio_id: form.convenioId,
+          monto_asesor: Number(form.montoAsesor) || 0,
+          monto_convenio: Number(form.montoConvenio) || 0,
+          tipo_cliente: form.tipoCliente,
+          descuento_id: form.descuentoId,
+          dateo_observacion: form.observacionDateo.trim() || null,
+          ...(confirmar ? { confirmar_excepcion: true } : {}),
+        }),
+      pedirConfirmacionSinComision,
+    )
+    // Canceló en el diálogo del ticket "sin comisión": el formulario queda abierto.
+    if (!hecho) return
     editDialog.value.visible = false
     await loadItems()
   } finally {
@@ -4468,6 +4567,7 @@ async function loadItems() {
   placa: filters.value.placa || undefined,
   tipoAsesor: filters.value.tipoAsesor || undefined,
   tipoCaptacion: filters.value.tipoCaptacion || undefined,
+  origen: filters.value.origen || undefined,
   sortBy: sort.key,
   order: sort.order,
 })
@@ -5543,7 +5643,7 @@ function reload() {
 }
 
 function resetFilters() {
-  filters.value = { desde: '', hasta: '', asesorId: null, convenioId: null, estado: '', tipoVehiculo: '', descuentoCodigo: '', tipoAsesor: '', tipoCaptacion: '', placa: '' }
+  filters.value = { desde: '', hasta: '', asesorId: null, convenioId: null, estado: '', tipoVehiculo: '', descuentoCodigo: '', tipoAsesor: '', tipoCaptacion: '', placa: '', origen: '' }
   filtroRapidoFecha.value = ''
   conveniosFiltroComercial.value = []
   selectedIds.value = []
@@ -6505,17 +6605,23 @@ async function guardarCreacion() {
   if (!turnoSeleccionado) return
   crearDialog.value.loading = true
   try {
-    await createComision({
-      turno_id: turnoSeleccionado.id,
-      asesor_id: form.asesorId,
-      convenio_id: form.convenioId,
-      monto_asesor: Number(form.montoAsesor) || 0,
-      monto_convenio: Number(form.montoConvenio) || 0,
-      tipo_cliente: form.tipoCliente,
-      descuento_id: form.descuentoId,
-      dateo_observacion: form.observacionDateo.trim() || null,
-      es_avance: form.esAvance,
-    })
+    const hecho = await conConfirmacionSinComision(
+      (confirmar) =>
+        createComision({
+          turno_id: turnoSeleccionado.id,
+          asesor_id: form.asesorId,
+          convenio_id: form.convenioId,
+          monto_asesor: Number(form.montoAsesor) || 0,
+          monto_convenio: Number(form.montoConvenio) || 0,
+          tipo_cliente: form.tipoCliente,
+          descuento_id: form.descuentoId,
+          dateo_observacion: form.observacionDateo.trim() || null,
+          es_avance: form.esAvance,
+          ...(confirmar ? { confirmar_excepcion: true } : {}),
+        }),
+      pedirConfirmacionSinComision,
+    )
+    if (!hecho) return
     crearDialog.value.visible = false
     await loadItems()
   } finally {

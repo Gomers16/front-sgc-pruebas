@@ -18,6 +18,22 @@ function buildQuery(params?: Record<string, unknown>) {
   return s ? `?${s}` : ''
 }
 
+/**
+ * Error HTTP con el status y el cuerpo de la respuesta (p. ej. el 409
+ * MONTO_CONTRADICE_TICKET_SIN_COMISION). Sigue siendo un Error con el mismo
+ * mensaje de siempre, así que quien solo leía `message` no cambia.
+ */
+export class ApiError extends Error {
+  status: number
+  data: Record<string, unknown> | null
+  constructor(message: string, status: number, data: Record<string, unknown> | null) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.data = data
+  }
+}
+
 async function apiFetch<T>(
   endpoint: string,
   opts: { method?: HttpMethod; body?: unknown; query?: Record<string, unknown>; headers?: HeadersInit } = {}
@@ -39,11 +55,13 @@ async function apiFetch<T>(
 
   if (!res.ok) {
     let msg = `HTTP ${res.status}`
+    let data: Record<string, unknown> | null = null
     try {
       const err = await res.json()
+      data = err as Record<string, unknown>
       msg = (err as Record<string, unknown>)?.message as string || JSON.stringify(err)
     } catch {}
-    throw new Error(msg)
+    throw new ApiError(msg, res.status, data)
   }
   return (await res.json()) as T
 }
@@ -178,6 +196,29 @@ export interface ComisionListItem {
 
   /** 🆕 Consecutivo del descuento, leído del ticket CONFIRMADA (null = sin ticket o ticket anterior) */
   consecutivo_descuento?: string | null
+
+  /** 🆕 Ticket de Excepción de Dateo de origen (null = no viene de un ticket). */
+  ticket_origen?: TicketOrigenComision | null
+}
+
+export type MarcaTicketComision = 'SIN_COMISION_ASESOR' | 'SIN_COMISION_CONVENIO' | 'SIN_COMISION'
+
+/** GET /comisiones y /comisiones/:id → ticket_origen (ver ticket_comision_origen_service del backend). */
+export interface TicketOrigenComision {
+  ticket_id: number
+  caso: 'SIN_CONVENIO' | 'CONVENIO_SELF' | 'CONVENIO_COMERCIAL'
+  dentro_ventana: boolean
+  sin_comision_asesor: boolean
+  sin_comision_convenio: boolean
+  /** null = el ticket se aprobó con comisión completa. */
+  marca: MarcaTicketComision | null
+  /** "Sin comisión asesor · ticket #123" */
+  etiqueta: string | null
+  decidido_por_id: number | null
+  decidido_por_nombre: string | null
+  decidido_at: string | null
+  /** Solo en el detalle. exacto = foto del valor calculado; si no, estimado. */
+  dejado_de_pagar?: { asesor: number; convenio: number | null; exacto: boolean } | null
 }
 
 export interface ComisionDetail extends ComisionListItem {
@@ -209,6 +250,8 @@ export interface ListParams {
   placa?: string
   tipoAsesor?: 'ASESOR_COMERCIAL' | 'ASESOR_CONVENIO' | 'CONVENIO' | ''
   tipoCaptacion?: 'NUEVO_DIRECTO' | 'CONVENIO' | ''
+  /** 🆕 con_ticket | sin_comision_ticket (vacío = todas). */
+  origen?: 'con_ticket' | 'sin_comision_ticket' | ''
 }
 
 export interface ListResponse<T> {
@@ -523,6 +566,7 @@ function mapComisionToListItem(api: unknown): ComisionListItem {
     consecutivo_descuento: (a.consecutivo_descuento ?? a.consecutivoDescuento ?? null) as
       | string
       | null,
+    ticket_origen: (a.ticket_origen ?? null) as TicketOrigenComision | null,
   }
 }
 
@@ -731,7 +775,7 @@ export async function getComision(id: number) {
 
 export async function patchValores(
   id: number,
-  payload: { cantidad: number; valor_unitario: number }
+  payload: { cantidad: number; valor_unitario: number; confirmar_excepcion?: boolean }
 ) {
   const raw = await apiFetch<unknown>(`/comisiones/${id}/valores`, {
     method: 'PATCH',
@@ -1244,6 +1288,8 @@ export async function patchComisionEditar(
     tipo_cliente?: 'NUEVO' | 'RECURRENTE' | 'RECUPERACION' | null
     descuento_id?: number | null
     dateo_observacion?: string | null
+    /** Solo SUPER_ADMIN/GERENCIA: confirma un monto contra la decisión del ticket. */
+    confirmar_excepcion?: boolean
   }
 ) {
   const raw = await apiFetch<unknown>(`/comisiones/${id}/editar`, {
@@ -1320,6 +1366,7 @@ export async function createComision(payload: {
   descuento_id?: number | null
   dateo_observacion?: string | null
   es_avance?: boolean
+  confirmar_excepcion?: boolean
 }): Promise<ComisionDetail> {
   const raw = await apiFetch<unknown>('/comisiones', {
     method: 'POST',

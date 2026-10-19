@@ -292,6 +292,13 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- 🆕 Monto contra la decisión de un ticket "sin comisión" -->
+    <ConfirmarSinComisionDialog
+      :model-value="confirmacion.visible"
+      :conflicto="confirmacion.conflicto"
+      @responder="responderSinComision"
+    />
   </v-container>
 </template>
 
@@ -309,6 +316,8 @@ import {
   type ComisionEstado,
 } from '@/services/comisionesService'
 import { etiquetaConvenio } from '@/services/conveniosService'
+import ConfirmarSinComisionDialog from './ConfirmarSinComisionDialog.vue'
+import { conConfirmacionSinComision, type ConflictoSinComision } from './ticketOrigen'
 
 interface ComisionDetailExtended extends ComisionDetail {
   es_avance?: boolean | null
@@ -394,12 +403,33 @@ async function load() {
   }
 }
 
-async function guardarValores() {
-  await patchValores(id, {
-    cantidad: Number(form.value.cantidad),
-    valor_unitario: Number(form.value.valor_unitario),
+const confirmacion = ref<{
+  visible: boolean
+  conflicto: ConflictoSinComision | null
+  resolver: ((ok: boolean) => void) | null
+}>({ visible: false, conflicto: null, resolver: null })
+function pedirConfirmacion(c: ConflictoSinComision) {
+  return new Promise<boolean>((resolve) => {
+    confirmacion.value = { visible: true, conflicto: c, resolver: resolve }
   })
-  await load()
+}
+function responderSinComision(ok: boolean) {
+  const r = confirmacion.value.resolver
+  confirmacion.value = { visible: false, conflicto: null, resolver: null }
+  r?.(ok)
+}
+
+async function guardarValores() {
+  const hecho = await conConfirmacionSinComision(
+    (confirmar) =>
+      patchValores(id, {
+        cantidad: Number(form.value.cantidad),
+        valor_unitario: Number(form.value.valor_unitario),
+        ...(confirmar ? { confirmar_excepcion: true } : {}),
+      }),
+    pedirConfirmacion,
+  )
+  if (hecho) await load()
 }
 
 function volver() {
