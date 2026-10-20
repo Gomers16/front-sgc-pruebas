@@ -780,8 +780,20 @@
                 <v-progress-circular indeterminate size="14" width="2" class="mr-1" /> Calculando…
               </div>
               <template v-else-if="edicion.previa">
-                <div v-if="edicion.previa.comision.comisionId" class="text-body-2 mb-1">
-                  #{{ edicion.previa.comision.comisionId }} · {{ edicion.previa.comision.estado }}
+                <div v-if="edicion.previa.comision.comisionId" class="d-flex align-center flex-wrap mb-1" style="gap:6px">
+                  <span class="text-body-2">#{{ edicion.previa.comision.comisionId }}</span>
+                  <v-chip size="x-small" variant="flat" :color="estadoComisionColor(edicion.previa.comision.estado)">
+                    {{ edicion.previa.comision.estado }}
+                  </v-chip>
+                  <v-chip
+                    v-if="edicion.previa.comision.enLiquidacion"
+                    size="x-small"
+                    variant="tonal"
+                    color="red-darken-2"
+                    prepend-icon="mdi-file-document-check-outline"
+                  >
+                    En liquidación #{{ edicion.previa.comision.liquidacionIds.join(', #') }}
+                  </v-chip>
                 </div>
                 <template v-if="comisionRecalculada">
                   <div class="text-body-2">
@@ -794,6 +806,12 @@
                   >
                     Convenio: {{ fmtCOP(comisionRecalculada.antes.montoConvenio) }}
                     → <strong>{{ fmtCOP(comisionRecalculada.despues.montoConvenio) }}</strong>
+                  </div>
+                  <div class="text-body-2" data-test="edicion-diferencia">
+                    Diferencia:
+                    <strong :class="comisionRecalculada.diferencia < 0 ? 'text-red-darken-2' : comisionRecalculada.diferencia > 0 ? 'text-green-darken-2' : ''">
+                      {{ comisionRecalculada.diferencia > 0 ? '+' : comisionRecalculada.diferencia < 0 ? '−' : '' }}{{ fmtCOP(Math.abs(comisionRecalculada.diferencia)) }}
+                    </strong>
                   </div>
                 </template>
                 <v-alert
@@ -847,9 +865,61 @@
         data-test="edicion-guardar"
         :loading="edicion.guardando"
         :disabled="!edicionPuedeGuardar"
-        @click="guardarEdicionDescuento"
+        @click="solicitarGuardarEdicion"
       >
         Guardar
+      </v-btn>
+    </v-card-actions>
+  </v-card>
+</v-dialog>
+
+<!-- 🆕 Aviso antes de guardar cuando cambia la comisión -->
+<v-dialog v-model="confirmarComision.open" max-width="520" persistent>
+  <v-card v-if="modalComisionEdicion" data-test="modal-comision">
+    <v-card-title class="d-flex align-center" style="gap:8px">
+      <v-icon :color="modalComisionEdicion.tipo === 'pagada' ? 'red-darken-2' : 'orange-darken-2'">
+        {{ modalComisionEdicion.tipo === 'pagada' ? 'mdi-alert-octagon' : 'mdi-cash-sync' }}
+      </v-icon>
+      {{ modalComisionEdicion.titulo }}
+    </v-card-title>
+    <v-divider />
+    <v-card-text>
+      <v-alert
+        :type="modalComisionEdicion.tipo === 'pagada' ? 'error' : 'warning'"
+        :variant="modalComisionEdicion.tipo === 'pagada' ? 'flat' : 'tonal'"
+        density="comfortable"
+        data-test="modal-comision-texto"
+      >
+        {{ modalComisionEdicion.texto }}
+      </v-alert>
+      <div v-if="comisionRecalculada" class="text-body-2 mt-3">
+        Asesor: {{ fmtCOP(comisionRecalculada.antes.montoAsesor) }} → <strong>{{ fmtCOP(comisionRecalculada.despues.montoAsesor) }}</strong>
+        <template v-if="comisionRecalculada.antes.montoConvenio || comisionRecalculada.despues.montoConvenio">
+          · Convenio: {{ fmtCOP(comisionRecalculada.antes.montoConvenio) }} → <strong>{{ fmtCOP(comisionRecalculada.despues.montoConvenio) }}</strong>
+        </template>
+      </div>
+      <v-checkbox
+        v-if="modalComisionEdicion.requiereCasilla"
+        v-model="confirmarComision.entiendo"
+        class="mt-2"
+        color="red-darken-2"
+        hide-details
+        label="Entiendo que ya se pagó"
+        data-test="modal-comision-entiendo"
+      />
+    </v-card-text>
+    <v-card-actions>
+      <v-spacer />
+      <v-btn variant="text" :disabled="edicion.guardando" @click="confirmarComision.open = false">Volver</v-btn>
+      <v-btn
+        :color="modalComisionEdicion.tipo === 'pagada' ? 'red-darken-2' : 'orange-darken-2'"
+        variant="flat"
+        data-test="modal-comision-confirmar"
+        :loading="edicion.guardando"
+        :disabled="modalComisionEdicion.requiereCasilla && !confirmarComision.entiendo"
+        @click="guardarEdicionDescuento(modalComisionEdicion.requiereCasilla)"
+      >
+        {{ modalComisionEdicion.requiereCasilla ? 'Guardar' : 'Confirmar' }}
       </v-btn>
     </v-card-actions>
   </v-card>
@@ -901,6 +971,7 @@ import {
 import {
   avisoComision,
   bodyEdicion,
+  modalComision,
   formInicialEdicion,
   hayCambioEdicion,
   motivoEdicionValido,
@@ -1656,12 +1727,37 @@ const avisoComisionEdicion = computed(() =>
 )
 const comisionRecalculada = computed(() => {
   const c = edicion.previa?.comision
-  return c?.accion === 'RECALCULADA' && c.antes && c.despues ? { antes: c.antes, despues: c.despues } : null
+  const recalcula = c?.accion === 'RECALCULADA' || c?.accion === 'AJUSTADA_TRAS_PAGO'
+  return recalcula && c.antes && c.despues
+    ? { antes: c.antes, despues: c.despues, diferencia: c.diferencia.total }
+    : null
 })
+const modalComisionEdicion = computed(() =>
+  edicion.previa ? modalComision(edicion.previa.comision, fmtCOP) : null,
+)
+const confirmarComision = reactive({ open: false, entiendo: false })
+function estadoComisionColor(estado: string | null) {
+  return estado === 'PAGADA' ? 'red-darken-2'
+    : estado === 'APROBADA' ? 'blue'
+    : estado === 'ANULADA' ? 'grey'
+    : 'orange-darken-2'
+}
+
+// Si la comisión cambia, primero el modal (con casilla si ya se pagó).
+function solicitarGuardarEdicion() {
+  if (!edicionPuedeGuardar.value) return
+  if (modalComisionEdicion.value) {
+    Object.assign(confirmarComision, { open: true, entiendo: false })
+    return
+  }
+  void guardarEdicionDescuento(false)
+}
 const edicionPuedeGuardar = computed(() => {
   const f = edicion.form
   if (edicion.guardando || edicion.cargando || !edicionHayCambio.value) return false
   if (!motivoEdicionValido(edicion.motivo) || edicion.error || edicion.previaCargando) return false
+  // Sin la previsualización no se sabe qué le pasa a la comisión.
+  if (!edicion.previa) return false
   if (f.descuentoId && edicion.consecutivoBloqueado) return false
   if (edicionDetalle.value?.codigo === 'INFORMATIVO_POLICIA' && !edicion.documentosCompletos) return false
   if (edicionRequiereAutorizador.value && !f.autorizadoPorId) return false
@@ -1704,15 +1800,16 @@ watch(
   { deep: true },
 )
 
-async function guardarEdicionDescuento() {
+async function guardarEdicionDescuento(confirmarPagada: boolean) {
   const ticket = edicion.ticket
   if (!ticket || !edicionPuedeGuardar.value) return
   edicion.guardando = true
   edicion.error = ''
   try {
     const r = await FacturacionService.editarDescuentoConfirmado(
-      ticket.id, bodyEdicion(edicion.form, edicion.motivo),
+      ticket.id, bodyEdicion(edicion.form, edicion.motivo, confirmarPagada),
     )
+    confirmarComision.open = false
     edicion.open = false
     const aviso = avisoComision(r.comision)
     snack.text = aviso.tipo === 'warning'
@@ -1725,6 +1822,7 @@ async function guardarEdicionDescuento() {
     await fetchList()
   } catch (err) {
     console.error('Error editando el descuento:', err)
+    confirmarComision.open = false
     edicion.error = err instanceof Error ? err.message : 'No se pudo guardar.'
   } finally {
     edicion.guardando = false

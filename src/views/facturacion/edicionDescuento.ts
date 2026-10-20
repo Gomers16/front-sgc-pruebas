@@ -88,10 +88,16 @@ export function totalesEdicion(t: TicketParaEditar, actual: FormEdicionDescuento
   return { antes: totalActual, despues: monto > 0 ? Math.max(0, base - monto) : base }
 }
 
-export function bodyEdicion(actual: FormEdicionDescuento, motivo: string): EdicionDescuentoBody {
+export function bodyEdicion(
+  actual: FormEdicionDescuento,
+  motivo: string,
+  confirmarComisionPagada = false,
+): EdicionDescuentoBody {
   const f = normalizar(actual)
-  if (!f.descuentoId) return { descuento_id: null, motivo_edicion: motivo.trim() }
+  const extra = confirmarComisionPagada ? { confirmar_comision_pagada: true } : {}
+  if (!f.descuentoId) return { descuento_id: null, motivo_edicion: motivo.trim(), ...extra }
   return {
+    ...extra,
     descuento_id: f.descuentoId,
     descuento_monto_aplicado: f.monto,
     autorizado_por_id: f.autorizadoPorId,
@@ -101,8 +107,13 @@ export function bodyEdicion(actual: FormEdicionDescuento, motivo: string): Edici
   }
 }
 
+type ComisionPrevia = ResultadoEdicionDescuento['comision']
+
+const totalComision = (m: { montoAsesor: number; montoConvenio: number }) =>
+  m.montoAsesor + m.montoConvenio
+
 /** Qué se muestra en el diálogo sobre la comisión del dateo del turno. */
-export function avisoComision(c: ResultadoEdicionDescuento['comision']): {
+export function avisoComision(c: ComisionPrevia): {
   tipo: 'info' | 'warning' | 'success'
   texto: string
 } {
@@ -112,12 +123,49 @@ export function avisoComision(c: ResultadoEdicionDescuento['comision']): {
         tipo: 'success',
         texto:
           c.mensaje ??
-          `La comisión #${c.comisionId} (PENDIENTE) se recalcula con el nuevo descuento.`,
+          `La comisión #${c.comisionId} (${c.estado}) se recalcula con el nuevo descuento.`,
       }
+    case 'AJUSTADA_TRAS_PAGO':
     case 'NO_MODIFICADA':
     case 'SIN_CONTINUIDAD':
       return { tipo: 'warning', texto: c.mensaje ?? `La comisión #${c.comisionId} no se modifica.` }
     default:
       return { tipo: 'info', texto: 'El ticket no tiene comisión que recalcular.' }
+  }
+}
+
+/**
+ * Modal antes de guardar cuando la comisión cambia:
+ *  - cambio (PENDIENTE / APROBADA): "La comisión #N (estado) cambiará de $X a $Y".
+ *  - pagada (PAGADA o en liquidación): advertencia fuerte y casilla obligatoria.
+ * null = se guarda sin modal (la comisión no cambia o no hay comisión).
+ */
+export function modalComision(
+  c: ComisionPrevia,
+  formatCOP: (n: number) => string,
+): { tipo: 'cambio' | 'pagada'; titulo: string; texto: string; requiereCasilla: boolean } | null {
+  if ((c.accion !== 'RECALCULADA' && c.accion !== 'AJUSTADA_TRAS_PAGO') || !c.antes || !c.despues) {
+    return null
+  }
+  const cambio = `La comisión #${c.comisionId} (${c.estado}) cambiará de ${formatCOP(totalComision(c.antes))} a ${formatCOP(totalComision(c.despues))}.`
+  if (!c.requiereConfirmacionPago) {
+    return {
+      tipo: 'cambio',
+      titulo: 'Confirmar cambio de comisión',
+      texto: cambio,
+      requiereCasilla: false,
+    }
+  }
+  const donde =
+    c.estado === 'PAGADA'
+      ? 'ya fue pagada'
+      : `ya está en la liquidación #${c.liquidacionIds.join(', #')}`
+  const signo = c.diferencia.total < 0 ? '−' : c.diferencia.total > 0 ? '+' : ''
+  return {
+    tipo: 'pagada',
+    titulo:
+      c.estado === 'PAGADA' ? 'Esta comisión ya fue pagada' : 'Esta comisión ya está liquidada',
+    texto: `Esta comisión ${donde}. Se modificará el monto en el sistema, pero el dinero ya entregado no cambia. Diferencia: ${signo}${formatCOP(Math.abs(c.diferencia.total))}. ${cambio}`,
+    requiereCasilla: true,
   }
 }

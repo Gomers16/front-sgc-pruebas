@@ -4,6 +4,7 @@ import {
   bodyEdicion,
   formInicialEdicion,
   hayCambioEdicion,
+  modalComision,
   motivoEdicionValido,
   requiereAutorizador,
   totalesEdicion,
@@ -127,33 +128,101 @@ describe('editar descuento: lo que se envía', () => {
   })
 })
 
-describe('editar descuento: aviso de la comisión', () => {
-  const base = { comisionId: 55, estado: 'PENDIENTE', antes: null, despues: null }
+describe('editar descuento: aviso y modal de la comisión', () => {
+  const formatCOP = (n: number) => `$${n.toLocaleString('es-CO')}`
+  const base = {
+    comisionId: 55,
+    estado: 'PENDIENTE',
+    antes: null,
+    despues: null,
+    diferencia: { asesor: 0, convenio: 0, total: 0 },
+    liquidacionIds: [] as number[],
+    enLiquidacion: false,
+    requiereConfirmacionPago: false,
+  }
+  const recalculo = {
+    ...base,
+    antes: { monto: 17280, montoAsesor: 17280, montoConvenio: 0 },
+    despues: { monto: 4300, montoAsesor: 4300, montoConvenio: 0 },
+    diferencia: { asesor: -12980, convenio: 0, total: -12980 },
+  }
 
-  it('APROBADA/PAGADA: muestra el aviso del backend con el número de la comisión', () => {
-    const texto = 'La comisión #55 ya está APROBADA: no se modificó, ajústala en Comisiones.'
-    expect(
-      avisoComision({ ...base, estado: 'APROBADA', accion: 'NO_MODIFICADA', mensaje: texto }),
-    ).toEqual({
-      tipo: 'warning',
-      texto,
-    })
+  it('ANULADA: aviso del backend con el número de la comisión y sin modal', () => {
+    const texto = 'La comisión #55 está ANULADA: no se modificó.'
+    const c = { ...base, estado: 'ANULADA', accion: 'NO_MODIFICADA' as const, mensaje: texto }
+    expect(avisoComision(c)).toEqual({ tipo: 'warning', texto })
+    expect(modalComision(c, formatCOP)).toBeNull()
   })
 
-  it('PENDIENTE recalculada, sin continuidad y sin comisión', () => {
-    expect(avisoComision({ ...base, accion: 'RECALCULADA', mensaje: null }).tipo).toBe('success')
-    expect(
-      avisoComision({
-        ...base,
-        accion: 'SIN_CONTINUIDAD',
-        mensaje: 'No se pudo recalcular: falta la continuidad guardada.',
-      }),
-    ).toEqual({ tipo: 'warning', texto: 'No se pudo recalcular: falta la continuidad guardada.' })
-    expect(
-      avisoComision({ ...base, comisionId: null, accion: 'SIN_COMISION', mensaje: null }),
-    ).toEqual({
+  it('PENDIENTE y APROBADA: modal "cambiará de $X a $Y" sin casilla', () => {
+    for (const estado of ['PENDIENTE', 'APROBADA']) {
+      const c = { ...recalculo, estado, accion: 'RECALCULADA' as const, mensaje: null }
+      expect(avisoComision(c).tipo).toBe('success')
+      expect(modalComision(c, formatCOP)).toEqual({
+        tipo: 'cambio',
+        titulo: 'Confirmar cambio de comisión',
+        texto: `La comisión #55 (${estado}) cambiará de $17.280 a $4.300.`,
+        requiereCasilla: false,
+      })
+    }
+  })
+
+  it('PAGADA: advertencia fuerte con la diferencia y casilla obligatoria', () => {
+    const c = {
+      ...recalculo,
+      estado: 'PAGADA',
+      accion: 'AJUSTADA_TRAS_PAGO' as const,
+      mensaje: 'x',
+      requiereConfirmacionPago: true,
+    }
+    const m = modalComision(c, formatCOP)!
+    expect(m.tipo).toBe('pagada')
+    expect(m.requiereCasilla).toBe(true)
+    expect(m.titulo).toBe('Esta comisión ya fue pagada')
+    expect(m.texto).toBe(
+      'Esta comisión ya fue pagada. Se modificará el monto en el sistema, pero el dinero ya entregado no cambia. Diferencia: −$12.980. La comisión #55 (PAGADA) cambiará de $17.280 a $4.300.',
+    )
+    expect(avisoComision(c).tipo).toBe('warning')
+  })
+
+  it('en liquidación (aunque siga PENDIENTE): igual que PAGADA, con el número de la liquidación', () => {
+    const c = {
+      ...recalculo,
+      accion: 'AJUSTADA_TRAS_PAGO' as const,
+      mensaje: null,
+      liquidacionIds: [12],
+      enLiquidacion: true,
+      requiereConfirmacionPago: true,
+    }
+    const m = modalComision(c, formatCOP)!
+    expect(m.requiereCasilla).toBe(true)
+    expect(m.texto).toContain('Esta comisión ya está en la liquidación #12.')
+  })
+
+  it('sin continuidad o sin comisión: sin modal', () => {
+    const sinCont = {
+      ...base,
+      accion: 'SIN_CONTINUIDAD' as const,
+      mensaje: 'No se pudo recalcular: falta la continuidad guardada.',
+    }
+    expect(avisoComision(sinCont)).toEqual({ tipo: 'warning', texto: sinCont.mensaje })
+    expect(modalComision(sinCont, formatCOP)).toBeNull()
+    const sinCom = { ...base, comisionId: null, accion: 'SIN_COMISION' as const, mensaje: null }
+    expect(avisoComision(sinCom)).toEqual({
       tipo: 'info',
       texto: 'El ticket no tiene comisión que recalcular.',
+    })
+    expect(modalComision(sinCom, formatCOP)).toBeNull()
+  })
+
+  it('al guardar una comisión pagada se envía confirmar_comision_pagada', () => {
+    const inicial = formInicialEdicion(CON_DESCUENTO)
+    expect(bodyEdicion(inicial, 'Motivo largo', true).confirmar_comision_pagada).toBe(true)
+    expect(bodyEdicion(inicial, 'Motivo largo')).not.toHaveProperty('confirmar_comision_pagada')
+    expect(bodyEdicion({ ...inicial, descuentoId: null }, 'Motivo largo', true)).toEqual({
+      descuento_id: null,
+      motivo_edicion: 'Motivo largo',
+      confirmar_comision_pagada: true,
     })
   })
 })

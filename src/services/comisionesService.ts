@@ -199,6 +199,29 @@ export interface ComisionListItem {
 
   /** 🆕 Ticket de Excepción de Dateo de origen (null = no viene de un ticket). */
   ticket_origen?: TicketOrigenComision | null
+
+  /** 🆕 Última edición del descuento en Facturación que cambió esta comisión. */
+  ajuste_edicion_factura?: AjusteEdicionFactura | null
+}
+
+/** GET /comisiones y /comisiones/:id → ajuste_edicion_factura. */
+export interface AjusteEdicionFactura {
+  edicion_id: number
+  facturacion_ticket_id: number
+  /** (asesor + convenio) después − antes */
+  diferencia: number
+  /** La comisión ya estaba PAGADA o en una liquidación. */
+  tras_pago: boolean
+  fecha: string | null
+}
+
+/** "Ajustada por edición de factura · −$4.300" */
+export function etiquetaAjusteFactura(
+  a: Pick<AjusteEdicionFactura, 'diferencia'>,
+  formatCOP: (n: number) => string,
+): string {
+  const signo = a.diferencia > 0 ? '+' : a.diferencia < 0 ? '−' : ''
+  return `Ajustada por edición de factura · ${signo}${formatCOP(Math.abs(a.diferencia))}`
 }
 
 export type MarcaTicketComision = 'SIN_COMISION_ASESOR' | 'SIN_COMISION_CONVENIO' | 'SIN_COMISION'
@@ -567,6 +590,7 @@ function mapComisionToListItem(api: unknown): ComisionListItem {
       | string
       | null,
     ticket_origen: (a.ticket_origen ?? null) as TicketOrigenComision | null,
+    ajuste_edicion_factura: (a.ajuste_edicion_factura ?? null) as AjusteEdicionFactura | null,
   }
 }
 

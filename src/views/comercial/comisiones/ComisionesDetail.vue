@@ -20,6 +20,10 @@
             <div class="text-body-2" v-if="comision?.aprobado_at"><strong>Aprobada:</strong> {{ fmt(comision.aprobado_at) }}</div>
             <div class="text-body-2" v-if="comision?.pagado_at"><strong>Pagada:</strong> {{ fmt(comision.pagado_at) }}</div>
             <div class="text-body-2" v-if="comision?.anulado_at"><strong>Anulada:</strong> {{ fmt(comision.anulado_at) }}</div>
+            <!-- 🆕 Cambió al editar el descuento de su ticket de facturación -->
+            <div v-if="comision?.ajuste_edicion_factura" class="mt-2">
+              <MarcaAjusteFactura :ajuste="comision.ajuste_edicion_factura" />
+            </div>
           </v-card-text>
           <v-card-actions class="px-4 pb-4 pt-0 d-flex flex-wrap gap-2">
             <v-btn
@@ -317,6 +321,7 @@ import {
 } from '@/services/comisionesService'
 import { etiquetaConvenio } from '@/services/conveniosService'
 import ConfirmarSinComisionDialog from './ConfirmarSinComisionDialog.vue'
+import MarcaAjusteFactura from './MarcaAjusteFactura.vue'
 import { conConfirmacionSinComision, type ConflictoSinComision } from './ticketOrigen'
 
 interface ComisionDetailExtended extends ComisionDetail {

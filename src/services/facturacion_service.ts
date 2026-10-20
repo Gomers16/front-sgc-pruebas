@@ -235,6 +235,8 @@ export interface EdicionDescuentoBody {
   consecutivo_descuento?: string | null
   /** Obligatorio al guardar (5 a 255 caracteres) */
   motivo_edicion: string
+  /** Obligatorio si la comisión está PAGADA o en una liquidación (si no, 409). */
+  confirmar_comision_pagada?: boolean
 }
 
 export interface EstadoDescuentoTicket {
@@ -255,11 +257,16 @@ export interface MontosComision {
 
 /**
  * Qué pasa con la comisión del dateo del turno:
- * RECALCULADA (estaba PENDIENTE) · NO_MODIFICADA (APROBADA, PAGADA, ANULADA
- * o en liquidación) · SIN_CONTINUIDAD (falta la continuidad guardada) ·
- * SIN_COMISION (no hay nada que recalcular).
+ * RECALCULADA (PENDIENTE o APROBADA) · AJUSTADA_TRAS_PAGO (PAGADA o en una
+ * liquidación; exige confirmar_comision_pagada) · NO_MODIFICADA (ANULADA) ·
+ * SIN_CONTINUIDAD (falta la continuidad guardada) · SIN_COMISION.
  */
-export type AccionComisionEdicion = 'RECALCULADA' | 'NO_MODIFICADA' | 'SIN_CONTINUIDAD' | 'SIN_COMISION'
+export type AccionComisionEdicion =
+  | 'RECALCULADA'
+  | 'AJUSTADA_TRAS_PAGO'
+  | 'NO_MODIFICADA'
+  | 'SIN_CONTINUIDAD'
+  | 'SIN_COMISION'
 
 export interface ResultadoEdicionDescuento {
   previsualizacion?: boolean
@@ -274,6 +281,11 @@ export interface ResultadoEdicionDescuento {
     estado: string | null
     antes: MontosComision | null
     despues: MontosComision | null
+    /** después − antes (0 si no se recalcula) */
+    diferencia: { asesor: number; convenio: number; total: number }
+    liquidacionIds: number[]
+    enLiquidacion: boolean
+    requiereConfirmacionPago: boolean
   }
 }
 

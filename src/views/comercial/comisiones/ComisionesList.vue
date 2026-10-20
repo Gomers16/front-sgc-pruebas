@@ -1779,6 +1779,9 @@
               <div v-if="item.ticket_origen?.marca" class="mt-1">
                 <MarcaTicketComision :origen="item.ticket_origen" />
               </div>
+              <div v-if="item.ajuste_edicion_factura" class="mt-1">
+                <MarcaAjusteFactura :ajuste="item.ajuste_edicion_factura" />
+              </div>
             </template>
 
             <template #item.tipo_vehiculo="{ item }">
@@ -2455,6 +2458,35 @@
             <span v-if="!detailDialog.item.ticket_origen.dejado_de_pagar.exacto" class="text-caption">
               (sin foto del valor calculado: se estima con la configuración vigente)
             </span>
+          </div>
+        </v-alert>
+
+        <!-- 🆕 ══ SECCIÓN: AJUSTE POR EDICIÓN DE LA FACTURA ══ -->
+        <v-alert
+          v-if="detailDialog.item.ajuste_edicion_factura"
+          :type="detailDialog.item.ajuste_edicion_factura.tras_pago ? 'error' : 'info'"
+          variant="tonal"
+          density="compact"
+          class="mb-4"
+          icon="mdi-receipt-text-edit-outline"
+          data-test="detalle-ajuste-factura"
+        >
+          <div class="d-flex align-center flex-wrap gap-2 mb-1">
+            <MarcaAjusteFactura :ajuste="detailDialog.item.ajuste_edicion_factura" />
+          </div>
+          <div class="text-body-2">
+            Se editó el descuento del
+            <router-link
+              :to="{ name: 'FacturacionHistorico', query: { focus: detailDialog.item.ajuste_edicion_factura.facturacion_ticket_id } }"
+            >
+              ticket de facturación #{{ detailDialog.item.ajuste_edicion_factura.facturacion_ticket_id }}
+            </router-link>
+            <template v-if="detailDialog.item.ajuste_edicion_factura.fecha">
+              el {{ formatDate(detailDialog.item.ajuste_edicion_factura.fecha) }}
+            </template>.
+            <template v-if="detailDialog.item.ajuste_edicion_factura.tras_pago">
+              La comisión ya estaba pagada: el dinero entregado no cambió.
+            </template>
           </div>
         </v-alert>
 
@@ -3649,6 +3681,7 @@ import {
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import AvisoCanal from '@/components/reportes/AvisoCanal.vue'
 import MarcaTicketComision from './MarcaTicketComision.vue'
+import MarcaAjusteFactura from './MarcaAjusteFactura.vue'
 import ConfirmarSinComisionDialog from './ConfirmarSinComisionDialog.vue'
 import {
   conConfirmacionSinComision,
