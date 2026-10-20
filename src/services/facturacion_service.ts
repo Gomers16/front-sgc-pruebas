@@ -114,6 +114,9 @@ export interface FacturacionTicket {
 
   // 🆕 DTO enriquecido del descuento (viene del getById)
   descuentoAplicado?: DescuentoAplicadoDTO | null
+  /** 🆕 Documentos de INFORMATIVO_POLICIA ya subidos (getById) */
+  documentosPoliciaCompletos?: boolean
+  documentosPoliciaFaltantes?: Array<'carnet' | 'tarjeta_propiedad' | 'cedula'>
 
   // 🔹 Enriquecidos (virtuales del backend al preloadear turno/servicio)
   turnoGlobal?: number | null
@@ -220,6 +223,58 @@ export interface VerificacionConsecutivoDescuento {
     confirmado_at: string | null
     created_at: string | null
   }>
+}
+
+/** 🆕 Edición del descuento de un ticket CONFIRMADA (solo SUPER_ADMIN/GERENCIA) */
+export interface EdicionDescuentoBody {
+  /** null = quitar el descuento */
+  descuento_id: number | null
+  descuento_monto_aplicado?: number | null
+  autorizado_por_id?: number | null
+  descuento_observacion?: string | null
+  consecutivo_descuento?: string | null
+  /** Obligatorio al guardar (5 a 255 caracteres) */
+  motivo_edicion: string
+}
+
+export interface EstadoDescuentoTicket {
+  descuento: { id: number; codigo: string; nombre: string } | null
+  monto: number | null
+  total: number | null
+  totalSinDescuento: number | null
+  consecutivoDescuento: string | null
+  autorizadoPorId: number | null
+  observacion: string | null
+}
+
+export interface MontosComision {
+  monto: number
+  montoAsesor: number
+  montoConvenio: number
+}
+
+/**
+ * Qué pasa con la comisión del dateo del turno:
+ * RECALCULADA (estaba PENDIENTE) · NO_MODIFICADA (APROBADA, PAGADA, ANULADA
+ * o en liquidación) · SIN_CONTINUIDAD (falta la continuidad guardada) ·
+ * SIN_COMISION (no hay nada que recalcular).
+ */
+export type AccionComisionEdicion = 'RECALCULADA' | 'NO_MODIFICADA' | 'SIN_CONTINUIDAD' | 'SIN_COMISION'
+
+export interface ResultadoEdicionDescuento {
+  previsualizacion?: boolean
+  message?: string
+  ticketId: number
+  antes: EstadoDescuentoTicket
+  despues: EstadoDescuentoTicket
+  comision: {
+    accion: AccionComisionEdicion
+    mensaje: string | null
+    comisionId: number | null
+    estado: string | null
+    antes: MontosComision | null
+    despues: MontosComision | null
+  }
 }
 
 /* =============================== Endpoints =============================== */
@@ -360,6 +415,16 @@ export const FacturacionService = {
    */
   update(id: number | string, body: TicketUpdatePayload) {
     return patch<FacturacionTicket>(`${base}/${id}`, body)
+  },
+
+  /** 🆕 Antes y después de editar el descuento de un ticket CONFIRMADA (no guarda nada). */
+  previsualizarEdicionDescuento(id: number | string, body: EdicionDescuentoBody) {
+    return patch<ResultadoEdicionDescuento>(`${base}/${id}`, { ...body, solo_previsualizar: true })
+  },
+
+  /** 🆕 Edita el descuento de un ticket CONFIRMADA (el backend deja registro). */
+  editarDescuentoConfirmado(id: number | string, body: EdicionDescuentoBody) {
+    return patch<ResultadoEdicionDescuento>(`${base}/${id}`, body)
   },
 
   /**

@@ -225,9 +225,23 @@
         </template>
 
         <template #item.acciones="{ item }">
-          <v-btn size="small" variant="tonal" prepend-icon="mdi-eye" @click.stop="openDetailById(item.id)">
-            Ver
-          </v-btn>
+          <div class="d-flex" style="gap:6px">
+            <v-btn size="small" variant="tonal" prepend-icon="mdi-eye" @click.stop="openDetailById(item.id)">
+              Ver
+            </v-btn>
+            <!-- 🆕 Editar el descuento de un ticket confirmado (solo SUPER_ADMIN/GERENCIA) -->
+            <v-btn
+              v-if="puedeEditarDescuento && item.estado === 'CONFIRMADA'"
+              size="small"
+              variant="tonal"
+              color="orange-darken-2"
+              prepend-icon="mdi-tag-edit"
+              data-test="editar-descuento"
+              @click.stop="abrirEdicionDescuento(item.id)"
+            >
+              Editar
+            </v-btn>
+          </div>
         </template>
 
         <template #body.append>
@@ -686,7 +700,162 @@
   </v-card>
 </v-dialog>
 
-<v-snackbar v-model="snack.show" :timeout="3000">{{ snack.text }}</v-snackbar>
+<!-- 🆕 DIALOG EDITAR DESCUENTO (ticket CONFIRMADA) -->
+<v-dialog v-model="edicion.open" max-width="780" persistent scrollable>
+  <v-card data-test="dialogo-editar-descuento">
+    <v-card-title class="d-flex align-center flex-wrap" style="gap:8px">
+      <v-icon color="orange-darken-2">mdi-tag-edit</v-icon>
+      Editar descuento
+      <span v-if="edicion.ticket" class="text-body-2 text-medium-emphasis">
+        Ticket #{{ edicion.ticket.id }} — {{ edicion.ticket.placa ?? '—' }}
+      </span>
+    </v-card-title>
+    <v-divider />
+    <v-card-text>
+      <div v-if="edicion.cargando" class="d-flex justify-center py-8">
+        <v-progress-circular indeterminate color="orange-darken-2" />
+      </div>
+      <template v-else-if="edicion.ticket">
+        <v-alert type="info" variant="tonal" density="compact" class="mb-2" prepend-icon="mdi-tag-outline">
+          <strong>Descuento actual:</strong>
+          {{ nombreDescuentoInicial }}
+          <template v-if="edicion.inicial.descuentoId">
+            · {{ fmtCOP(edicion.inicial.monto) }} · consecutivo {{ edicion.inicial.consecutivo || '—' }}
+          </template>
+        </v-alert>
+
+        <DescuentoCajaEditor
+          v-model:descuento-id="edicion.form.descuentoId"
+          v-model:monto="edicion.form.monto"
+          v-model:autorizado-por-id="edicion.form.autorizadoPorId"
+          v-model:observacion="edicion.form.observacion"
+          v-model:consecutivo="edicion.form.consecutivo"
+          modo="caja"
+          etiqueta-selector="Descuento (vacío = sin descuento)"
+          :descuentos="descuentosEdicion"
+          :usuarios="autorizadoresEdicion"
+          :es-moto="edicionEsMoto"
+          :ticket-id="edicion.ticket.id"
+          :documentos-cargados="edicionDocumentosCargados"
+          :requiere-autorizador="edicionRequiereAutorizador"
+          :mostrar-efecto-comision="false"
+          mostrar-observacion
+          @update:consecutivo-bloqueado="(b: boolean) => (edicion.consecutivoBloqueado = b)"
+          @update:documentos-completos="(v: boolean) => (edicion.documentosCompletos = v)"
+          @aviso="avisoSnack"
+        >
+          <template #observacion-ayuda>Nota de por qué se aplica o cambia el descuento.</template>
+        </DescuentoCajaEditor>
+
+        <v-alert v-if="edicionMontoCero" type="warning" variant="tonal" density="compact" class="mt-2">
+          El descuento va en $0: se registrará sin reducir el precio.
+        </v-alert>
+
+        <v-row dense class="mt-3">
+          <v-col cols="12" md="6">
+            <v-card variant="outlined" class="pa-3 rounded-lg h-100" data-test="edicion-total">
+              <div class="label-desc">Total del ticket</div>
+              <div class="d-flex align-center flex-wrap" style="gap:8px">
+                <span class="text-body-1">{{ fmtCOP(edicionTotales.antes) }}</span>
+                <v-icon size="18">mdi-arrow-right</v-icon>
+                <span
+                  class="text-h6 font-weight-bold"
+                  :class="{ 'text-orange-darken-2': edicionTotales.despues !== edicionTotales.antes }"
+                >
+                  {{ fmtCOP(edicionTotales.despues) }}
+                </span>
+              </div>
+              <div class="text-caption text-medium-emphasis mt-1">
+                Antes → después. Se recalcula desde el total sin descuento.
+              </div>
+            </v-card>
+          </v-col>
+          <v-col cols="12" md="6">
+            <v-card variant="outlined" class="pa-3 rounded-lg h-100" data-test="edicion-comision">
+              <div class="label-desc">Comisión del dateo</div>
+              <div v-if="!edicionHayCambio" class="text-caption text-medium-emphasis">
+                Cambia el descuento para ver el efecto en la comisión.
+              </div>
+              <div v-else-if="edicion.previaCargando" class="text-caption text-medium-emphasis">
+                <v-progress-circular indeterminate size="14" width="2" class="mr-1" /> Calculando…
+              </div>
+              <template v-else-if="edicion.previa">
+                <div v-if="edicion.previa.comision.comisionId" class="text-body-2 mb-1">
+                  #{{ edicion.previa.comision.comisionId }} · {{ edicion.previa.comision.estado }}
+                </div>
+                <template v-if="comisionRecalculada">
+                  <div class="text-body-2">
+                    Asesor: {{ fmtCOP(comisionRecalculada.antes.montoAsesor) }}
+                    → <strong>{{ fmtCOP(comisionRecalculada.despues.montoAsesor) }}</strong>
+                  </div>
+                  <div
+                    v-if="comisionRecalculada.antes.montoConvenio || comisionRecalculada.despues.montoConvenio"
+                    class="text-body-2"
+                  >
+                    Convenio: {{ fmtCOP(comisionRecalculada.antes.montoConvenio) }}
+                    → <strong>{{ fmtCOP(comisionRecalculada.despues.montoConvenio) }}</strong>
+                  </div>
+                </template>
+                <v-alert
+                  v-if="avisoComisionEdicion"
+                  :type="avisoComisionEdicion.tipo"
+                  variant="tonal"
+                  density="compact"
+                  class="mt-2 text-caption"
+                  data-test="edicion-aviso-comision"
+                >
+                  {{ avisoComisionEdicion.texto }}
+                </v-alert>
+              </template>
+              <div v-else-if="!edicion.error" class="text-caption text-medium-emphasis">
+                Digita el consecutivo del descuento para ver el efecto en la comisión.
+              </div>
+            </v-card>
+          </v-col>
+        </v-row>
+
+        <v-alert v-if="edicion.error" type="error" variant="tonal" density="compact" class="mt-3" data-test="edicion-error">
+          {{ edicion.error }}
+        </v-alert>
+        <v-alert v-else-if="!edicionHayCambio" type="info" variant="tonal" density="compact" class="mt-3">
+          El descuento no cambia: no hay nada que guardar.
+        </v-alert>
+
+        <v-textarea
+          v-model="edicion.motivo"
+          class="mt-3"
+          label="Motivo de la edición *"
+          variant="outlined"
+          density="comfortable"
+          rows="2"
+          auto-grow
+          counter
+          maxlength="255"
+          data-test="edicion-motivo"
+          :error-messages="edicionMotivoError"
+          hint="Obligatorio. Queda registrado quién, cuándo y el antes y después."
+          persistent-hint
+        />
+      </template>
+    </v-card-text>
+    <v-card-actions>
+      <v-spacer />
+      <v-btn variant="text" :disabled="edicion.guardando" @click="edicion.open = false">Cancelar</v-btn>
+      <v-btn
+        color="orange-darken-2"
+        variant="flat"
+        data-test="edicion-guardar"
+        :loading="edicion.guardando"
+        :disabled="!edicionPuedeGuardar"
+        @click="guardarEdicionDescuento"
+      >
+        Guardar
+      </v-btn>
+    </v-card-actions>
+  </v-card>
+</v-dialog>
+
+<v-snackbar v-model="snack.show" :timeout="4000">{{ snack.text }}</v-snackbar>
   </v-container>
 </template>
 
@@ -718,6 +887,31 @@ import {
 } from './filtrosHistorico'
 import { etiquetaConvenio } from '@/services/conveniosService'
 import { authSetStore } from '@/stores/AuthStore'
+import { obtenerUsuarios } from '@/services/UserService'
+import DescuentoCajaEditor from '@/components/facturacion/DescuentoCajaEditor.vue'
+import type { DocPoliciaKey } from '@/components/facturacion/DocumentosPoliciaCarga.vue'
+import {
+  autorizadoresDescuento,
+  mapearDescuentosActivos,
+  montoMaximo,
+  pideConfirmarMontoCero,
+  type DescuentoDetalle,
+  type DescuentoRaw,
+} from './descuentoFacturacion'
+import {
+  avisoComision,
+  bodyEdicion,
+  formInicialEdicion,
+  hayCambioEdicion,
+  motivoEdicionValido,
+  MOTIVO_EDICION_MIN,
+  requiereAutorizador,
+  ROLES_EDICION_DESCUENTO,
+  totalesEdicion,
+  type FormEdicionDescuento,
+  type TicketParaEditar,
+} from './edicionDescuento'
+import type { ResultadoEdicionDescuento } from '@/services/facturacion_service'
 
 const route = useRoute()
 const router = useRouter()
@@ -899,6 +1093,9 @@ async function cargarCatalogos() {
     descuentosCatalogo.value = arr
       .filter((d) => typeof d.id === 'number')
       .map((d) => ({ id: d.id as number, nombre: d.nombre }))
+    descuentosEdicion.value = mapearDescuentosActivos(
+      arr.filter((d) => typeof d.id === 'number') as DescuentoRaw[],
+    )
   }
   if (serv.status === 'fulfilled' && Array.isArray(serv.value)) {
     serviciosCatalogo.value = serv.value.map((s) => ({ id: s.id, nombre: s.nombre }))
@@ -967,7 +1164,7 @@ const headers = [
   { title: 'Sede', key: 'sedeNombre', width: 200 },
   { title: 'Vendedor', key: 'vendedor_text', width: 220 },
   { title: 'Consec. descuento', key: 'consecutivo_descuento', width: 160 },
-  { title: 'Acciones', key: 'acciones', width: 120 },
+  { title: 'Acciones', key: 'acciones', width: 200 },
 ]
 
 let consulta = 0
@@ -1348,6 +1545,195 @@ async function saveCorregirConsecutivo() {
   } finally {
     corregirConsecutivo.saving = false
   }
+}
+
+/* ===== 🆕 Editar el descuento de un ticket CONFIRMADA ===== */
+// Mismo bloque del modal de confirmación (DescuentoCajaEditor). El backend
+// recalcula total y comisión (PENDIENTE) y deja registro; el diálogo muestra
+// el antes y el después con solo_previsualizar antes de guardar.
+type TicketEdicion = TicketParaEditar & {
+  placa?: string | null
+  tipoVehiculoSnapshot?: string | null
+  documentosPoliciaFaltantes?: DocPoliciaKey[]
+  descuentoAplicado?: { autorizadoPor?: { id: number; nombre: string } | null } | null
+  turno?: { tipoVehiculo?: string | null } | null
+}
+
+const puedeEditarDescuento = computed(() => authStore.hasAnyRole([...ROLES_EDICION_DESCUENTO]))
+const descuentosEdicion = ref<DescuentoDetalle[]>([])
+const autorizadoresEdicion = ref<{ id: number; nombre: string }[]>([])
+
+const formVacio = (): FormEdicionDescuento => ({
+  descuentoId: null, monto: 0, autorizadoPorId: null, observacion: '', consecutivo: '',
+})
+const edicion = reactive({
+  open: false,
+  cargando: false,
+  guardando: false,
+  ticket: null as TicketEdicion | null,
+  inicial: formVacio(),
+  form: formVacio(),
+  motivo: '',
+  consecutivoBloqueado: true,
+  documentosCompletos: false,
+  previa: null as ResultadoEdicionDescuento | null,
+  previaCargando: false,
+  error: '',
+})
+
+async function cargarAutorizadores(ticket: TicketEdicion) {
+  if (!autorizadoresEdicion.value.length) {
+    try {
+      autorizadoresEdicion.value = autorizadoresDescuento(await obtenerUsuarios())
+    } catch (err) {
+      console.error('Error cargando autorizadores:', err)
+    }
+  }
+  // El que ya autorizó el descuento aparece aunque hoy no esté en la lista.
+  const actual = ticket.descuentoAplicado?.autorizadoPor
+  if (actual && !autorizadoresEdicion.value.some((u) => u.id === actual.id)) {
+    autorizadoresEdicion.value = [...autorizadoresEdicion.value, actual]
+  }
+}
+
+async function abrirEdicionDescuento(id: number) {
+  Object.assign(edicion, {
+    open: true, cargando: true, guardando: false, ticket: null, motivo: '',
+    previa: null, previaCargando: false, error: '',
+  })
+  try {
+    const t = (await FacturacionService.getById(id)) as unknown as TicketEdicion
+    await cargarAutorizadores(t)
+    edicion.inicial = formInicialEdicion(t)
+    edicion.form = { ...edicion.inicial }
+    edicion.ticket = t
+  } catch (err) {
+    console.error('Error cargando el ticket para editar:', err)
+    snack.text = '❌ No se pudo cargar el ticket'
+    snack.show = true
+    edicion.open = false
+  } finally {
+    edicion.cargando = false
+  }
+}
+
+const nombreDescuentoInicial = computed(() => {
+  const id = edicion.inicial.descuentoId
+  if (!id) return 'sin descuento'
+  return descuentosEdicion.value.find((d) => d.id === id)?.nombre ?? `Descuento #${id}`
+})
+const edicionEsMoto = computed(() => {
+  const tipo = (edicion.ticket?.tipoVehiculoSnapshot ?? edicion.ticket?.turno?.tipoVehiculo ?? '').toUpperCase()
+  return tipo.includes('MOTO')
+})
+const edicionDocumentosCargados = computed((): DocPoliciaKey[] => {
+  const faltan = edicion.ticket?.documentosPoliciaFaltantes ?? ['carnet', 'tarjeta_propiedad', 'cedula']
+  return (['carnet', 'tarjeta_propiedad', 'cedula'] as const).filter((k) => !faltan.includes(k))
+})
+const edicionDetalle = computed(() =>
+  descuentosEdicion.value.find((d) => d.id === edicion.form.descuentoId) ?? null,
+)
+const edicionHayCambio = computed(() => hayCambioEdicion(edicion.inicial, edicion.form))
+const edicionRequiereAutorizador = computed(() => requiereAutorizador(edicion.inicial, edicion.form))
+const edicionMontoCero = computed(() =>
+  !!edicion.form.descuentoId &&
+  pideConfirmarMontoCero(
+    edicionDetalle.value?.codigo,
+    edicion.form.monto,
+    montoMaximo(edicionDetalle.value, edicionEsMoto.value),
+  ),
+)
+const edicionTotales = computed(() =>
+  edicion.ticket ? totalesEdicion(edicion.ticket, edicion.form) : { antes: 0, despues: 0 },
+)
+const edicionMotivoError = computed(() =>
+  edicion.motivo && !motivoEdicionValido(edicion.motivo)
+    ? `Mínimo ${MOTIVO_EDICION_MIN} caracteres.`
+    : '',
+)
+const avisoComisionEdicion = computed(() =>
+  edicion.previa ? avisoComision(edicion.previa.comision) : null,
+)
+const comisionRecalculada = computed(() => {
+  const c = edicion.previa?.comision
+  return c?.accion === 'RECALCULADA' && c.antes && c.despues ? { antes: c.antes, despues: c.despues } : null
+})
+const edicionPuedeGuardar = computed(() => {
+  const f = edicion.form
+  if (edicion.guardando || edicion.cargando || !edicionHayCambio.value) return false
+  if (!motivoEdicionValido(edicion.motivo) || edicion.error || edicion.previaCargando) return false
+  if (f.descuentoId && edicion.consecutivoBloqueado) return false
+  if (edicionDetalle.value?.codigo === 'INFORMATIVO_POLICIA' && !edicion.documentosCompletos) return false
+  if (edicionRequiereAutorizador.value && !f.autorizadoPorId) return false
+  return true
+})
+
+// Antes y después (total y comisión) desde el backend, sin guardar nada.
+let previaTimer: ReturnType<typeof setTimeout> | null = null
+let previaConsulta = 0
+watch(
+  () => [edicion.open, edicion.ticket?.id, { ...edicion.form }] as const,
+  () => {
+    if (previaTimer) clearTimeout(previaTimer)
+    edicion.error = ''
+    edicion.previa = null
+    const ticket = edicion.ticket
+    // Con descuento y sin consecutivo válido el backend respondería 422: se espera.
+    const consecutivoListo = !edicion.form.descuentoId || CONSECUTIVO_DESCUENTO_RE.test(edicion.form.consecutivo)
+    if (!edicion.open || !ticket || !edicionHayCambio.value || !consecutivoListo) {
+      edicion.previaCargando = false
+      return
+    }
+    edicion.previaCargando = true
+    const consulta = ++previaConsulta
+    previaTimer = setTimeout(async () => {
+      try {
+        const r = await FacturacionService.previsualizarEdicionDescuento(
+          ticket.id, bodyEdicion(edicion.form, ''),
+        )
+        if (consulta === previaConsulta) edicion.previa = r
+      } catch (err) {
+        if (consulta === previaConsulta) {
+          edicion.error = err instanceof Error ? err.message : 'No se pudo calcular el efecto.'
+        }
+      } finally {
+        if (consulta === previaConsulta) edicion.previaCargando = false
+      }
+    }, 500)
+  },
+  { deep: true },
+)
+
+async function guardarEdicionDescuento() {
+  const ticket = edicion.ticket
+  if (!ticket || !edicionPuedeGuardar.value) return
+  edicion.guardando = true
+  edicion.error = ''
+  try {
+    const r = await FacturacionService.editarDescuentoConfirmado(
+      ticket.id, bodyEdicion(edicion.form, edicion.motivo),
+    )
+    edicion.open = false
+    const aviso = avisoComision(r.comision)
+    snack.text = aviso.tipo === 'warning'
+      ? `✅ Descuento actualizado. ${aviso.texto}`
+      : '✅ Descuento actualizado'
+    snack.show = true
+    if (dialog.item?.id === ticket.id) {
+      dialog.item = (await FacturacionService.getById(ticket.id)) as ExtendedFacturacionTicket
+    }
+    await fetchList()
+  } catch (err) {
+    console.error('Error editando el descuento:', err)
+    edicion.error = err instanceof Error ? err.message : 'No se pudo guardar.'
+  } finally {
+    edicion.guardando = false
+  }
+}
+
+function avisoSnack(texto: string) {
+  snack.text = texto
+  snack.show = true
 }
 
 /* ===== Snack ===== */

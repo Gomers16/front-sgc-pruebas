@@ -470,434 +470,122 @@
               Descuento
             </div>
 
-            <!-- ── CASO A: pre-marcado desde dateo, sin override ── -->
-            <template v-if="turnoMeta.descuentoId && !overrideDateoDescuento">
-
-              <v-alert
-                type="warning"
-                variant="tonal"
-                density="compact"
-                color="orange-darken-2"
-                class="mt-2"
-                prepend-icon="mdi-tag-check"
-              >
-                <div class="d-flex align-center justify-space-between flex-wrap" style="gap:8px">
-                  <div>
-                    <strong>Pre-marcado desde el dateo:</strong> {{ descuentoDelDateoNombre }}
-                    <div class="text-caption mt-1">
-                      El comercial indicó este descuento al crear el dateo.
-                      Se aplicará automáticamente — la comisión bajará del valor nuevo directo
-                      al valor básico de dateo.
-                    </div>
-                  </div>
-                  <v-btn
-                    size="x-small"
-                    variant="outlined"
+            <!-- Bloque compartido con la edición del Historial (components/facturacion).
+                 CASO A: pre-marcado desde el dateo, sin override.
+                 CASO A con override / CASO B: elegido en caja. -->
+            <DescuentoCajaEditor
+              ref="descuentoEditorRef"
+              v-model:descuento-id="descuentoIdEnCaja"
+              v-model:monto="descuentoMontoAplicado"
+              v-model:autorizado-por-id="autorizadoPorId"
+              v-model:observacion="descuentoObservacion"
+              v-model:consecutivo="consecutivoDescuento"
+              :modo="turnoMeta.descuentoId && !overrideDateoDescuento ? 'premarcado' : 'caja'"
+              :descuentos="descuentosActivos"
+              :usuarios="usuariosItems"
+              :descuento-premarcado-id="turnoMeta.descuentoId"
+              :descuento-premarcado="detallePremarcado"
+              :ocultar-monto="premarcadoNoCargado"
+              :es-moto="esVehiculoMoto"
+              :ticket-id="currentTicketId"
+              :mostrar-observacion="!!turnoMeta.dateoId && !turnoMeta.descuentoId"
+              @update:consecutivo-bloqueado="(b: boolean) => (consecutivoDescuentoBloqueado = b)"
+              @update:documentos-completos="(v: boolean) => (documentosPoliciaCompletos = v)"
+              @aviso="(t: string) => { snack.text = t; snack.show = true }"
+            >
+              <template #encabezado>
+                <template v-if="turnoMeta.descuentoId && !overrideDateoDescuento">
+                  <v-alert
+                    type="warning"
+                    variant="tonal"
+                    density="compact"
                     color="orange-darken-2"
-                    prepend-icon="mdi-swap-horizontal"
-                    @click="overrideDateoDescuento = true; descuentoIdEnCaja = null; descuentoMontoAplicado = 0; resetDocPolicia()"
+                    class="mt-2"
+                    prepend-icon="mdi-tag-check"
                   >
-                    Cambiar descuento
-                  </v-btn>
-                </div>
-              </v-alert>
-
-              <v-alert
-                v-if="premarcadoNoCargado"
-                type="error"
-                variant="tonal"
-                density="compact"
-                class="mt-3"
-                data-test="premarcado-no-cargado"
-              >
-                No se pudo cargar el descuento pre-marcado, así que no se sabe su monto.
-                Recarga la página o usa «Cambiar descuento» para elegirlo en caja.
-              </v-alert>
-
-              <!-- Monto descuento - CASO A dateo pre-marcado -->
-              <v-card v-else variant="tonal" color="orange-darken-2" class="mt-3 pa-3 rounded-lg">
-                <div class="text-subtitle-2 font-weight-bold mb-1 d-flex align-center" style="gap:6px">
-                  <v-icon size="16">mdi-currency-usd</v-icon>
-                  Descuento aplicado
-                  <v-chip size="x-small" color="blue" variant="flat" class="ms-1">
-                    {{ esVehiculoMoto ? 'Moto' : 'Carro' }}
-                  </v-chip>
-                  <!-- chip Monto fijo cubre policía, empleado y avance propietario -->
-                  <v-chip v-if="esDescuentoPolicia || esDescuentoEmpleado || esDescuentoAvancePropietario" size="x-small" color="blue-darken-3" variant="flat" class="ms-1">
-                    Monto fijo
-                  </v-chip>
-                </div>
-
-                <!-- INFORMATIVO_POLICIA / INFORMATIVO_EMPLEADO / AVANCE_PROPIETARIO: monto fijo, solo lectura -->
-                <template v-if="esDescuentoPolicia || esDescuentoEmpleado || esDescuentoAvancePropietario">
-                  <div class="text-caption text-medium-emphasis mb-2">
-                    El descuento tiene monto fijo según configuración.
-                  </div>
-                  <div class="text-h6 font-weight-bold">
-                    {{ formatCOP(descuentoMaximo) }}
-                  </div>
-                </template>
-
-                <!-- Otros descuentos: slider editable -->
-                <template v-else>
-                  <div class="text-caption text-medium-emphasis mb-3">
-                    Máximo: <strong>{{ formatCOP(descuentoMaximo) }}</strong> — puedes aplicar de $0 a {{ formatCOP(descuentoMaximo) }}
-                  </div>
-                  <v-row dense align="center">
-                    <v-col cols="12" md="5">
-                      <v-text-field
-                        :model-value="descuentoMontoTexto"
-                        label="Monto descuento ($)"
+                    <div class="d-flex align-center justify-space-between flex-wrap" style="gap:8px">
+                      <div>
+                        <strong>Pre-marcado desde el dateo:</strong> {{ descuentoDelDateoNombre }}
+                        <div class="text-caption mt-1">
+                          El comercial indicó este descuento al crear el dateo.
+                          Se aplicará automáticamente — la comisión bajará del valor nuevo directo
+                          al valor básico de dateo.
+                        </div>
+                      </div>
+                      <v-btn
+                        size="x-small"
                         variant="outlined"
-                        density="comfortable"
-                        inputmode="decimal"
-                        prefix="$"
-                        hide-details
-                        @update:model-value="onDescuentoMontoTexto"
-                        @blur="onDescuentoMontoBlur"
-                      />
-                    </v-col>
-                    <v-col cols="12" md="7">
-                      <v-slider
-                        v-model="descuentoMontoAplicado"
-                        :min="0"
-                        :max="descuentoMaximo"
-                        :step="1000"
                         color="orange-darken-2"
-                        thumb-label
-                        hide-details
-                        class="mt-2"
+                        prepend-icon="mdi-swap-horizontal"
+                        @click="overrideDateoDescuento = true; descuentoIdEnCaja = null; descuentoMontoAplicado = 0; resetDocPolicia()"
                       >
-                        <template #thumb-label="{ modelValue }">
-                          ${{ Math.round(modelValue / 1000) }}k
-                        </template>
-                      </v-slider>
-                    </v-col>
-                  </v-row>
-                  <div v-if="descuentoMontoAplicado === 0" class="text-caption text-medium-emphasis mt-2">
-                    ℹ️ Con $0 se registra el descuento pero sin reducción de precio.
-                  </div>
-                </template>
-              </v-card>
-            </template>
-
-            <!-- ── CASO A con override activado / CASO B: caja manual ── -->
-            <template v-else>
-
-              <!-- Aviso de override (solo cuando venía pre-marcado y la cajera eligió cambiar) -->
-              <v-alert
-                v-if="turnoMeta.descuentoId && overrideDateoDescuento"
-                type="info"
-                variant="tonal"
-                density="compact"
-                class="mt-2 mb-2"
-                prepend-icon="mdi-information-outline"
-              >
-                <div class="d-flex align-center justify-space-between flex-wrap" style="gap:8px">
-                  <span class="text-caption">
-                    Estás reemplazando el descuento pre-marcado
-                    <strong>({{ descuentoDelDateoNombre }})</strong>.
-                    El nuevo descuento requiere autorización en caja.
-                  </span>
-                  <v-btn
-                    size="x-small"
-                    variant="text"
-                    prepend-icon="mdi-undo"
-                    @click="overrideDateoDescuento = false; descuentoIdEnCaja = null; descuentoMontoAplicado = 0; resetDocPolicia()"
-                  >
-                    Volver al pre-marcado
-                  </v-btn>
-                </div>
-              </v-alert>
-
-              <v-row dense class="mt-2">
-                <v-col cols="12" md="6">
-                  <v-select
-                    v-model="descuentoIdEnCaja"
-                    :items="descuentosActivos"
-                    item-title="nombre"
-                    item-value="id"
-                    label="Aplicar descuento informativo (opcional)"
-                    variant="outlined"
-                    density="comfortable"
-                    clearable
-                    hide-details
-                    prepend-inner-icon="mdi-tag-outline"
-                  />
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-autocomplete
-                    v-model="autorizadoPorId"
-                    :items="usuariosItems"
-                    item-title="nombre"
-                    item-value="id"
-                    label="Autorizado por"
-                    variant="outlined"
-                    density="comfortable"
-                    :disabled="!descuentoIdEnCaja"
-                    hide-details
-                    clearable
-                    prepend-inner-icon="mdi-account-check"
-                    placeholder="Usuario que autoriza el descuento"
-                  />
-                </v-col>
-                <v-col cols="12" v-if="descuentoIdEnCaja">
-                  <!-- Monto descuento - CASO B caja manual -->
-                  <v-card variant="tonal" color="orange-darken-2" class="mt-2 pa-3 rounded-lg">
-                    <div class="text-subtitle-2 font-weight-bold mb-1 d-flex align-center" style="gap:6px">
-                      <v-icon size="16">mdi-currency-usd</v-icon>
-                      Descuento aplicado
-                      <v-chip size="x-small" color="blue" variant="flat" class="ms-1">
-                        {{ esVehiculoMoto ? 'Moto' : 'Carro' }}
-                      </v-chip>
-                      <!-- chip Monto fijo cubre policía, empleado y avance propietario -->
-                      <v-chip v-if="esDescuentoPolicia || esDescuentoEmpleado || esDescuentoAvancePropietario" size="x-small" color="blue-darken-3" variant="flat" class="ms-1">
-                        Monto fijo
-                      </v-chip>
-                    </div>
-
-                    <!-- INFORMATIVO_POLICIA / INFORMATIVO_EMPLEADO / AVANCE_PROPIETARIO: monto fijo, solo lectura -->
-                <template v-if="esDescuentoPolicia || esDescuentoEmpleado || esDescuentoAvancePropietario">
-                  <div class="text-caption text-medium-emphasis mb-1">
-                    Monto fijo configurado para policía / militar:
-                  </div>
-                  <div class="text-h5 font-weight-bold text-orange-darken-2">
-                    {{ formatCOP(descuentoMaximo) }}
-                  </div>
-                  <div class="text-caption text-medium-emphasis mt-1">
-                    {{ esVehiculoMoto ? 'Tarifa moto' : 'Tarifa carro' }} · No editable
-                  </div>
-                </template>
-
-                    <!-- Otros descuentos: slider editable -->
-                    <template v-else>
-                      <div class="text-caption text-medium-emphasis mb-3">
-                        Máximo: <strong>{{ formatCOP(descuentoMaximo) }}</strong> — puedes aplicar de $0 a {{ formatCOP(descuentoMaximo) }}
-                      </div>
-                      <v-row dense align="center">
-                        <v-col cols="12" md="5">
-                          <v-text-field
-                            :model-value="descuentoMontoTexto"
-                            label="Monto descuento ($)"
-                            variant="outlined"
-                            density="comfortable"
-                            inputmode="decimal"
-                            prefix="$"
-                            hide-details
-                            @update:model-value="onDescuentoMontoTexto"
-                            @blur="onDescuentoMontoBlur"
-                          />
-                        </v-col>
-                        <v-col cols="12" md="7">
-                          <v-slider
-                            v-model="descuentoMontoAplicado"
-                            :min="0"
-                            :max="descuentoMaximo"
-                            :step="1000"
-                            color="orange-darken-2"
-                            thumb-label
-                            hide-details
-                            class="mt-2"
-                          >
-                            <template #thumb-label="{ modelValue }">
-                              ${{ Math.round(modelValue / 1000) }}k
-                            </template>
-                          </v-slider>
-                        </v-col>
-                      </v-row>
-                      <div v-if="descuentoMontoAplicado === 0" class="text-caption text-medium-emphasis mt-2">
-                        ℹ️ Con $0 se registra el descuento pero sin reducción de precio.
-                      </div>
-                    </template>
-                  </v-card>
-
-                  <v-alert type="warning" variant="tonal" density="compact" class="mt-1">
-                    <strong>⚠️ Efecto en comisión:</strong>
-                    La comisión bajará del valor nuevo directo al valor básico de dateo.
-                    <div v-if="!autorizadoPorId" class="mt-1" style="color:#c62828">
-                      Debes registrar quién autorizó el descuento antes de confirmar.
+                        Cambiar descuento
+                      </v-btn>
                     </div>
                   </v-alert>
-                </v-col>
 
-                <!-- 🆕 Observación opcional: solo cuando el dateo NO tenía
-                     descuento pre-marcado (nada que comparar/override aquí,
-                     es una aplicación nueva en caja) -->
-                <v-col
-                  cols="12"
-                  v-if="descuentoIdEnCaja && turnoMeta.dateoId && !turnoMeta.descuentoId"
-                >
-                  <v-card variant="tonal" color="blue-grey" class="mt-2 pa-3 rounded-lg">
-                    <div class="text-subtitle-2 font-weight-bold mb-2 d-flex align-center" style="gap:6px">
-                      <v-icon size="16">mdi-comment-text-outline</v-icon>
-                      Observación (opcional)
-                    </div>
-                    <div class="text-caption text-medium-emphasis mb-2">
-                      El asesor no dejó ningún descuento marcado en el dateo. Si quieres, deja una nota de por qué se aplica aquí.
-                    </div>
-                    <div class="d-flex flex-wrap mb-2" style="gap:8px">
-                      <v-chip
-                        v-for="razon in RAZONES_RAPIDAS_DESCUENTO"
-                        :key="razon"
-                        size="small"
-                        variant="outlined"
-                        color="blue-grey"
-                        @click="descuentoObservacion = razon"
-                      >
-                        {{ razon }}
-                      </v-chip>
-                    </div>
-                    <v-textarea
-                      v-model="descuentoObservacion"
-                      label="Observación"
-                      variant="outlined"
-                      density="comfortable"
-                      rows="2"
-                      auto-grow
-                      hide-details
-                      placeholder="Ej: el cliente lo pidió en el momento"
-                    />
-                  </v-card>
-                </v-col>
-              </v-row>
-            </template>
-
-            <!-- 🆕 Consecutivo del descuento: obligatorio con descuento en uso
-                 (caso A pre-marcado y caso B en caja). Lo digita caja y no se
-                 puede repetir entre tickets confirmados. -->
-            <v-row v-if="descuentoIdEfectivo" dense class="mt-2">
-              <v-col cols="12" md="6">
-                <v-text-field
-                  :model-value="consecutivoDescuento"
-                  label="Consecutivo del descuento *"
-                  variant="outlined"
-                  density="comfortable"
-                  prepend-inner-icon="mdi-pound"
-                  placeholder="Ej: D-000123"
-                  maxlength="30"
-                  autocomplete="off"
-                  persistent-hint
-                  :loading="consecutivoDescuentoCheck.loading"
-                  :error-messages="consecutivoDescuentoError"
-                  :hint="consecutivoDescuentoHint"
-                  @update:model-value="onConsecutivoDescuentoInput"
-                />
-              </v-col>
-            </v-row>
-
-            <!-- ===== DOCUMENTOS POLICIA (solo si descuento es INFORMATIVO_POLICIA) ===== -->
-            <template v-if="esDescuentoPolicia">
-              <v-divider class="my-3" />
-              <div class="text-subtitle-2 font-weight-bold mb-2 d-flex align-center" style="gap:6px">
-                <v-icon size="18" color="blue-darken-3">mdi-shield-account</v-icon>
-                Documentos requeridos — Policía / Militar
-              </div>
-              <div class="text-caption text-medium-emphasis mb-3">
-                Sube los 3 documentos para habilitar el descuento. Se guardan directamente en el ticket.
-              </div>
-
-              <v-row dense>
-                <v-col
-                  v-for="tipo in (['carnet', 'tarjeta_propiedad', 'cedula'] as const)"
-                  :key="tipo"
-                  cols="12" md="4"
-                >
-                  <v-card
-                    variant="outlined"
-                    :color="docPoliciaEstado[tipo] === 'done' ? 'success'
-                           : docPoliciaEstado[tipo] === 'error' ? 'error'
-                           : docPoliciaEstado[tipo] === 'uploading' ? 'info'
-                           : undefined"
-                    class="pa-3 text-center rounded-lg"
-                    style="cursor:pointer; min-height:120px"
-                    @click="docPoliciaInputEls[tipo]?.click()"
+                  <v-alert
+                    v-if="premarcadoNoCargado"
+                    type="error"
+                    variant="tonal"
+                    density="compact"
+                    class="mt-3"
+                    data-test="premarcado-no-cargado"
                   >
-                    <input
-  :ref="(el) => setDocPoliciaRef(tipo, el)"
-  type="file"
-  accept="image/jpeg,image/png,.jfif"
-  class="d-none"
-  @change="onDocPoliciaFile(tipo, $event)"
-/>
-
-                    <!-- Preview si existe -->
-                    <div v-if="docPoliciaPreview[tipo]" class="mb-1">
-                      <v-img
-                        :src="docPoliciaPreview[tipo]"
-                        height="60"
-                        contain
-                        class="rounded"
-                      />
-                    </div>
-
-                    <!-- Ícono de estado -->
-                    <v-progress-circular
-                      v-if="docPoliciaEstado[tipo] === 'uploading'"
-                      indeterminate
-                      size="24"
-                      color="info"
-                      class="mb-1"
-                    />
-                    <v-icon
-                      v-else-if="docPoliciaEstado[tipo] === 'done'"
-                      color="success"
-                      size="28"
-                      class="mb-1"
-                    >mdi-check-circle</v-icon>
-                    <v-icon
-                      v-else-if="docPoliciaEstado[tipo] === 'error'"
-                      color="error"
-                      size="28"
-                      class="mb-1"
-                    >mdi-alert-circle</v-icon>
-                    <v-icon v-else size="28" class="mb-1" color="grey">mdi-upload</v-icon>
-
-                    <div class="text-caption font-weight-medium">
-                      {{ DOC_POLICIA_LABELS[tipo] }}
-                    </div>
-                    <div class="text-caption text-medium-emphasis">
-                      {{ docPoliciaEstado[tipo] === 'done' ? '✓ Cargado'
-                       : docPoliciaEstado[tipo] === 'uploading' ? 'Subiendo...'
-                       : docPoliciaEstado[tipo] === 'error' ? 'Reintentar'
-                       : 'Toca para subir' }}
-                    </div>
-                  </v-card>
-                </v-col>
-              </v-row>
-
-              <!-- Impacto en comisión cuando viene aplicado en caja sin pre-marcado -->
-              <v-alert
-                v-if="impactoComisionPolicia"
-                type="info"
-                variant="tonal"
-                density="compact"
-                class="mt-3"
-                prepend-icon="mdi-cash-check"
-              >
-                <div class="font-weight-bold mb-1">Efecto en comisiones con este descuento:</div>
-                <div v-if="impactoComisionPolicia.comercial" class="text-caption">
-                  <v-icon size="14" color="info">mdi-account-tie</v-icon>
-                  <strong>{{ impactoComisionPolicia.comercial.nombre }}</strong>
-                  → {{ impactoComisionPolicia.comercial.monto }}
-                </div>
-                <div v-if="impactoComisionPolicia.convenio" class="text-caption mt-1">
-                  <v-icon size="14" color="info">mdi-handshake</v-icon>
-                  <strong>{{ impactoComisionPolicia.convenio.nombre }}</strong>
-                  → {{ impactoComisionPolicia.convenio.monto }}
-                </div>
-              </v-alert>
-
-              <v-alert
-                v-if="esDescuentoPolicia && !documentosPoliciaCompletos"
-                type="warning"
-                variant="tonal"
-                density="compact"
-                class="mt-2"
-              >
-                Debes subir los 3 documentos para poder confirmar el descuento INFORMATIVO_POLICIA.
-              </v-alert>
-            </template>
-            <!-- ===== FIN DOCUMENTOS POLICIA ===== -->
+                    No se pudo cargar el descuento pre-marcado, así que no se sabe su monto.
+                    Recarga la página o usa «Cambiar descuento» para elegirlo en caja.
+                  </v-alert>
+                </template>
+                <!-- Aviso de override (solo cuando venía pre-marcado y la cajera eligió cambiar) -->
+                <v-alert
+                  v-else-if="turnoMeta.descuentoId && overrideDateoDescuento"
+                  type="info"
+                  variant="tonal"
+                  density="compact"
+                  class="mt-2 mb-2"
+                  prepend-icon="mdi-information-outline"
+                >
+                  <div class="d-flex align-center justify-space-between flex-wrap" style="gap:8px">
+                    <span class="text-caption">
+                      Estás reemplazando el descuento pre-marcado
+                      <strong>({{ descuentoDelDateoNombre }})</strong>.
+                      El nuevo descuento requiere autorización en caja.
+                    </span>
+                    <v-btn
+                      size="x-small"
+                      variant="text"
+                      prepend-icon="mdi-undo"
+                      @click="overrideDateoDescuento = false; descuentoIdEnCaja = null; descuentoMontoAplicado = 0; resetDocPolicia()"
+                    >
+                      Volver al pre-marcado
+                    </v-btn>
+                  </div>
+                </v-alert>
+              </template>
+              <template #policia>
+                <!-- Impacto en comisión cuando viene aplicado en caja sin pre-marcado -->
+                <v-alert
+                  v-if="impactoComisionPolicia"
+                  type="info"
+                  variant="tonal"
+                  density="compact"
+                  class="mt-3"
+                  prepend-icon="mdi-cash-check"
+                >
+                  <div class="font-weight-bold mb-1">Efecto en comisiones con este descuento:</div>
+                  <div v-if="impactoComisionPolicia.comercial" class="text-caption">
+                    <v-icon size="14" color="info">mdi-account-tie</v-icon>
+                    <strong>{{ impactoComisionPolicia.comercial.nombre }}</strong>
+                    → {{ impactoComisionPolicia.comercial.monto }}
+                  </div>
+                  <div v-if="impactoComisionPolicia.convenio" class="text-caption mt-1">
+                    <v-icon size="14" color="info">mdi-handshake</v-icon>
+                    <strong>{{ impactoComisionPolicia.convenio.nombre }}</strong>
+                    → {{ impactoComisionPolicia.convenio.monto }}
+                  </div>
+                </v-alert>
+              </template>
+            </DescuentoCajaEditor>
 
           </template>
           <!-- FIN SECCIÓN DESCUENTO INFORMATIVO -->
@@ -1046,20 +734,22 @@
   </v-container>
 </template>
 <script setup lang="ts">
-// ++ CAMBIO 1: agregar watch ++
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
-import { FacturacionService, type VerificacionConsecutivoDescuento } from '@/services/facturacion_service'
+import { FacturacionService } from '@/services/facturacion_service'
+import DescuentoCajaEditor from '@/components/facturacion/DescuentoCajaEditor.vue'
 import { etiquetaConvenio } from '@/services/conveniosService'
 // ✅ FIX 1: descuentosService es default export → sin llaves, minúscula
 import descuentosService from '@/services/descuentosService'
 import {
+  autorizadoresDescuento,
   esMontoFijo,
+  mapearDescuentosActivos,
   montoMaximo,
-  parseMontoCOP,
   pideConfirmarMontoCero,
   resolverDescuentoPremarcado,
+  type DescuentoRaw,
 } from './descuentoFacturacion'
 // ✅ FIX 2: obtenerUsuarios existe en UserService → no hace falta crear usuariosService
 import { obtenerUsuarios } from '@/services/UserService'
@@ -1121,17 +811,6 @@ interface UsuarioItem {
   nombre: string
 }
 
-interface DescuentoRaw {
-  id?: number
-  codigo: string
-  nombre: string
-  valorCarro?: number
-  valorMoto?: number
-  valor_carro?: number
-  valor_moto?: number
-  descripcion?: string | null
-  activo: boolean
-}
 
 /* ===================== Router / Query ===================== */
 const route = useRoute()
@@ -1166,86 +845,17 @@ const overrideDateoDescuento = ref(false)
 // 🆕 Observación opcional cuando el dateo NO tenía descuento pre-marcado y
 // la cajera aplica uno de todas formas — solo se muestra/envía en ese caso.
 const descuentoObservacion = ref<string>('')
-const RAZONES_RAPIDAS_DESCUENTO = [
-  'Asesor no puso descuento',
-  'Cliente pide en caja el descuento',
-] as const
 
-// 🆕 Consecutivo del descuento: lo digita caja; mayúsculas, solo [A-Z0-9-],
-// máx. 30. El backend lo exige al confirmar con descuento en uso y rechaza
-// (409) uno ya registrado en otro ticket CONFIRMADA.
-const CONSECUTIVO_DESCUENTO_RE = /^[A-Z0-9-]{1,30}$/
+// 🆕 Consecutivo del descuento: lo digita caja (ConsecutivoDescuentoCampo lo
+// normaliza y lo verifica en vivo). El backend lo exige al confirmar con
+// descuento en uso y rechaza (409) uno ya registrado en otro ticket CONFIRMADA.
 const consecutivoDescuento = ref<string>('')
-const consecutivoDescuentoCheck = reactive({
-  loading: false,
-  /** Valor al que corresponde el resultado (descarta respuestas viejas) */
-  verificado: '',
-  exists: false,
-  bloqueante: false,
-  tickets: [] as VerificacionConsecutivoDescuento['tickets'],
-})
-let consecutivoDescuentoTimer: ReturnType<typeof setTimeout> | null = null
+// No válido o ya confirmado en otro ticket (lo informa el campo).
+const consecutivoDescuentoBloqueado = ref(true)
 
 function resetConsecutivoDescuento() {
-  if (consecutivoDescuentoTimer) clearTimeout(consecutivoDescuentoTimer)
   consecutivoDescuento.value = ''
-  Object.assign(consecutivoDescuentoCheck, {
-    loading: false, verificado: '', exists: false, bloqueante: false, tickets: [],
-  })
 }
-
-function onConsecutivoDescuentoInput(v: string | null) {
-  consecutivoDescuento.value = String(v ?? '').toUpperCase().replace(/\s+/g, '')
-  if (consecutivoDescuentoTimer) clearTimeout(consecutivoDescuentoTimer)
-  Object.assign(consecutivoDescuentoCheck, {
-    loading: false, verificado: '', exists: false, bloqueante: false, tickets: [],
-  })
-  const valor = consecutivoDescuento.value
-  if (!CONSECUTIVO_DESCUENTO_RE.test(valor)) return
-
-  consecutivoDescuentoCheck.loading = true
-  consecutivoDescuentoTimer = setTimeout(async () => {
-    try {
-      const r = await FacturacionService.verificarConsecutivoDescuento(valor, currentTicketId.value)
-      if (consecutivoDescuento.value !== valor) return
-      Object.assign(consecutivoDescuentoCheck, {
-        verificado: valor, exists: r.exists, bloqueante: r.bloqueante, tickets: r.tickets,
-      })
-    } catch (err) {
-      console.warn('No se pudo verificar el consecutivo del descuento:', err)
-    } finally {
-      if (consecutivoDescuento.value === valor) consecutivoDescuentoCheck.loading = false
-    }
-  }, 400)
-}
-
-const consecutivoDescuentoValido = computed(() =>
-  CONSECUTIVO_DESCUENTO_RE.test(consecutivoDescuento.value)
-)
-const consecutivoDescuentoVerificado = computed(() =>
-  consecutivoDescuentoCheck.verificado === consecutivoDescuento.value
-)
-
-const consecutivoDescuentoError = computed((): string => {
-  const v = consecutivoDescuento.value
-  if (v && !consecutivoDescuentoValido.value) return 'Solo letras, números y guion (-), máximo 30.'
-  if (consecutivoDescuentoVerificado.value && consecutivoDescuentoCheck.bloqueante) {
-    const t = consecutivoDescuentoCheck.tickets.find(x => x.estado === 'CONFIRMADA')
-    return `Ya registrado en el ticket #${t?.id ?? '—'}${t?.placa ? ` (placa ${t.placa})` : ''}, confirmado.`
-  }
-  return ''
-})
-
-const consecutivoDescuentoHint = computed((): string => {
-  if (!consecutivoDescuento.value) return 'Obligatorio cuando hay descuento. No se puede repetir.'
-  if (consecutivoDescuentoCheck.loading) return 'Verificando…'
-  if (!consecutivoDescuentoVerificado.value) return ''
-  if (consecutivoDescuentoCheck.exists) {
-    const t = consecutivoDescuentoCheck.tickets[0]
-    return `⚠️ Aparece en el ticket #${t?.id ?? '—'} (${t?.estado ?? '—'}, sin confirmar). Revisa antes de seguir.`
-  }
-  return '✓ Disponible'
-})
 
 /* ===================== OCR (cliente y backend) ===================== */
 type OCRStatus = 'idle' | 'running' | 'done'
@@ -1687,10 +1297,6 @@ const turnoMeta = reactive<{
 
 const descuentoDelDateoDetalle = ref<DescuentoItem | null>(null)
 const descuentoMontoAplicado = ref<number>(0)
-// Texto del campo "Monto descuento": se interpreta con parseMontoCOP para
-// aceptar "8.000" / "8,000" (con type=number el navegador los leía como 8 o vacío).
-const descuentoMontoTexto = ref<string>('0')
-
 // Pre-marcado del dateo: si GET /descuentos/:id falló (la cajera no tiene
 // permiso), el detalle sale de los descuentos activos.
 const premarcado = computed(() =>
@@ -1703,33 +1309,7 @@ const premarcadoNoCargado = computed(
   () => !!turnoMeta.descuentoId && !overrideDateoDescuento.value && premarcado.value.noCargado,
 )
 
-/* ===================== DOCUMENTOS INFORMATIVO_POLICIA ===================== */
-type DocPoliciaKey = 'carnet' | 'tarjeta_propiedad' | 'cedula'
-
-const DOC_POLICIA_LABELS: Record<DocPoliciaKey, string> = {
-  carnet:            'Carnet policial / militar',
-  tarjeta_propiedad: 'Tarjeta de propiedad',
-  cedula:            'Cédula del propietario',
-}
-
-const docPoliciaEstado = reactive<Record<DocPoliciaKey, 'idle' | 'uploading' | 'done' | 'error'>>({
-  carnet:            'idle',
-  tarjeta_propiedad: 'idle',
-  cedula:            'idle',
-})
-const docPoliciaPreview = reactive<Record<DocPoliciaKey, string | null>>({
-  carnet:            null,
-  tarjeta_propiedad: null,
-  cedula:            null,
-})
-const docPoliciaInputEls = reactive<Record<DocPoliciaKey, HTMLInputElement | null>>({
-  carnet:            null,
-  tarjeta_propiedad: null,
-  cedula:            null,
-})
-function setDocPoliciaRef(tipo: DocPoliciaKey, el: unknown) {
-  docPoliciaInputEls[tipo] = el as HTMLInputElement | null
-}
+const descuentoEditorRef = ref<InstanceType<typeof DescuentoCajaEditor> | null>(null)
 
 /* ===================== Computeds descuento ===================== */
 
@@ -1742,10 +1322,7 @@ const descuentoIdEfectivo = computed(() => {
 // 🆕 Con descuento en uso no se confirma sin consecutivo válido, ni con uno ya
 // confirmado en otro ticket (el backend igual lo valida y responde 409).
 const consecutivoDescuentoFalta = computed(() =>
-  !!descuentoIdEfectivo.value && (
-    !consecutivoDescuentoValido.value
-    || (consecutivoDescuentoVerificado.value && consecutivoDescuentoCheck.bloqueante)
-  )
+  !!descuentoIdEfectivo.value && consecutivoDescuentoBloqueado.value
 )
 
 const esDescuentoPolicia = computed(() => {
@@ -1825,49 +1402,12 @@ const impactoComisionPolicia = computed(() => {
   return null
 })
 
-const documentosPoliciaCompletos = computed(() =>
-  (Object.keys(docPoliciaEstado) as DocPoliciaKey[]).every(k => docPoliciaEstado[k] === 'done')
-)
+// Los 3 documentos de INFORMATIVO_POLICIA (los sube DocumentosPoliciaCarga).
+const documentosPoliciaCompletos = ref(false)
 
 function resetDocPolicia() {
-  const keys: DocPoliciaKey[] = ['carnet', 'tarjeta_propiedad', 'cedula']
-  for (const k of keys) {
-    docPoliciaEstado[k] = 'idle'
-    if (docPoliciaPreview[k]) {
-      URL.revokeObjectURL(docPoliciaPreview[k]!)
-      docPoliciaPreview[k] = null
-    }
-  }
+  descuentoEditorRef.value?.resetDocPolicia()
 }
-
-async function onDocPoliciaFile(tipo: DocPoliciaKey, e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  ;(e.target as HTMLInputElement).value = ''
-
-  const id = currentTicketId.value
-  if (!id) {
-    snack.text = '❌ Primero sube la imagen del ticket antes de cargar los documentos'
-    snack.show = true
-    return
-  }
-
-  // Preview inmediato
-  if (docPoliciaPreview[tipo]) URL.revokeObjectURL(docPoliciaPreview[tipo]!)
-  docPoliciaPreview[tipo] = URL.createObjectURL(file)
-  docPoliciaEstado[tipo] = 'uploading'
-
-  try {
-    await FacturacionService.subirDocumentoPolicia(id, tipo, file)
-    docPoliciaEstado[tipo] = 'done'
-  } catch (err) {
-    console.error(`Error subiendo documento ${tipo}:`, err)
-    docPoliciaEstado[tipo] = 'error'
-    snack.text = `❌ Error al subir ${DOC_POLICIA_LABELS[tipo]}`
-    snack.show = true
-  }
-}
-/* ===================== FIN DOCUMENTOS POLICIA ===================== */
 
 const esVehiculoMoto = computed(() => {
   const tipo = (turnoCard.tipoVehiculo || '').toUpperCase()
@@ -1904,46 +1444,8 @@ const descuentoMaximo = computed((): number => {
   return 0
 })
 
-watch(descuentoIdEnCaja, () => {
-  descuentoMontoAplicado.value = 0
-  descuentoObservacion.value = ''
-  resetDocPolicia()
-})
-watch(descuentoMaximo, (max) => {
-  // monto fijo aplica para policía, empleado y avance propietario
-  if (esDescuentoPolicia.value || esDescuentoEmpleado.value || esDescuentoAvancePropietario.value) {
-    descuentoMontoAplicado.value = max
-  } else if (descuentoMontoAplicado.value > max) {
-    descuentoMontoAplicado.value = max
-  }
-})
-// Watcher combinado: fija monto al máximo cuando se activa policía, empleado o avance propietario
-watch([esDescuentoPolicia, esDescuentoEmpleado, esDescuentoAvancePropietario], ([esPolicia, esEmpleado, esAvance]) => {
-  if (esPolicia || esEmpleado || esAvance) descuentoMontoAplicado.value = descuentoMaximo.value
-})
-
-function clampDescuentoMonto() {
-  const max = descuentoMaximo.value
-  if (descuentoMontoAplicado.value < 0) descuentoMontoAplicado.value = 0
-  if (descuentoMontoAplicado.value > max) descuentoMontoAplicado.value = max
-}
-
-// Escribiendo: si el texto ya es un monto, mueve el deslizador en vivo.
-function onDescuentoMontoTexto(v: string) {
-  descuentoMontoTexto.value = v
-  const n = parseMontoCOP(v)
-  if (n !== null) descuentoMontoAplicado.value = n
-}
-// Al salir del campo: quita separadores, limita al máximo y normaliza el texto.
-function onDescuentoMontoBlur() {
-  descuentoMontoAplicado.value = parseMontoCOP(descuentoMontoTexto.value) ?? 0
-  clampDescuentoMonto()
-  descuentoMontoTexto.value = String(descuentoMontoAplicado.value)
-}
-// Deslizador o reset → texto del campo (sin pisar lo que se está escribiendo).
-watch(descuentoMontoAplicado, (v) => {
-  if (parseMontoCOP(descuentoMontoTexto.value) !== v) descuentoMontoTexto.value = String(v)
-})
+// Al cambiar el descuento en caja, el monto fijo, el máximo y el texto del
+// monto los maneja DescuentoCajaEditor.
 
 // Monto fijo (policía, empleado, avance propietario): se envía el que muestra el modal.
 function aplicarMontoFijoSiCorresponde() {
@@ -2235,35 +1737,8 @@ async function loadDescuentosYUsuarios() {
     ])
 
     const arr = Array.isArray(descsResp.data) ? descsResp.data : []
-    // ++ CAMBIO 5: mapear también valorCarro y valorMoto ++
-   descuentosActivos.value = (arr as DescuentoRaw[]).map(d => ({
-      id: d.id!,
-      codigo: d.codigo,
-      nombre: d.nombre,
-      valorCarro: Number(d.valorCarro ?? d.valor_carro ?? 0),
-      valorMoto:  Number(d.valorMoto  ?? d.valor_moto  ?? 0),
-    }))
-
-    const CARGOS_AUTORIZADORES = new Set([
-      'GERENCIA',
-      'LIDER DE SEDE',
-      'DIRECCION DE CALIDAD Y AUDITORÍA',
-      'DIRECCION DE CALIDAD Y AUDITORIA',
-      'DIRECCION ADMINISTRATIVA Y COMERCIAL',
-      'LIDER DE INFORMES',
-      'LIDER NACIONAL',
-    ])
-
-    usuariosItems.value = users
-      .filter(u => {
-        const cargo = (u.cargo?.nombre ?? '').toUpperCase().trim()
-        const rol   = (u.rol?.nombre   ?? '').toUpperCase().trim()
-        return CARGOS_AUTORIZADORES.has(cargo) || rol === 'GERENCIA'
-      })
-      .map(u => ({
-        id: u.id,
-        nombre: `${u.nombres} ${u.apellidos}`.trim(),
-      }))
+    descuentosActivos.value = mapearDescuentosActivos(arr as DescuentoRaw[])
+    usuariosItems.value = autorizadoresDescuento(users)
   } catch (err) {
     console.error('Error cargando descuentos/usuarios:', err)
   }

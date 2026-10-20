@@ -88,3 +88,53 @@ export function pideConfirmarMontoCero(
   if (monto > 0 || maximo <= 0) return false
   return !(codigo && CODIGOS_CERO_INTENCIONAL.has(codigo))
 }
+
+/** Descuento tal como llega de GET /descuentos/activos (camel o snake). */
+export interface DescuentoRaw {
+  id?: number
+  codigo: string
+  nombre: string
+  valorCarro?: number
+  valorMoto?: number
+  valor_carro?: number
+  valor_moto?: number
+}
+
+export function mapearDescuentosActivos(arr: DescuentoRaw[]): DescuentoDetalle[] {
+  return arr.map((d) => ({
+    id: d.id!,
+    codigo: d.codigo,
+    nombre: d.nombre,
+    valorCarro: Number(d.valorCarro ?? d.valor_carro ?? 0),
+    valorMoto: Number(d.valorMoto ?? d.valor_moto ?? 0),
+  }))
+}
+
+// Quiénes pueden figurar en "Autorizado por": estos cargos o el rol GERENCIA.
+const CARGOS_AUTORIZADORES = new Set([
+  'GERENCIA',
+  'LIDER DE SEDE',
+  'DIRECCION DE CALIDAD Y AUDITORÍA',
+  'DIRECCION DE CALIDAD Y AUDITORIA',
+  'DIRECCION ADMINISTRATIVA Y COMERCIAL',
+  'LIDER DE INFORMES',
+  'LIDER NACIONAL',
+])
+
+export function autorizadoresDescuento(
+  users: Array<{
+    id: number
+    nombres: string
+    apellidos: string
+    cargo?: { nombre?: string | null } | null
+    rol?: { nombre?: string | null } | null
+  }>,
+): { id: number; nombre: string }[] {
+  return users
+    .filter((u) => {
+      const cargo = (u.cargo?.nombre ?? '').toUpperCase().trim()
+      const rol = (u.rol?.nombre ?? '').toUpperCase().trim()
+      return CARGOS_AUTORIZADORES.has(cargo) || rol === 'GERENCIA'
+    })
+    .map((u) => ({ id: u.id, nombre: `${u.nombres} ${u.apellidos}`.trim() }))
+}
