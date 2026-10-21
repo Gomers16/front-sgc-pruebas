@@ -508,8 +508,7 @@
                         <strong>Pre-marcado desde el dateo:</strong> {{ descuentoDelDateoNombre }}
                         <div class="text-caption mt-1">
                           El comercial indicó este descuento al crear el dateo.
-                          Se aplicará automáticamente — la comisión bajará del valor nuevo directo
-                          al valor básico de dateo.
+                          Se aplicará automáticamente. Efecto en la comisión: {{ TEXTO_EFECTO_DESCUENTO }}
                         </div>
                       </div>
                       <v-btn
@@ -679,7 +678,7 @@
                 <strong>Origen:</strong> Aplicado en caja.
                 Autorizado por: <strong>{{ usuariosItems.find(u => u.id === autorizadoPorId)?.nombre ?? '—' }}</strong>.
               </template>
-              La comisión fue ajustada al valor básico de dateo.
+              Efecto en la comisión: {{ TEXTO_EFECTO_DESCUENTO }}
             </div>
           </v-alert>
 
@@ -739,6 +738,7 @@ import { useRoute, useRouter } from 'vue-router'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import { FacturacionService } from '@/services/facturacion_service'
 import DescuentoCajaEditor from '@/components/facturacion/DescuentoCajaEditor.vue'
+import { TEXTO_EFECTO_DESCUENTO } from '@/services/desgloseComision'
 import { etiquetaConvenio } from '@/services/conveniosService'
 // ✅ FIX 1: descuentosService es default export → sin llaves, minúscula
 import descuentosService from '@/services/descuentosService'

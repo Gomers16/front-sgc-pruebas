@@ -1,5 +1,6 @@
 // src/services/comisionesService.ts
 import { listConveniosLight } from '@/services/conveniosService'
+import type { CasoComision, DesgloseComision } from './desgloseComision'
 
 const BASE = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/api`
@@ -202,6 +203,11 @@ export interface ComisionListItem {
 
   /** 🆕 Última edición del descuento en Facturación que cambió esta comisión. */
   ajuste_edicion_factura?: AjusteEdicionFactura | null
+  /** Caso por cómo quedó guardada la comisión y su texto. */
+  caso?: CasoComision
+  caso_texto?: string
+  /** Regla con la que se calculó (null en comisiones antiguas o sin regla guardada). */
+  regla_aplicada?: string | null
 }
 
 /** GET /comisiones y /comisiones/:id → ajuste_edicion_factura. */
@@ -257,6 +263,12 @@ export interface ComisionDetail extends ComisionListItem {
   descuento_aplicado_por?: UsuarioLight | null
   /** Usuario que autorizó el descuento (solo cuando origen = 'caja') */
   descuento_autorizado_por?: UsuarioLight | null
+
+  /** Quién cobra y cuánto según el motor, con la factura confirmada del turno. */
+  desglose_motor?: DesgloseComision | null
+  desglose_factura_id?: number | null
+  /** Por qué no hay desglose (p. ej. el turno no tiene factura confirmada). */
+  desglose_motivo?: string | null
 }
 
 export interface ListParams {
@@ -591,6 +603,9 @@ function mapComisionToListItem(api: unknown): ComisionListItem {
       | null,
     ticket_origen: (a.ticket_origen ?? null) as TicketOrigenComision | null,
     ajuste_edicion_factura: (a.ajuste_edicion_factura ?? null) as AjusteEdicionFactura | null,
+    caso: (a.caso ?? undefined) as CasoComision | undefined,
+    caso_texto: (a.caso_texto ?? undefined) as string | undefined,
+    regla_aplicada: (a.regla_aplicada ?? null) as string | null,
   }
 }
 
@@ -617,6 +632,9 @@ function mapComisionToDetail(api: unknown): ComisionDetail {
     descuento_autorizado_por: mapUsuarioLight(
       a.descuento_autorizado_por ?? a.autorizado_por ?? a.autorizadoPor ?? null
     ),
+    desglose_motor: (a.desglose_motor ?? null) as DesgloseComision | null,
+    desglose_factura_id: a.desglose_factura_id != null ? num(a.desglose_factura_id) : null,
+    desglose_motivo: (a.desglose_motivo ?? null) as string | null,
   }
 }
 

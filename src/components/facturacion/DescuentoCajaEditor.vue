@@ -71,7 +71,7 @@
           class="mt-1"
         >
           <strong>⚠️ Efecto en comisión:</strong>
-          La comisión bajará del valor nuevo directo al valor básico de dateo.
+          {{ TEXTO_EFECTO_DESCUENTO }}
           <div v-if="!autorizadoPorId" class="mt-1" style="color: #c62828">
             Debes registrar quién autorizó el descuento antes de confirmar.
           </div>
@@ -170,6 +170,7 @@ import {
   montoMaximo,
   type DescuentoDetalle,
 } from '@/views/facturacion/descuentoFacturacion'
+import { TEXTO_EFECTO_DESCUENTO } from '@/services/desgloseComision'
 
 const props = withDefaults(
   defineProps<{

@@ -1,5 +1,6 @@
 // src/services/facturacion_service.ts
 import { get, upload, post, patch, download } from './http'
+import type { DesgloseComision } from './desgloseComision'
 
 /* =========================== Tipos del dominio =========================== */
 
@@ -286,6 +287,8 @@ export interface ResultadoEdicionDescuento {
     liquidacionIds: number[]
     enLiquidacion: boolean
     requiereConfirmacionPago: boolean
+    /** Quién cobra y cuánto con este descuento (null sin dateo o sin RTM). */
+    desglose?: DesgloseComision | null
   }
 }
 

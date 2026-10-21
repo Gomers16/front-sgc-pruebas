@@ -1534,6 +1534,22 @@
                         <span v-else class="text-medium-emphasis text-caption">—</span>
                       </template>
 
+                      <template #item.calculo="{ item }">
+                        <div class="celda-calculo" data-test="celda-calculo">
+                          <v-chip v-if="item.caso_texto" size="x-small" variant="tonal" color="primary">
+                            {{ item.caso_texto }}
+                          </v-chip>
+                          <v-tooltip v-if="item.regla_aplicada" location="top" max-width="420">
+                            <template #activator="{ props: tip }">
+                              <div v-bind="tip" class="text-caption text-medium-emphasis regla-corta">
+                                {{ item.regla_aplicada }}
+                              </div>
+                            </template>
+                            {{ item.regla_aplicada }}
+                          </v-tooltip>
+                          <div v-else class="text-caption text-medium-emphasis">Sin regla guardada</div>
+                        </div>
+                      </template>
                       <template #item.tipo_cliente="{ item }">
                         <v-chip size="x-small" :color="tipoClienteColor(item.turno)" variant="tonal">
                           {{ tipoClienteLabel(item.turno) }}
@@ -1797,6 +1813,22 @@
               <span v-else class="text-medium-emphasis text-caption">—</span>
             </template>
 
+            <template #item.calculo="{ item }">
+              <div class="celda-calculo" data-test="celda-calculo">
+                <v-chip v-if="item.caso_texto" size="x-small" variant="tonal" color="primary">
+                  {{ item.caso_texto }}
+                </v-chip>
+                <v-tooltip v-if="item.regla_aplicada" location="top" max-width="420">
+                  <template #activator="{ props: tip }">
+                    <div v-bind="tip" class="text-caption text-medium-emphasis regla-corta">
+                      {{ item.regla_aplicada }}
+                    </div>
+                  </template>
+                  {{ item.regla_aplicada }}
+                </v-tooltip>
+                <div v-else class="text-caption text-medium-emphasis">Sin regla guardada</div>
+              </div>
+            </template>
             <template #item.tipo_cliente="{ item }">
               <v-chip size="x-small" :color="tipoClienteColor(item.turno)" variant="tonal">
                 {{ tipoClienteLabel(item.turno) }}
@@ -2428,6 +2460,39 @@
       <v-skeleton-loader v-if="detailDialog.loading" type="card, card, card" />
 
       <template v-else>
+
+        <!-- 🆕 ══ SECCIÓN: CÓMO SE CALCULÓ (mismo motor que la edición de facturas) ══ -->
+        <div class="mb-4" data-test="detalle-calculo">
+          <div class="text-body-2 mb-2">
+            <strong>{{ detailDialog.item.caso_texto ?? 'Caso' }}</strong> ·
+            <span class="text-caption regla-larga">
+              {{
+                detailDialog.item.regla_aplicada ??
+                'Sin regla guardada (comisión anterior a esta funcionalidad o creada por otra ruta)'
+              }}
+            </span>
+          </div>
+          <DesgloseComisionCard
+            v-if="detailDialog.item.desglose_motor"
+            :desglose="detailDialog.item.desglose_motor"
+            titulo="Según el motor, con la factura del turno"
+          >
+            <template #acciones>
+              <v-btn
+                size="x-small"
+                variant="text"
+                color="primary"
+                prepend-icon="mdi-open-in-new"
+                :to="`/comercial/comisiones/${detailDialog.item.id}`"
+              >
+                Abrir la comisión
+              </v-btn>
+            </template>
+          </DesgloseComisionCard>
+          <v-alert v-else type="info" variant="tonal" density="compact">
+            {{ detailDialog.item.desglose_motivo ?? 'Sin desglose del motor para esta comisión.' }}
+          </v-alert>
+        </div>
 
         <!-- 🆕 ══ SECCIÓN: TICKET DE ORIGEN (decisión "sin comisión") ══ -->
         <v-alert
@@ -3681,6 +3746,7 @@ import {
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import AvisoCanal from '@/components/reportes/AvisoCanal.vue'
 import MarcaTicketComision from './MarcaTicketComision.vue'
+import DesgloseComisionCard from '@/components/comisiones/DesgloseComisionCard.vue'
 import MarcaAjusteFactura from './MarcaAjusteFactura.vue'
 import ConfirmarSinComisionDialog from './ConfirmarSinComisionDialog.vue'
 import {
@@ -3854,6 +3920,8 @@ const headers = [
   { title: 'Estado', key: 'estado', sortable: true },
   { title: 'Vehículo', key: 'tipo_vehiculo', sortable: false },
   { title: 'Tipo cliente', key: 'tipo_cliente', sortable: false },
+  // 🆕 Caso y regla con la que se calculó (el desglose completo, en el detalle)
+  { title: 'Cálculo', key: 'calculo', sortable: false },
   { title: 'Turno', key: 'turno', sortable: false },
   { title: 'Asesor', key: 'asesor', sortable: false },
   { title: 'Convenio', key: 'convenio', sortable: false },
@@ -6758,5 +6826,20 @@ loadResumen()
   top: 8px;
   right: 8px;
   color: white;
+}
+.celda-calculo {
+  min-width: 170px;
+  max-width: 240px;
+}
+.regla-corta {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.regla-larga {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-word;
 }
 </style>

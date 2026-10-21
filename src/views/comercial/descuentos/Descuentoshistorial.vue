@@ -300,8 +300,7 @@
                     {{ detailDialog.item.consecutivo_descuento ?? '—' }}
                   </div>
                   <div class="text-caption text-medium-emphasis mt-1">
-                    🏷️ Efecto: la comisión se calculó con valor básico de recurrencia
-                    en lugar del valor nuevo directo.
+                    🏷️ Efecto en la comisión: {{ TEXTO_EFECTO_DESCUENTO }}
                   </div>
                 </v-card-text>
               </v-card>
@@ -473,6 +472,7 @@
 import { ref, reactive, watch, onUnmounted, onMounted } from 'vue'
 import { get, download } from '@/services/http'
 import { formatCOP, listAgentesCaptacion } from '@/services/comisionesService'
+import { TEXTO_EFECTO_DESCUENTO } from '@/services/desgloseComision'
 
 /* ── Tipos ── */
 interface DescuentoLight {
