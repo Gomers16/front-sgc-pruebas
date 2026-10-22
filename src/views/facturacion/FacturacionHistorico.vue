@@ -766,9 +766,6 @@
                   {{ fmtCOP(edicionTotales.despues) }}
                 </span>
               </div>
-              <div class="text-caption text-medium-emphasis mt-1">
-                Antes → después. Se recalcula desde el total sin descuento.
-              </div>
             </v-card>
           </v-col>
           <v-col cols="12" md="6">
@@ -777,55 +774,16 @@
               <div v-if="edicion.previaCargando" class="text-caption text-medium-emphasis">
                 <v-progress-circular indeterminate size="14" width="2" class="mr-1" /> Calculando…
               </div>
-              <template v-else-if="edicion.previa">
-                <div v-if="edicion.previa.comision.comisionId" class="d-flex align-center flex-wrap mb-1" style="gap:6px">
-                  <span class="text-body-2">#{{ edicion.previa.comision.comisionId }}</span>
-                  <v-chip size="x-small" variant="flat" :color="estadoComisionColor(edicion.previa.comision.estado)">
-                    {{ edicion.previa.comision.estado }}
-                  </v-chip>
-                  <v-chip
-                    v-if="edicion.previa.comision.enLiquidacion"
-                    size="x-small"
-                    variant="tonal"
-                    color="red-darken-2"
-                    prepend-icon="mdi-file-document-check-outline"
-                  >
-                    En liquidación #{{ edicion.previa.comision.liquidacionIds.join(', #') }}
-                  </v-chip>
-                </div>
-                <template v-if="comisionRecalculada">
-                  <div class="text-body-2">
-                    Asesor: {{ fmtCOP(comisionRecalculada.antes.montoAsesor) }}
-                    → <strong>{{ fmtCOP(comisionRecalculada.despues.montoAsesor) }}</strong>
-                  </div>
-                  <div
-                    v-if="comisionRecalculada.antes.montoConvenio || comisionRecalculada.despues.montoConvenio"
-                    class="text-body-2"
-                  >
-                    Convenio: {{ fmtCOP(comisionRecalculada.antes.montoConvenio) }}
-                    → <strong>{{ fmtCOP(comisionRecalculada.despues.montoConvenio) }}</strong>
-                  </div>
-                  <div class="text-body-2" data-test="edicion-diferencia">
-                    Diferencia:
-                    <strong :class="comisionRecalculada.diferencia < 0 ? 'text-red-darken-2' : comisionRecalculada.diferencia > 0 ? 'text-green-darken-2' : ''">
-                      {{ comisionRecalculada.diferencia > 0 ? '+' : comisionRecalculada.diferencia < 0 ? '−' : '' }}{{ fmtCOP(Math.abs(comisionRecalculada.diferencia)) }}
-                    </strong>
-                  </div>
-                </template>
-                <v-alert
-                  v-if="avisoComisionEdicion"
-                  :type="avisoComisionEdicion.tipo"
-                  variant="tonal"
-                  density="compact"
-                  class="mt-2 text-caption"
-                  data-test="edicion-aviso-comision"
-                >
-                  {{ avisoComisionEdicion.texto }}
-                </v-alert>
-                <div v-if="!edicionHayCambio" class="text-caption text-medium-emphasis mt-1">
-                  Así está hoy. Cambia el descuento para ver el efecto.
-                </div>
-              </template>
+              <v-alert
+                v-else-if="avisoComisionEdicion"
+                :type="avisoComisionEdicion.tipo"
+                variant="tonal"
+                density="compact"
+                class="text-caption"
+                data-test="edicion-aviso-comision"
+              >
+                {{ avisoComisionEdicion.texto }}
+              </v-alert>
               <div v-else-if="!edicion.error" class="text-caption text-medium-emphasis">
                 Digita el consecutivo del descuento para ver el efecto en la comisión.
               </div>
@@ -836,6 +794,8 @@
         <DesgloseComisionCard
           v-if="edicion.previa?.comision.desglose && !edicion.previaCargando"
           :desglose="edicion.previa.comision.desglose"
+          :estado="edicion.previa.comision.estado"
+          :en-liquidacion="edicion.previa.comision.enLiquidacion"
           class="mt-3"
         >
           <template #acciones>
@@ -994,6 +954,7 @@ import {
 } from './descuentoFacturacion'
 import {
   avisoComision,
+  avisoComisionCorto,
   bodyEdicion,
   modalComision,
   formInicialEdicion,
@@ -1747,7 +1708,7 @@ const edicionMotivoError = computed(() =>
     : '',
 )
 const avisoComisionEdicion = computed(() =>
-  edicion.previa ? avisoComision(edicion.previa.comision) : null,
+  edicion.previa ? avisoComisionCorto(edicion.previa.comision) : null,
 )
 const comisionRecalculada = computed(() => {
   const c = edicion.previa?.comision
@@ -1764,12 +1725,6 @@ const confirmarComision = reactive({ open: false, entiendo: false })
 // corrige a mano con el bloqueo de "sin comisión" que ya existe.
 function rutaComision(id: number) {
   return router.resolve(`/comercial/comisiones/${id}`).href
-}
-function estadoComisionColor(estado: string | null) {
-  return estado === 'PAGADA' ? 'red-darken-2'
-    : estado === 'APROBADA' ? 'blue'
-    : estado === 'ANULADA' ? 'grey'
-    : 'orange-darken-2'
 }
 
 // Si la comisión cambia, primero el modal (con casilla si ya se pagó).

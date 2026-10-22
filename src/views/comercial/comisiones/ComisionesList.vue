@@ -2461,21 +2461,12 @@
 
       <template v-else>
 
-        <!-- 🆕 ══ SECCIÓN: CÓMO SE CALCULÓ (mismo motor que la edición de facturas) ══ -->
+        <!-- 🆕 ══ SECCIÓN: DESGLOSE (misma tarjeta que la edición de facturas) ══ -->
         <div class="mb-4" data-test="detalle-calculo">
-          <div class="text-body-2 mb-2">
-            <strong>{{ detailDialog.item.caso_texto ?? 'Caso' }}</strong> ·
-            <span class="text-caption regla-larga">
-              {{
-                detailDialog.item.regla_aplicada ??
-                'Sin regla guardada (comisión anterior a esta funcionalidad o creada por otra ruta)'
-              }}
-            </span>
-          </div>
           <DesgloseComisionCard
             v-if="detailDialog.item.desglose_motor"
             :desglose="detailDialog.item.desglose_motor"
-            titulo="Según el motor, con la factura del turno"
+            :estado="detailDialog.item.estado"
           >
             <template #acciones>
               <v-btn
@@ -2485,13 +2476,24 @@
                 prepend-icon="mdi-open-in-new"
                 :to="`/comercial/comisiones/${detailDialog.item.id}`"
               >
-                Abrir la comisión
+                Corregir manualmente en Comisiones
               </v-btn>
             </template>
           </DesgloseComisionCard>
-          <v-alert v-else type="info" variant="tonal" density="compact">
-            {{ detailDialog.item.desglose_motivo ?? 'Sin desglose del motor para esta comisión.' }}
-          </v-alert>
+          <template v-else>
+            <div class="text-body-2 mb-2">
+              <strong>{{ detailDialog.item.caso_texto ?? 'Caso' }}</strong> ·
+              <span class="text-caption regla-larga">
+                {{
+                  detailDialog.item.regla_aplicada ??
+                  'Sin regla guardada (comisión anterior a esta funcionalidad o creada por otra ruta)'
+                }}
+              </span>
+            </div>
+            <v-alert type="info" variant="tonal" density="compact">
+              {{ detailDialog.item.desglose_motivo ?? 'Sin desglose del motor para esta comisión.' }}
+            </v-alert>
+          </template>
         </div>
 
         <!-- 🆕 ══ SECCIÓN: TICKET DE ORIGEN (decisión "sin comisión") ══ -->

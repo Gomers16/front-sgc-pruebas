@@ -134,6 +134,25 @@ export function avisoComision(c: ComisionPrevia): {
   }
 }
 
+/** El mismo aviso en una línea, para el diálogo (el detalle está en la tarjeta del desglose). */
+export function avisoComisionCorto(c: ComisionPrevia): {
+  tipo: 'info' | 'warning' | 'success'
+  texto: string
+} {
+  switch (c.accion) {
+    case 'RECALCULADA':
+      return { tipo: 'success', texto: 'Se recalcula con este descuento.' }
+    case 'AJUSTADA_TRAS_PAGO':
+      return { tipo: 'warning', texto: 'Ya pagada: solo cambia el registro.' }
+    case 'NO_MODIFICADA':
+      return { tipo: 'warning', texto: 'No se modifica.' }
+    case 'SIN_CONTINUIDAD':
+      return { tipo: 'warning', texto: 'Continuidad vacía: no se recalcula.' }
+    default:
+      return { tipo: 'info', texto: 'El ticket no tiene comisión.' }
+  }
+}
+
 /**
  * Modal antes de guardar cuando la comisión cambia:
  *  - cambio (PENDIENTE / APROBADA): "La comisión #N (estado) cambiará de $X a $Y".

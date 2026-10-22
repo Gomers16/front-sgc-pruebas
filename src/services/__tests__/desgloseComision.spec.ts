@@ -5,9 +5,16 @@ import { describe, expect, it } from 'vitest'
 import {
   ETIQUETA_ROL,
   TEXTO_EFECTO_DESCUENTO,
+  avisosVisibles,
+  colorEstadoComision,
   diferenciaBeneficiario,
+  diferenciaTotal,
+  estadoVisible,
   origenValorConfig,
+  totalDespues,
+  type AlertaComision,
   type BeneficiarioComision,
+  type DesgloseComision,
   type ValorConfigUsado,
 } from '../desgloseComision'
 
@@ -85,5 +92,85 @@ describe('textos', () => {
     expect(t).toContain('si el cliente es nuevo')
     expect(t).not.toMatch(/valor básico de dateo/i)
     expect(t).not.toMatch(/Incentivo final/i)
+  })
+})
+
+const desglose = (
+  beneficiarios: BeneficiarioComision[],
+  alertas: AlertaComision[] = [],
+  estimado = false,
+) => ({ estimado, beneficiarios, alertas }) as unknown as DesgloseComision
+
+describe('diferenciaTotal y totalDespues', () => {
+  it('suma después − antes de todos los beneficiarios', () => {
+    const d = desglose([beneficiario(17280, 4300), { ...beneficiario(5000, 0), rol: 'CONVENIO' }])
+    expect(diferenciaTotal(d)).toBe(-17980)
+    expect(totalDespues(d)).toBe(4300)
+    expect(diferenciaTotal(desglose([beneficiario(8640, 8640)]))).toBe(0)
+  })
+
+  it('estimado (sin "antes"): no hay diferencia', () => {
+    expect(diferenciaTotal(desglose([beneficiario(null, 4300)], [], true))).toBeNull()
+  })
+})
+
+describe('estado del chip', () => {
+  it('el de la comisión, o ESTIMADO si es estimado o no hay estado', () => {
+    const d = desglose([beneficiario(0, 0)])
+    expect(estadoVisible(d, 'APROBADA')).toBe('APROBADA')
+    expect(estadoVisible(d, null)).toBe('ESTIMADO')
+    expect(estadoVisible(desglose([], [], true), 'PENDIENTE')).toBe('ESTIMADO')
+  })
+
+  it('colores', () => {
+    expect(colorEstadoComision('PAGADA')).toBe('red-darken-2')
+    expect(colorEstadoComision('APROBADA')).toBe('blue')
+    expect(colorEstadoComision('ANULADA')).toBe('grey')
+    expect(colorEstadoComision('ESTIMADO')).toBe('indigo')
+    expect(colorEstadoComision('PENDIENTE')).toBe('orange-darken-2')
+  })
+})
+
+describe('avisosVisibles', () => {
+  const a = (codigo: AlertaComision['codigo'], tipo: AlertaComision['tipo'] = 'warning') => ({
+    codigo,
+    tipo,
+    mensaje: `mensaje largo de ${codigo}`,
+  })
+
+  it('solo config en $0, ticket sin comisión, pagada/liquidada y continuidad vacía; uno por tipo', () => {
+    const d = desglose(
+      [],
+      [
+        a('CONFIG_EN_CERO'),
+        a('CONFIG_EN_CERO'),
+        a('SIN_COMISION_TICKET'),
+        a('AVANCE_HEREDADO', 'info'),
+        a('SIN_CONTINUIDAD'),
+        a('ESTIMADO', 'info'),
+        a('NO_MODIFICADA'),
+        a('DISTINTO_AL_MOTOR', 'error'),
+      ],
+    )
+    expect(avisosVisibles(d, 'PAGADA')).toEqual([
+      { codigo: 'PAGADA', tipo: 'error', texto: 'Comisión ya pagada' },
+      { codigo: 'CONFIG_EN_CERO', tipo: 'warning', texto: 'Valor en $0 por la configuración' },
+      { codigo: 'SIN_COMISION_TICKET', tipo: 'warning', texto: 'Ticket aprobado «sin comisión»' },
+      { codigo: 'SIN_CONTINUIDAD', tipo: 'warning', texto: 'Continuidad vacía: no se recalculó' },
+    ])
+  })
+
+  it('en liquidación (sin estar pagada) y sin avisos', () => {
+    expect(avisosVisibles(desglose([]), 'APROBADA', true)).toEqual([
+      { codigo: 'EN_LIQUIDACION', tipo: 'error', texto: 'Comisión ya en una liquidación' },
+    ])
+    expect(avisosVisibles(desglose([]), 'PENDIENTE')).toEqual([])
+  })
+
+  it('cada aviso cabe en una línea (≤ 40 caracteres)', () => {
+    const d = desglose([], [a('CONFIG_EN_CERO'), a('SIN_COMISION_TICKET'), a('SIN_CONTINUIDAD')])
+    for (const x of [...avisosVisibles(d, 'PAGADA'), ...avisosVisibles(d, 'APROBADA', true)]) {
+      expect(x.texto.length).toBeLessThanOrEqual(40)
+    }
   })
 })

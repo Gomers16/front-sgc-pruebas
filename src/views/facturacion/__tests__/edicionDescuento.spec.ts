@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   avisoComision,
+  avisoComisionCorto,
   bodyEdicion,
   formInicialEdicion,
   hayCambioEdicion,
@@ -276,5 +277,51 @@ describe('catálogos compartidos con el modal de confirmación', () => {
       { id: 1, nombre: 'N1 X' },
       { id: 2, nombre: 'N2 X' },
     ])
+  })
+})
+
+describe('editar descuento: aviso de la comisión en una línea', () => {
+  const c = (
+    accion:
+      | 'RECALCULADA'
+      | 'AJUSTADA_TRAS_PAGO'
+      | 'NO_MODIFICADA'
+      | 'SIN_CONTINUIDAD'
+      | 'SIN_COMISION',
+  ) => ({
+    accion,
+    mensaje:
+      'Mensaje largo del backend que no va en el diálogo, porque el detalle está en la tarjeta.',
+    comisionId: accion === 'SIN_COMISION' ? null : 55,
+    estado: 'PENDIENTE',
+    antes: null,
+    despues: null,
+    diferencia: { asesor: 0, convenio: 0, total: 0 },
+    liquidacionIds: [] as number[],
+    enLiquidacion: false,
+    requiereConfirmacionPago: false,
+  })
+
+  it('un texto corto por acción, sin el mensaje largo del backend', () => {
+    expect(avisoComisionCorto(c('RECALCULADA'))).toEqual({
+      tipo: 'success',
+      texto: 'Se recalcula con este descuento.',
+    })
+    expect(avisoComisionCorto(c('AJUSTADA_TRAS_PAGO'))).toEqual({
+      tipo: 'warning',
+      texto: 'Ya pagada: solo cambia el registro.',
+    })
+    expect(avisoComisionCorto(c('NO_MODIFICADA'))).toEqual({
+      tipo: 'warning',
+      texto: 'No se modifica.',
+    })
+    expect(avisoComisionCorto(c('SIN_CONTINUIDAD'))).toEqual({
+      tipo: 'warning',
+      texto: 'Continuidad vacía: no se recalcula.',
+    })
+    expect(avisoComisionCorto(c('SIN_COMISION'))).toEqual({
+      tipo: 'info',
+      texto: 'El ticket no tiene comisión.',
+    })
   })
 })

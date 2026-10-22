@@ -1,17 +1,30 @@
-// La tarjeta solo muestra el desglose del backend: caso, descuento, quién
-// cobra (antes/después o estimado), la regla, la configuración usada y las
-// alertas. Aquí se prueba qué muestra, no el dibujo de Vuetify.
+// La tarjeta solo muestra el desglose del backend. Por defecto: quién cobra
+// (antes → después), la diferencia, el estado y los avisos cortos; el caso,
+// el descuento, la regla, la configuración y la explicación van en el panel
+// "Ver cómo se calculó". Aquí se prueba qué muestra, no el dibujo de Vuetify.
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import DesgloseComisionCard from '../DesgloseComisionCard.vue'
 import type { DesgloseComision } from '@/services/desgloseComision'
 
-const STUBS = Object.fromEntries(
-  ['v-card', 'v-chip', 'v-spacer', 'v-table', 'v-alert'].map((n) => [
-    n,
-    { template: '<div><slot /></div>' },
-  ]),
-)
+const STUBS = {
+  ...Object.fromEntries(
+    [
+      'v-card',
+      'v-chip',
+      'v-spacer',
+      'v-table',
+      'v-alert',
+      'v-expansion-panel',
+      'v-expansion-panel-title',
+    ].map((n) => [n, { template: '<div><slot /></div>' }]),
+  ),
+  'v-expansion-panels': {
+    props: ['modelValue'],
+    template: '<div data-stub="panels" :data-abierto="modelValue ?? \'\'"><slot /></div>',
+  },
+  'v-expansion-panel-text': { template: '<div data-test="panel-texto"><slot /></div>' },
+}
 
 const base = (d: Partial<DesgloseComision> = {}): DesgloseComision => ({
   estimado: false,
@@ -76,91 +89,179 @@ const base = (d: Partial<DesgloseComision> = {}): DesgloseComision => ({
   ...d,
 })
 
-const montar = (desglose: DesgloseComision, titulo?: string) =>
+const montar = (
+  desglose: DesgloseComision,
+  props: { estado?: string | null; enLiquidacion?: boolean } = {},
+) =>
   mount(DesgloseComisionCard, {
-    props: { desglose, ...(titulo ? { titulo } : {}) },
+    props: { desglose, estado: 'PENDIENTE', ...props },
     global: { stubs: STUBS },
-    slots: { acciones: '<a data-test="accion">Corregir</a>' },
+    slots: { acciones: '<a data-test="accion">Corregir manualmente en Comisiones</a>' },
   })
 
 // Intl pone espacios duros: se comparan solo los dígitos.
 const digitos = (s: string) => s.replace(/\D/g, '')
 
-describe('DesgloseComisionCard', () => {
-  it('título por defecto, caso, escenario, vehículo y la acción del padre', () => {
+/** Texto visible sin abrir el panel "Ver cómo se calculó". */
+const visible = (w: VueWrapper) => {
+  const panel = w.get('[data-test="panel-texto"]').text()
+  return w.text().replace(panel, '')
+}
+
+describe('DesgloseComisionCard: lo que se ve por defecto', () => {
+  it('título, chip de estado y el enlace del padre', () => {
     const w = montar(base())
     expect(w.text()).toContain('Comisión según este descuento')
-    expect(w.get('[data-test="desglose-caso"]').text()).toMatch(
-      /Comercial con convenio\s*· Cliente nuevo\s*· Carro/,
-    )
-    expect(w.find('[data-test="accion"]').exists()).toBe(true)
-    expect(montar(base(), 'Según el motor').text()).toContain('Según el motor')
+    expect(w.get('[data-test="desglose-estado"]').text()).toBe('PENDIENTE')
+    expect(w.get('[data-test="accion"]').text()).toBe('Corregir manualmente en Comisiones')
   })
 
-  it('descuento con su origen y la marca de avance', () => {
-    const t = montar(base()).get('[data-test="desglose-descuento"]').text()
-    expect(t).toContain('QAT-AVANCE · Del dateo')
-    expect(t).toContain('El dateo trae marca de avance')
-    const sin = montar(
-      base({
-        descuento: { codigo: null, origen: null, origenTexto: 'Sin descuento', esAvance: false },
-      }),
-    )
-      .get('[data-test="desglose-descuento"]')
-      .text()
-    expect(sin).toContain('ninguno · Sin descuento')
-    expect(sin).not.toContain('avance')
-  })
-
-  it('quién cobra: antes y después, con quién recibe la parte del convenio', () => {
-    const w = montar(base())
-    const filas = w.findAll('[data-test="desglose-beneficiarios"] tbody tr')
+  it('una fila por beneficiario con nombre, rol y antes → después', () => {
+    const filas = montar(base()).findAll('[data-test="desglose-beneficiarios"] tbody tr')
     expect(filas).toHaveLength(2)
     expect(filas[0]!.text()).toContain('QAT Comercial')
     expect(filas[0]!.text()).toContain('Asesor comercial')
-    const celdas1 = filas[1]!.findAll('td')
-    expect(filas[1]!.text()).toContain('Convenio · TALLER')
-    expect(filas[1]!.text()).toContain('lo cobra QAT Asesor Convenio')
-    expect(digitos(celdas1[1]!.text())).toBe('5000')
-    expect(digitos(celdas1[2]!.text())).toBe('0')
-    // La baja se marca en rojo; sin cambio, sin color.
-    expect(celdas1[2]!.find('strong').classes()).toContain('text-red-darken-2')
-    expect(filas[0]!.findAll('td')[2]!.find('strong').classes()).toEqual([])
-    expect(w.get('[data-test="desglose-beneficiarios"] thead').text()).toMatch(/Antes\s*Después/)
+    expect(filas[1]!.text()).toContain('QAT Convenio')
+    expect(filas[1]!.text()).toContain('Convenio')
+    const monto = filas[1]!.findAll('td')[1]!
+    expect(monto.text()).toContain('→')
+    expect(digitos(monto.text())).toBe('50000')
+    expect(monto.find('strong').classes()).toContain('text-red-darken-2')
+    const sinCambio = filas[0]!.findAll('td')[1]!.find('strong').classes()
+    expect(sinCambio).not.toContain('text-red-darken-2')
+    expect(sinCambio).not.toContain('text-green-darken-2')
   })
 
-  it('estimado: chip ESTIMADO, sin columna "Antes"', () => {
-    const d = base({ estimado: true })
-    d.beneficiarios = d.beneficiarios.map((b) => ({ ...b, antes: null }))
-    const w = montar(d)
-    expect(w.find('[data-test="desglose-estimado"]').exists()).toBe(true)
-    expect(w.get('[data-test="desglose-beneficiarios"] thead').text()).not.toContain('Antes')
-    expect(w.get('[data-test="desglose-beneficiarios"] thead').text()).toContain('Estimado')
-    const celdas = w.findAll('[data-test="desglose-beneficiarios"] tbody tr')[1]!.findAll('td')
-    expect(celdas[1]!.text()).toBe('')
+  it('Caso 2: una sola fila, "Asesor convenio"', () => {
+    const w = montar(
+      base({
+        caso: 'CONVENIO_SELF',
+        beneficiarios: [
+          {
+            rol: 'ASESOR_CONVENIO',
+            id: 7,
+            nombre: 'QAT Asesor Convenio',
+            tipo: null,
+            cobraAsesorConvenio: null,
+            antes: 0,
+            despues: 0,
+          },
+        ],
+      }),
+    )
+    const filas = w.findAll('[data-test="desglose-beneficiarios"] tbody tr')
+    expect(filas).toHaveLength(1)
+    expect(filas[0]!.text()).toContain('Asesor convenio')
   })
 
-  it('sin recalcular se avisa', () => {
-    expect(montar(base({ recalculado: false })).text()).toContain('Sin recalcular')
-    expect(montar(base()).text()).not.toContain('Sin recalcular')
+  it('diferencia total con signo, "Sin cambio" o el total estimado', () => {
+    const baja = montar(base()).get('[data-test="desglose-diferencia"]')
+    expect(baja.text()).toMatch(/^Diferencia:\s*−/)
+    expect(digitos(baja.text())).toBe('5000')
+    expect(baja.find('strong').classes()).toContain('text-red-darken-2')
+
+    const igual = base()
+    igual.beneficiarios = igual.beneficiarios.map((b) => ({ ...b, despues: b.antes! }))
+    expect(montar(igual).get('[data-test="desglose-diferencia"]').text()).toBe('Sin cambio')
+
+    const est = base({ estimado: true })
+    est.beneficiarios = est.beneficiarios.map((b) => ({ ...b, antes: null, despues: 4300 }))
+    const w = montar(est, { estado: null })
+    expect(w.get('[data-test="desglose-diferencia"]').text()).toMatch(/^Estimado:/)
+    expect(digitos(w.get('[data-test="desglose-diferencia"]').text())).toBe('8600')
+    expect(w.get('[data-test="desglose-estado"]').text()).toBe('ESTIMADO')
+    expect(w.get('[data-test="desglose-beneficiarios"]').text()).not.toContain('→')
   })
 
-  it('regla y regla guardada solo si son distintas', () => {
+  it('avisos cortos solo si aplican; los demás quedan en el panel', () => {
+    const sinAvisos = montar(base())
+    expect(sinAvisos.findAll('[data-test^="desglose-aviso-"]')).toHaveLength(0)
+
+    const w = montar(
+      base({
+        alertas: [
+          { codigo: 'CONFIG_EN_CERO', tipo: 'warning', mensaje: 'Incentivo en $0 (fila #15).' },
+          { codigo: 'CONFIG_EN_CERO', tipo: 'warning', mensaje: 'Base en $0 (fila #2).' },
+          { codigo: 'SIN_COMISION_TICKET', tipo: 'warning', mensaje: 'Ticket #1843 sin comisión.' },
+          { codigo: 'SIN_CONTINUIDAD', tipo: 'warning', mensaje: 'Continuidad vacía, largo.' },
+          {
+            codigo: 'DISTINTO_AL_MOTOR',
+            tipo: 'error',
+            mensaje: 'Lo guardado no es lo del motor.',
+          },
+        ],
+      }),
+      { estado: 'PAGADA' },
+    )
+    const avisos = w.findAll('[data-test^="desglose-aviso-"]').map((a) => a.text())
+    expect(avisos).toEqual([
+      'Comisión ya pagada',
+      'Valor en $0 por la configuración',
+      'Ticket aprobado «sin comisión»',
+      'Continuidad vacía: no se recalculó',
+    ])
+    expect(visible(w)).not.toContain('Lo guardado no es lo del motor.')
+    expect(w.get('[data-test="desglose-alerta-DISTINTO_AL_MOTOR"]').text()).toBe(
+      'Lo guardado no es lo del motor.',
+    )
+    expect(w.get('[data-test="desglose-estado"]').text()).toBe('PAGADA')
+  })
+
+  it('en liquidación también avisa', () => {
+    const w = montar(base(), { estado: 'APROBADA', enLiquidacion: true })
+    expect(w.get('[data-test="desglose-aviso-EN_LIQUIDACION"]').text()).toBe(
+      'Comisión ya en una liquidación',
+    )
+  })
+
+  it('no muestra caso, descuento, regla, configuración ni explicación fuera del panel', () => {
+    const v = visible(montar(base()))
+    for (const t of [
+      'Comercial con convenio',
+      'Cliente nuevo',
+      'QAT-AVANCE',
+      'Del dateo',
+      'CASO3_COMERCIAL_CON_CONVENIO_AVANCE',
+      'Valor asesor',
+      'El asesor cobra su valor',
+    ]) {
+      expect(v).not.toContain(t)
+    }
+  })
+})
+
+describe('DesgloseComisionCard: panel "Ver cómo se calculó"', () => {
+  it('cerrado por defecto', () => {
+    const w = montar(base())
+    expect(w.text()).toContain('Ver cómo se calculó')
+    expect(w.get('[data-stub="panels"]').attributes('data-abierto')).toBe('')
+  })
+
+  it('caso, escenario, vehículo, descuento con origen y marca de avance', () => {
+    const w = montar(base())
+    expect(w.get('[data-test="desglose-caso"]').text()).toMatch(
+      /Comercial con convenio\s*· Cliente nuevo\s*· Carro/,
+    )
+    const d = w.get('[data-test="desglose-descuento"]').text()
+    expect(d).toContain('QAT-AVANCE · Del dateo')
+    expect(d).toContain('El dateo trae marca de avance')
+  })
+
+  it('regla y regla guardada solo si son distintas; "Sin recalcular"', () => {
     expect(montar(base()).get('[data-test="desglose-regla"]').text()).not.toContain(
       'Regla guardada hoy',
     )
-    const t = montar(base({ reglaGuardada: 'CASO1_NUEVO_DIRECTO' }))
-      .get('[data-test="desglose-regla"]')
-      .text()
+    const w = montar(base({ reglaGuardada: 'CASO1_NUEVO_DIRECTO', recalculado: false }))
+    const t = w.get('[data-test="desglose-regla"]').text()
+    expect(t).toContain('El asesor cobra su valor')
     expect(t).toContain('Regla: CASO3_COMERCIAL_CON_CONVENIO_AVANCE')
     expect(t).toContain('Regla guardada hoy: CASO1_NUEVO_DIRECTO')
+    expect(w.get('[data-test="desglose-caso"]').text()).toContain('Sin recalcular')
   })
 
   it('configuración: origen de cada valor y "no interviene"; el cero usado en rojo', () => {
-    const w = montar(base())
-    const filas = w.findAll('[data-test="desglose-config"]')
+    const filas = montar(base()).findAll('[data-test="desglose-config"]')
     expect(filas[0]!.text()).toContain('(Global #2 · VEHICULO · base)')
-    expect(filas[0]!.text()).not.toContain('no interviene')
     expect(filas[1]!.text()).toContain('(Fila propia #15 · VEHICULO · incentivo)')
     expect(filas[1]!.text()).toContain('no interviene')
     expect(filas[1]!.find('strong').classes()).not.toContain('text-red-darken-2')
@@ -169,26 +270,5 @@ describe('DesgloseComisionCard', () => {
     d.configuracion[1] = { ...d.configuracion[1]!, usado: true }
     const cero = montar(d).findAll('[data-test="desglose-config"]')[1]!
     expect(cero.find('strong').classes()).toContain('text-red-darken-2')
-  })
-
-  it('muestra cada alerta del backend con su código', () => {
-    const w = montar(
-      base({
-        alertas: [
-          { codigo: 'CONFIG_EN_CERO', tipo: 'warning', mensaje: 'El incentivo está en $0.' },
-          {
-            codigo: 'DISTINTO_AL_MOTOR',
-            tipo: 'error',
-            mensaje: 'Lo guardado no es lo del motor.',
-          },
-        ],
-      }),
-    )
-    expect(w.get('[data-test="desglose-alerta-CONFIG_EN_CERO"]').text()).toBe(
-      'El incentivo está en $0.',
-    )
-    expect(w.get('[data-test="desglose-alerta-DISTINTO_AL_MOTOR"]').text()).toBe(
-      'Lo guardado no es lo del motor.',
-    )
   })
 })

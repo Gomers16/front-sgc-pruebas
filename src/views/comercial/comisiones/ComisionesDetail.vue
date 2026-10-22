@@ -222,17 +222,15 @@
         </v-card>
       </v-col>
 
-      <!-- 🆕 Cómo se calculó: caso, regla, configuración y quién cobra (mismo motor que Facturación) -->
+      <!-- 🆕 Desglose de la comisión (misma tarjeta que la edición de facturas) -->
       <v-col cols="12" data-test="comision-calculo">
-        <v-card class="rounded-lg" elevation="4">
-          <v-card-title class="d-flex align-center flex-wrap" style="gap: 8px">
-            <span class="text-subtitle-1 font-weight-bold">Cómo se calculó</span>
-            <v-chip v-if="comision?.caso_texto" size="small" variant="tonal" color="primary">
-              {{ comision.caso_texto }}
-            </v-chip>
-          </v-card-title>
-          <v-divider />
-          <v-card-text>
+        <v-card class="rounded-lg pa-2" elevation="4">
+          <DesgloseComisionCard
+            v-if="comision?.desglose_motor"
+            :desglose="comision.desglose_motor"
+            :estado="comision.estado"
+          />
+          <template v-else>
             <div class="text-body-2 mb-2" data-test="comision-regla">
               <strong>Regla guardada:</strong>
               <span class="regla-guardada">
@@ -242,21 +240,10 @@
                 }}
               </span>
             </div>
-            <DesgloseComisionCard
-              v-if="comision?.desglose_motor"
-              :desglose="comision.desglose_motor"
-              titulo="Según el motor, con la factura del turno"
-            >
-              <template #acciones>
-                <span v-if="comision.desglose_factura_id" class="text-caption text-medium-emphasis">
-                  Factura #{{ comision.desglose_factura_id }}
-                </span>
-              </template>
-            </DesgloseComisionCard>
-            <v-alert v-else type="info" variant="tonal" density="compact">
+            <v-alert type="info" variant="tonal" density="compact">
               {{ comision?.desglose_motivo ?? 'Sin desglose del motor para esta comisión.' }}
             </v-alert>
-          </v-card-text>
+          </template>
         </v-card>
       </v-col>
 
