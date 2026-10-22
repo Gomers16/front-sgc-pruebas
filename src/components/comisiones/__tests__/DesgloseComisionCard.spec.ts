@@ -35,7 +35,12 @@ const base = (d: Partial<DesgloseComision> = {}): DesgloseComision => ({
   escenarioTexto: 'Cliente nuevo',
   continuidad: { aplica: false, estado: null, texto: '' },
   tipoVehiculo: 'VEHICULO',
-  descuento: { codigo: 'QAT-AVANCE', origen: 'DATEO', origenTexto: 'Del dateo', esAvance: true },
+  descuento: {
+    codigo: 'QAT-AVANCE',
+    origen: 'DATEO',
+    origenTexto: 'Del dateo',
+    convenioSinComision: true,
+  },
   regla: 'CASO3_COMERCIAL_CON_CONVENIO_AVANCE',
   explicacion: 'El asesor cobra su valor; el convenio queda en $0 por el avance.',
   reglaGuardada: 'CASO3_COMERCIAL_CON_CONVENIO_AVANCE',
@@ -237,14 +242,14 @@ describe('DesgloseComisionCard: panel "Ver cómo se calculó"', () => {
     expect(w.get('[data-stub="panels"]').attributes('data-abierto')).toBe('')
   })
 
-  it('caso, escenario, vehículo, descuento con origen y marca de avance', () => {
+  it('caso, escenario, vehículo, descuento con origen y convenio en cero', () => {
     const w = montar(base())
     expect(w.get('[data-test="desglose-caso"]').text()).toMatch(
       /Comercial con convenio\s*· Cliente nuevo\s*· Carro/,
     )
     const d = w.get('[data-test="desglose-descuento"]').text()
     expect(d).toContain('QAT-AVANCE · Del dateo')
-    expect(d).toContain('Cuenta como Avance')
+    expect(d).toContain('Con descuento: la comisión del convenio queda en cero')
   })
 
   it('regla y regla guardada solo si son distintas; "Sin recalcular"', () => {

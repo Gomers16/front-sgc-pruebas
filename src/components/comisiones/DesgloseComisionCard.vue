@@ -89,13 +89,15 @@
             <strong>Descuento:</strong> {{ desglose.descuento.codigo ?? 'ninguno' }} ·
             {{ desglose.descuento.origenTexto }}
             <v-chip
-              v-if="desglose.descuento.esAvance"
+              v-if="desglose.descuento.convenioSinComision"
               size="x-small"
               color="orange-darken-2"
               variant="tonal"
               class="ml-1"
+              data-test="chip-convenio-sin-comision"
             >
-              Cuenta como Avance: el convenio cobró en la factura
+              Con descuento: la comisión del
+              {{ desglose.caso === 'CONVENIO_SELF' ? 'asesor convenio' : 'convenio' }} queda en cero
             </v-chip>
           </div>
 

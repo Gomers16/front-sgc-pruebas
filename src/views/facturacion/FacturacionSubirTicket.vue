@@ -206,7 +206,7 @@
                   AVANCE
                 </v-chip>
                 <span class="text-medium-emphasis font-weight-medium">
-                  El comercial marcó Avance en el dateo.
+                  {{ TEXTO_MARCA_AVANCE }}
                 </span>
               </div>
 
@@ -454,7 +454,7 @@
                   <!-- ++ AVANCE en modal de confirmación ++ -->
                   <div class="capt-line" v-if="turnoMeta.esAvance">
                     <v-chip size="x-small" color="warning" variant="flat" prepend-icon="mdi-cash-fast">AVANCE</v-chip>
-                    <span class="text-medium-emphasis">El comercial marcó Avance en el dateo.</span>
+                    <span class="text-medium-emphasis">{{ TEXTO_MARCA_AVANCE }}</span>
                   </div>
                   <div v-if="!turnoCard.agenteComercialNombre && !turnoCard.asesorConvenioNombre && !turnoCard.convenioNombre && !turnoMeta.esAvance">—</div>
                 </div>
@@ -490,7 +490,7 @@
               :ticket-id="currentTicketId"
               :mostrar-observacion="!!turnoMeta.dateoId && !turnoMeta.descuentoId"
               :caso-comision="casoTurno"
-              :traia-avance="premarcadoEsAvance ? 'DATEO' : null"
+              :traia-descuento="turnoMeta.descuentoId ? 'DATEO' : null"
               @update:consecutivo-bloqueado="(b: boolean) => (consecutivoDescuentoBloqueado = b)"
               @update:documentos-completos="(v: boolean) => (documentosPoliciaCompletos = v)"
               @aviso="(t: string) => { snack.text = t; snack.show = true }"
@@ -560,29 +560,6 @@
                     >
                       Volver al pre-marcado
                     </v-btn>
-                  </div>
-                </v-alert>
-              </template>
-              <template #policia>
-                <!-- Impacto en comisión cuando viene aplicado en caja sin pre-marcado -->
-                <v-alert
-                  v-if="impactoComisionPolicia"
-                  type="info"
-                  variant="tonal"
-                  density="compact"
-                  class="mt-3"
-                  prepend-icon="mdi-cash-check"
-                >
-                  <div class="font-weight-bold mb-1">Efecto en comisiones con este descuento:</div>
-                  <div v-if="impactoComisionPolicia.comercial" class="text-caption">
-                    <v-icon size="14" color="info">mdi-account-tie</v-icon>
-                    <strong>{{ impactoComisionPolicia.comercial.nombre }}</strong>
-                    → {{ impactoComisionPolicia.comercial.monto }}
-                  </div>
-                  <div v-if="impactoComisionPolicia.convenio" class="text-caption mt-1">
-                    <v-icon size="14" color="info">mdi-handshake</v-icon>
-                    <strong>{{ impactoComisionPolicia.convenio.nombre }}</strong>
-                    → {{ impactoComisionPolicia.convenio.monto }}
                   </div>
                 </v-alert>
               </template>
@@ -743,8 +720,7 @@ import DescuentoCajaEditor from '@/components/facturacion/DescuentoCajaEditor.vu
 import {
   TEXTO_EFECTO_DESCUENTO,
   casoDelTurno,
-  impactoInformativoEspecialCaja,
-  textoAvance,
+  textoDescuentoConvenio,
 } from '@/services/desgloseComision'
 import { etiquetaConvenio } from '@/services/conveniosService'
 // ✅ FIX 1: descuentosService es default export → sin llaves, minúscula
@@ -1361,43 +1337,10 @@ const esDescuentoAvancePropietario = computed(() => {
   return d?.codigo === 'AVANCE_PROPIETARIO'
 })
 
-// ++ NUEVO: INFORMATIVO_OBSEQUIO — usa slider normal, NO monto fijo ++
-const esDescuentoObsequio = computed(() => {
-  if (!descuentoIdEfectivo.value) return false
-  if (turnoMeta.descuentoId && !overrideDateoDescuento.value && detallePremarcado.value)
-    return detallePremarcado.value.codigo === 'INFORMATIVO_OBSEQUIO'
-  const d = descuentosActivos.value.find(x => x.id === descuentoIdEfectivo.value)
-  return d?.codigo === 'INFORMATIVO_OBSEQUIO'
-})
-
-// Solo cuando INFORMATIVO_POLICIA se aplica en caja (sin pre-marcado de dateo, o con override)
-const esInformativoPoliciaEnCaja = computed(() =>
-  esDescuentoPolicia.value && (!turnoMeta.descuentoId || overrideDateoDescuento.value)
-)
-
 // true cuando el descuento activo fue elegido en caja y requiere autorizador
 const esDescuentoEnCajaActivo = computed(() =>
   !!descuentoIdEnCaja.value && (!turnoMeta.descuentoId || overrideDateoDescuento.value)
 )
-
-// Resumen del impacto en comisión para mostrar en modal (sin cifras: el
-// escenario del cliente se conoce al confirmar).
-const impactoComisionPolicia = computed(() => {
-  if (!esInformativoPoliciaEnCaja.value || esDescuentoObsequio.value) return null
-  const efecto = impactoInformativoEspecialCaja(casoTurno.value)
-  if (!efecto) return null
-  return {
-    comercial: efecto.comercial
-      ? { nombre: turnoCard.agenteComercialNombre!, monto: efecto.comercial }
-      : null,
-    convenio: efecto.convenio
-      ? {
-          nombre: etiquetaConvenio({ nombre: turnoCard.convenioNombre, establecimiento: turnoCard.convenioEstablecimiento }),
-          monto: efecto.convenio,
-        }
-      : null,
-  }
-})
 
 // Caso de la comisión con lo que muestra la tarjeta del dateo (null sin dateo).
 const casoTurno = computed(() =>
@@ -1408,26 +1351,23 @@ const casoTurno = computed(() =>
       })
     : null,
 )
-const premarcadoEsAvance = computed(() => detallePremarcado.value?.codigo === 'AVANCE')
-// El Avance cuenta por el descuento final de la factura (pre-marcado o de caja).
+// Con convenio manda el descuento final de la factura (pre-marcado o de caja),
+// sea cual sea su código o monto.
 const efectoComisionPremarcado = computed(
   () =>
-    textoAvance({ caso: casoTurno.value, codigo: detallePremarcado.value?.codigo }) ??
-    TEXTO_EFECTO_DESCUENTO,
+    textoDescuentoConvenio({ caso: casoTurno.value, hayDescuento: true }) ?? TEXTO_EFECTO_DESCUENTO,
 )
-const efectoComisionConfirmar = computed(() => {
-  const usaPremarcado = !!turnoMeta.descuentoId && !overrideDateoDescuento.value
-  const codigo = usaPremarcado
-    ? detallePremarcado.value?.codigo
-    : descuentosActivos.value.find((d) => d.id === descuentoIdEnCaja.value)?.codigo
-  return (
-    textoAvance({
+const efectoComisionConfirmar = computed(
+  () =>
+    textoDescuentoConvenio({
       caso: casoTurno.value,
-      codigo,
-      traiaAvance: premarcadoEsAvance.value ? 'DATEO' : null,
-    }) ?? TEXTO_EFECTO_DESCUENTO
-  )
-})
+      hayDescuento: !!descuentoIdEfectivo.value,
+      traiaDescuento: turnoMeta.descuentoId ? 'DATEO' : null,
+    }) ?? TEXTO_EFECTO_DESCUENTO,
+)
+// La marca es_avance del dateo es solo informativa: cuenta el descuento de la factura.
+const TEXTO_MARCA_AVANCE =
+  'El comercial marcó Avance en el dateo (informativo: cuenta el descuento que quede en la factura).'
 
 // Los 3 documentos de INFORMATIVO_POLICIA (los sube DocumentosPoliciaCarga).
 const documentosPoliciaCompletos = ref(false)

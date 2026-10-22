@@ -4,12 +4,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   ETIQUETA_ROL,
-  TEXTO_AVANCE_ASESOR_CONVENIO,
-  TEXTO_AVANCE_CONVENIO,
+  TEXTO_DESCUENTO_ASESOR_CONVENIO,
+  TEXTO_DESCUENTO_CONVENIO,
   TEXTO_EFECTO_DESCUENTO,
   casoDelTurno,
-  impactoInformativoEspecialCaja,
-  textoAvance,
+  textoDescuentoConvenio,
   avisosVisibles,
   colorEstadoComision,
   diferenciaBeneficiario,
@@ -90,15 +89,13 @@ describe('textos', () => {
 
   it('el efecto general del descuento nombra los tres casos y no promete el "valor básico de dateo"', () => {
     const t = TEXTO_EFECTO_DESCUENTO
-    expect(t).toContain('Sin convenio y cliente nuevo')
+    expect(t).toContain(
+      'Con convenio, cualquier descuento deja la comisión del convenio en cero; el asesor comercial cobra su valor normal.',
+    )
+    expect(t).toContain('Si el asesor convenio se datea a sí mismo, su comisión queda en cero.')
+    expect(t).toContain('Sin convenio y con cliente nuevo')
     expect(t).toContain('valor de recurrencia')
-    expect(t).toContain(
-      'Asesor convenio que se datea a sí mismo: su comisión queda en cero con Avance',
-    )
-    expect(t).toContain(
-      'Comercial con convenio: el comercial cobra su valor normal; el convenio queda en cero con Avance',
-    )
-    expect(t).toContain('si el cliente es nuevo')
+    expect(t).not.toMatch(/Avance|informativo especial/i)
     expect(t).not.toMatch(/valor básico de dateo/i)
     expect(t).not.toMatch(/Incentivo final/i)
   })
@@ -154,7 +151,6 @@ describe('avisosVisibles', () => {
         a('CONFIG_EN_CERO'),
         a('CONFIG_EN_CERO'),
         a('SIN_COMISION_TICKET'),
-        a('AVANCE_HEREDADO', 'info'),
         a('SIN_CONTINUIDAD'),
         a('ESTIMADO', 'info'),
         a('NO_MODIFICADA'),
@@ -184,33 +180,42 @@ describe('avisosVisibles', () => {
   })
 })
 
-describe('Avance: textos de caja y edición (sin cifras)', () => {
-  it('AVANCE como descuento final: el convenio queda en cero; el comercial cobra normal', () => {
-    expect(textoAvance({ caso: 'CONVENIO_COMERCIAL', codigo: 'AVANCE' })).toBe(
-      TEXTO_AVANCE_CONVENIO,
+describe('Descuento con convenio: textos de caja y edición (sin cifras)', () => {
+  it('con descuento final: el convenio queda en cero y el comercial cobra normal (cualquier código)', () => {
+    expect(textoDescuentoConvenio({ caso: 'CONVENIO_COMERCIAL', hayDescuento: true })).toBe(
+      TEXTO_DESCUENTO_CONVENIO,
     )
-    expect(textoAvance({ caso: 'CONVENIO_SELF', codigo: 'AVANCE' })).toBe(
-      TEXTO_AVANCE_ASESOR_CONVENIO,
+    expect(textoDescuentoConvenio({ caso: 'CONVENIO_SELF', hayDescuento: true })).toBe(
+      TEXTO_DESCUENTO_ASESOR_CONVENIO,
     )
-    expect(TEXTO_AVANCE_CONVENIO).toContain('El asesor comercial cobra su valor normal')
+    expect(TEXTO_DESCUENTO_CONVENIO).toContain('el asesor comercial cobra su valor normal')
   })
 
-  it('Avance cambiado o quitado: avisa que el convenio vuelve a cobrar', () => {
+  it('descuento quitado: avisa que el convenio cobra normal', () => {
     expect(
-      textoAvance({ caso: 'CONVENIO_COMERCIAL', codigo: 'INFORMATIVO', traiaAvance: 'DATEO' }),
+      textoDescuentoConvenio({
+        caso: 'CONVENIO_COMERCIAL',
+        hayDescuento: false,
+        traiaDescuento: 'DATEO',
+      }),
+    ).toBe('El dateo traía descuento. Sin descuento, el convenio cobra su comisión normal.')
+    expect(
+      textoDescuentoConvenio({
+        caso: 'CONVENIO_SELF',
+        hayDescuento: false,
+        traiaDescuento: 'FACTURA',
+      }),
     ).toBe(
-      'El dateo traía Avance. Si lo cambias o lo quitas, el convenio volverá a cobrar su comisión.',
-    )
-    expect(textoAvance({ caso: 'CONVENIO_SELF', codigo: null, traiaAvance: 'FACTURA' })).toBe(
-      'La factura traía Avance. Si lo cambias o lo quitas, el asesor convenio volverá a cobrar su comisión.',
+      'La factura traía descuento. Sin descuento, el asesor convenio cobra su comisión normal.',
     )
   })
 
-  it('no aplica en Caso 1, sin caso conocido, ni sin Avance antes ni ahora', () => {
-    expect(textoAvance({ caso: 'SIN_CONVENIO', codigo: 'AVANCE', traiaAvance: 'DATEO' })).toBeNull()
-    expect(textoAvance({ caso: null, codigo: 'AVANCE' })).toBeNull()
-    expect(textoAvance({ caso: 'CONVENIO_COMERCIAL', codigo: 'INFORMATIVO' })).toBeNull()
-    expect(textoAvance({ caso: 'CONVENIO_COMERCIAL', codigo: 'AVANCE_PROPIETARIO' })).toBeNull()
+  it('no aplica en Caso 1, sin caso conocido, ni sin descuento antes ni ahora', () => {
+    expect(
+      textoDescuentoConvenio({ caso: 'SIN_CONVENIO', hayDescuento: true, traiaDescuento: 'DATEO' }),
+    ).toBeNull()
+    expect(textoDescuentoConvenio({ caso: null, hayDescuento: true })).toBeNull()
+    expect(textoDescuentoConvenio({ caso: 'CONVENIO_COMERCIAL', hayDescuento: false })).toBeNull()
   })
 
   it('caso del turno según quién datea y si hay convenio', () => {
@@ -220,30 +225,16 @@ describe('Avance: textos de caja y edición (sin cifras)', () => {
     expect(casoDelTurno({ tieneComercial: false, tieneConvenio: false })).toBeNull()
   })
 
-  it('efecto por persona del informativo especial en caja: el Caso 3 ya no dice que el comercial baja', () => {
-    expect(impactoInformativoEspecialCaja('CONVENIO_COMERCIAL')).toEqual({
-      comercial: 'cobra su valor normal (no cambia)',
-      convenio: 'queda en cero si el cliente es nuevo',
-    })
-    expect(impactoInformativoEspecialCaja('CONVENIO_SELF')).toEqual({
-      comercial: null,
-      convenio: 'queda en cero',
-    })
-    expect(impactoInformativoEspecialCaja('SIN_CONVENIO')?.comercial).toContain(
-      'valor de recurrencia',
-    )
-    expect(impactoInformativoEspecialCaja(null)).toBeNull()
-  })
-
   it('ningún texto de ayuda lleva cifras escritas', () => {
     const textos = [
       TEXTO_EFECTO_DESCUENTO,
-      TEXTO_AVANCE_CONVENIO,
-      TEXTO_AVANCE_ASESOR_CONVENIO,
-      textoAvance({ caso: 'CONVENIO_COMERCIAL', codigo: null, traiaAvance: 'DATEO' })!,
-      ...(['CONVENIO_COMERCIAL', 'CONVENIO_SELF', 'SIN_CONVENIO'] as const).flatMap((c) =>
-        Object.values(impactoInformativoEspecialCaja(c)!).filter(Boolean),
-      ),
+      TEXTO_DESCUENTO_CONVENIO,
+      TEXTO_DESCUENTO_ASESOR_CONVENIO,
+      textoDescuentoConvenio({
+        caso: 'CONVENIO_COMERCIAL',
+        hayDescuento: false,
+        traiaDescuento: 'DATEO',
+      })!,
     ]
     for (const t of textos) expect(t).not.toMatch(/\$|\d/)
   })

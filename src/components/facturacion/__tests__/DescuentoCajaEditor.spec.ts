@@ -6,8 +6,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import DescuentoCajaEditor from '../DescuentoCajaEditor.vue'
 import {
-  TEXTO_AVANCE_ASESOR_CONVENIO,
-  TEXTO_AVANCE_CONVENIO,
+  TEXTO_DESCUENTO_ASESOR_CONVENIO,
+  TEXTO_DESCUENTO_CONVENIO,
   TEXTO_EFECTO_DESCUENTO,
 } from '@/services/desgloseComision'
 
@@ -131,50 +131,55 @@ describe('DescuentoCajaEditor', () => {
     expect(ultimo<boolean>(listos, 'update:documentosCompletos')).toBe(true)
   })
 
-  describe('avisos de Avance (el descuento final manda)', () => {
-    it('caja, Caso 3 con Avance: el aviso de efecto dice que el convenio queda en cero', () => {
-      const w = montar({ descuentoId: 2, casoComision: 'CONVENIO_COMERCIAL' })
-      expect(w.text()).toContain(TEXTO_AVANCE_CONVENIO)
-      expect(w.find('[data-test="aviso-avance"]').exists()).toBe(false)
+  describe('avisos del convenio (cualquier descuento final manda)', () => {
+    it('caja, Caso 3 con cualquier descuento (Informativo, Avance, Empleado): el convenio queda en cero', () => {
+      for (const descuentoId of [1, 2, 3]) {
+        const w = montar({ descuentoId, casoComision: 'CONVENIO_COMERCIAL' })
+        expect(w.text()).toContain(TEXTO_DESCUENTO_CONVENIO)
+        expect(w.text()).not.toContain(TEXTO_EFECTO_DESCUENTO)
+        expect(w.find('[data-test="aviso-convenio"]').exists()).toBe(false)
+      }
     })
 
-    it('caja, otro descuento: aviso general; Caso 1 con Avance: también el general', () => {
-      expect(montar({ descuentoId: 1, casoComision: 'CONVENIO_COMERCIAL' }).text()).toContain(
-        TEXTO_EFECTO_DESCUENTO,
-      )
-      const caso1 = montar({ descuentoId: 2, casoComision: 'SIN_CONVENIO' })
+    it('caja, Caso 1 o caso desconocido: aviso general', () => {
+      const caso1 = montar({ descuentoId: 1, casoComision: 'SIN_CONVENIO' })
       expect(caso1.text()).toContain(TEXTO_EFECTO_DESCUENTO)
-      expect(caso1.text()).not.toContain(TEXTO_AVANCE_CONVENIO)
+      expect(caso1.text()).toContain('Sin convenio y con cliente nuevo')
+      expect(montar({ descuentoId: 2 }).text()).toContain(TEXTO_EFECTO_DESCUENTO)
     })
 
-    it('Avance del dateo quitado en caja: avisa que el convenio vuelve a cobrar', () => {
+    it('descuento del dateo quitado en caja: avisa que el convenio cobra normal', () => {
       const w = montar({
         descuentoId: null,
         casoComision: 'CONVENIO_COMERCIAL',
-        traiaAvance: 'DATEO',
+        traiaDescuento: 'DATEO',
       })
-      expect(w.get('[data-test="aviso-avance"]').text()).toBe(
-        'El dateo traía Avance. Si lo cambias o lo quitas, el convenio volverá a cobrar su comisión.',
+      expect(w.get('[data-test="aviso-convenio"]').text()).toBe(
+        'El dateo traía descuento. Sin descuento, el convenio cobra su comisión normal.',
       )
     })
 
-    it('edición (sin aviso general): Avance agregado o quitado se avisa aparte', () => {
+    it('edición (sin aviso general): descuento agregado o quitado se avisa aparte', () => {
       const agrega = montar({
-        descuentoId: 2,
+        descuentoId: 1,
         casoComision: 'CONVENIO_SELF',
         mostrarEfectoComision: false,
       })
-      expect(agrega.get('[data-test="aviso-avance"]').text()).toBe(TEXTO_AVANCE_ASESOR_CONVENIO)
-      const cambia = montar({
-        descuentoId: 1,
+      expect(agrega.get('[data-test="aviso-convenio"]').text()).toBe(
+        TEXTO_DESCUENTO_ASESOR_CONVENIO,
+      )
+      const quita = montar({
+        descuentoId: null,
         casoComision: 'CONVENIO_COMERCIAL',
-        traiaAvance: 'FACTURA',
+        traiaDescuento: 'FACTURA',
         mostrarEfectoComision: false,
       })
-      expect(cambia.get('[data-test="aviso-avance"]').text()).toContain('La factura traía Avance')
+      expect(quita.get('[data-test="aviso-convenio"]').text()).toContain(
+        'La factura traía descuento',
+      )
       expect(
         montar({ descuentoId: 1, mostrarEfectoComision: false })
-          .find('[data-test="aviso-avance"]')
+          .find('[data-test="aviso-convenio"]')
           .exists(),
       ).toBe(false)
     })
