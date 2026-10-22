@@ -740,6 +740,8 @@
           :documentos-cargados="edicionDocumentosCargados"
           :requiere-autorizador="edicionRequiereAutorizador"
           :mostrar-efecto-comision="false"
+          :caso-comision="casoEdicion"
+          :traia-avance="edicionTraiaAvance ? 'FACTURA' : null"
           mostrar-observacion
           @update:consecutivo-bloqueado="(b: boolean) => (edicion.consecutivoBloqueado = b)"
           @update:documentos-completos="(v: boolean) => (edicion.documentosCompletos = v)"
@@ -942,7 +944,7 @@ import { authSetStore } from '@/stores/AuthStore'
 import { obtenerUsuarios } from '@/services/UserService'
 import DescuentoCajaEditor from '@/components/facturacion/DescuentoCajaEditor.vue'
 import DesgloseComisionCard from '@/components/comisiones/DesgloseComisionCard.vue'
-import { TEXTO_EFECTO_DESCUENTO } from '@/services/desgloseComision'
+import { TEXTO_EFECTO_DESCUENTO, type CasoComision } from '@/services/desgloseComision'
 import type { DocPoliciaKey } from '@/components/facturacion/DocumentosPoliciaCarga.vue'
 import {
   autorizadoresDescuento,
@@ -1636,6 +1638,23 @@ const edicion = reactive({
   previaCargando: false,
   error: '',
 })
+// Caso de la comisión del ticket en edición (de la última previsualización,
+// para que el aviso de Avance no parpadee mientras se recalcula).
+const casoEdicion = ref<CasoComision | null>(null)
+watch(
+  () => edicion.ticket?.id,
+  () => (casoEdicion.value = null),
+)
+watch(
+  () => edicion.previa?.comision.desglose?.caso,
+  (caso) => {
+    if (caso) casoEdicion.value = caso
+  },
+)
+const edicionTraiaAvance = computed(
+  () =>
+    descuentosEdicion.value.find((d) => d.id === edicion.inicial.descuentoId)?.codigo === 'AVANCE',
+)
 
 async function cargarAutorizadores(ticket: TicketEdicion) {
   if (!autorizadoresEdicion.value.length) {

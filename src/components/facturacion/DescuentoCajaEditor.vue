@@ -71,7 +71,7 @@
           class="mt-1"
         >
           <strong>⚠️ Efecto en comisión:</strong>
-          {{ TEXTO_EFECTO_DESCUENTO }}
+          {{ avisoAvance ?? TEXTO_EFECTO_DESCUENTO }}
           <div v-if="!autorizadoPorId" class="mt-1" style="color: #c62828">
             Debes registrar quién autorizó el descuento antes de confirmar.
           </div>
@@ -84,6 +84,12 @@
           class="mt-1"
         >
           Debes registrar quién autorizó el descuento.
+        </v-alert>
+      </v-col>
+      <!-- Avance cuando el aviso general no se ve (descuento quitado o edición) -->
+      <v-col v-if="avisoAvance && (!descuentoId || !mostrarEfectoComision)" cols="12">
+        <v-alert type="info" variant="tonal" density="compact" data-test="aviso-avance">
+          {{ avisoAvance }}
         </v-alert>
       </v-col>
 
@@ -170,7 +176,7 @@ import {
   montoMaximo,
   type DescuentoDetalle,
 } from '@/views/facturacion/descuentoFacturacion'
-import { TEXTO_EFECTO_DESCUENTO } from '@/services/desgloseComision'
+import { TEXTO_EFECTO_DESCUENTO, textoAvance, type CasoComision } from '@/services/desgloseComision'
 
 const props = withDefaults(
   defineProps<{
@@ -195,8 +201,14 @@ const props = withDefaults(
     autorizadoPorId: number | null
     observacion: string
     consecutivo: string
+    /** Caso de la comisión del turno (null = sin dateo o desconocido): avisos de Avance. */
+    casoComision?: CasoComision | null
+    /** El dateo (caja) o la factura (edición) traía Avance. */
+    traiaAvance?: 'DATEO' | 'FACTURA' | null
   }>(),
   {
+    casoComision: null,
+    traiaAvance: null,
     descuentoPremarcadoId: null,
     descuentoPremarcado: null,
     ocultarMonto: false,
@@ -237,6 +249,14 @@ const esPolicia = computed(
 // Monto fijo según configuración: policía, empleado y avance propietario.
 const montoFijo = computed(() => !!idEfectivo.value && esMontoFijo(detalle.value?.codigo))
 const maximo = computed(() => montoMaximo(detalle.value, props.esMoto))
+// Avance (descuento final) o Avance cambiado/quitado, según el caso del turno.
+const avisoAvance = computed(() =>
+  textoAvance({
+    caso: props.casoComision,
+    codigo: idEfectivo.value ? detalle.value?.codigo : null,
+    traiaAvance: props.traiaAvance,
+  }),
+)
 
 const docsRef = ref<InstanceType<typeof DocumentosPoliciaCarga> | null>(null)
 function resetDocPolicia() {

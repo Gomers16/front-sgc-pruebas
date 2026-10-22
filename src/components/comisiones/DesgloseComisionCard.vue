@@ -95,7 +95,7 @@
               variant="tonal"
               class="ml-1"
             >
-              El dateo trae marca de avance
+              Cuenta como Avance: el convenio cobró en la factura
             </v-chip>
           </div>
 

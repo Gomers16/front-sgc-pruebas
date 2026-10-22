@@ -244,7 +244,7 @@ describe('DesgloseComisionCard: panel "Ver cómo se calculó"', () => {
     )
     const d = w.get('[data-test="desglose-descuento"]').text()
     expect(d).toContain('QAT-AVANCE · Del dateo')
-    expect(d).toContain('El dateo trae marca de avance')
+    expect(d).toContain('Cuenta como Avance')
   })
 
   it('regla y regla guardada solo si son distintas; "Sin recalcular"', () => {

@@ -206,7 +206,7 @@
                   AVANCE
                 </v-chip>
                 <span class="text-medium-emphasis font-weight-medium">
-                  El incentivo del convenio se aplica como descuento variable en caja.
+                  El comercial marcó Avance en el dateo.
                 </span>
               </div>
 
@@ -454,7 +454,7 @@
                   <!-- ++ AVANCE en modal de confirmación ++ -->
                   <div class="capt-line" v-if="turnoMeta.esAvance">
                     <v-chip size="x-small" color="warning" variant="flat" prepend-icon="mdi-cash-fast">AVANCE</v-chip>
-                    <span class="text-medium-emphasis">Descuento variable aplicado en caja</span>
+                    <span class="text-medium-emphasis">El comercial marcó Avance en el dateo.</span>
                   </div>
                   <div v-if="!turnoCard.agenteComercialNombre && !turnoCard.asesorConvenioNombre && !turnoCard.convenioNombre && !turnoMeta.esAvance">—</div>
                 </div>
@@ -489,6 +489,8 @@
               :es-moto="esVehiculoMoto"
               :ticket-id="currentTicketId"
               :mostrar-observacion="!!turnoMeta.dateoId && !turnoMeta.descuentoId"
+              :caso-comision="casoTurno"
+              :traia-avance="premarcadoEsAvance ? 'DATEO' : null"
               @update:consecutivo-bloqueado="(b: boolean) => (consecutivoDescuentoBloqueado = b)"
               @update:documentos-completos="(v: boolean) => (documentosPoliciaCompletos = v)"
               @aviso="(t: string) => { snack.text = t; snack.show = true }"
@@ -508,7 +510,7 @@
                         <strong>Pre-marcado desde el dateo:</strong> {{ descuentoDelDateoNombre }}
                         <div class="text-caption mt-1">
                           El comercial indicó este descuento al crear el dateo.
-                          Se aplicará automáticamente. Efecto en la comisión: {{ TEXTO_EFECTO_DESCUENTO }}
+                          Se aplicará automáticamente. Efecto en la comisión: {{ efectoComisionPremarcado }}
                         </div>
                       </div>
                       <v-btn
@@ -678,7 +680,7 @@
                 <strong>Origen:</strong> Aplicado en caja.
                 Autorizado por: <strong>{{ usuariosItems.find(u => u.id === autorizadoPorId)?.nombre ?? '—' }}</strong>.
               </template>
-              Efecto en la comisión: {{ TEXTO_EFECTO_DESCUENTO }}
+              Efecto en la comisión: {{ efectoComisionConfirmar }}
             </div>
           </v-alert>
 
@@ -738,7 +740,12 @@ import { useRoute, useRouter } from 'vue-router'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import { FacturacionService } from '@/services/facturacion_service'
 import DescuentoCajaEditor from '@/components/facturacion/DescuentoCajaEditor.vue'
-import { TEXTO_EFECTO_DESCUENTO } from '@/services/desgloseComision'
+import {
+  TEXTO_EFECTO_DESCUENTO,
+  casoDelTurno,
+  impactoInformativoEspecialCaja,
+  textoAvance,
+} from '@/services/desgloseComision'
 import { etiquetaConvenio } from '@/services/conveniosService'
 // ✅ FIX 1: descuentosService es default export → sin llaves, minúscula
 import descuentosService from '@/services/descuentosService'
@@ -1373,33 +1380,53 @@ const esDescuentoEnCajaActivo = computed(() =>
   !!descuentoIdEnCaja.value && (!turnoMeta.descuentoId || overrideDateoDescuento.value)
 )
 
-// Resumen del impacto en comisión para mostrar en modal
+// Resumen del impacto en comisión para mostrar en modal (sin cifras: el
+// escenario del cliente se conoce al confirmar).
 const impactoComisionPolicia = computed(() => {
   if (!esInformativoPoliciaEnCaja.value || esDescuentoObsequio.value) return null
-  const tieneConvenio = !!turnoCard.convenioNombre
-  const tieneComercial = !!turnoCard.agenteComercialNombre
-  if (tieneComercial && tieneConvenio) {
-    // CASO 3: comercial datea con convenio
-    return {
-      comercial: { nombre: turnoCard.agenteComercialNombre!, monto: '$4.300 (baja de comisión estándar)' },
-      convenio:  { nombre: etiquetaConvenio({ nombre: turnoCard.convenioNombre, establecimiento: turnoCard.convenioEstablecimiento }), monto: '$0' },
-    }
+  const efecto = impactoInformativoEspecialCaja(casoTurno.value)
+  if (!efecto) return null
+  return {
+    comercial: efecto.comercial
+      ? { nombre: turnoCard.agenteComercialNombre!, monto: efecto.comercial }
+      : null,
+    convenio: efecto.convenio
+      ? {
+          nombre: etiquetaConvenio({ nombre: turnoCard.convenioNombre, establecimiento: turnoCard.convenioEstablecimiento }),
+          monto: efecto.convenio,
+        }
+      : null,
   }
-  if (tieneConvenio && !tieneComercial) {
-    // CASO 2: asesor convenio datea él mismo
-    return {
-      comercial: null,
-      convenio:  { nombre: etiquetaConvenio({ nombre: turnoCard.convenioNombre, establecimiento: turnoCard.convenioEstablecimiento }), monto: '$0' },
-    }
-  }
-  if (tieneComercial && !tieneConvenio) {
-    // CASO 1: comercial sin convenio
-    return {
-      comercial: { nombre: turnoCard.agenteComercialNombre!, monto: '$4.300 (baja de comisión estándar)' },
-      convenio:  null,
-    }
-  }
-  return null
+})
+
+// Caso de la comisión con lo que muestra la tarjeta del dateo (null sin dateo).
+const casoTurno = computed(() =>
+  turnoMeta.dateoId
+    ? casoDelTurno({
+        tieneComercial: !!turnoCard.agenteComercialNombre,
+        tieneConvenio: !!turnoCard.convenioNombre,
+      })
+    : null,
+)
+const premarcadoEsAvance = computed(() => detallePremarcado.value?.codigo === 'AVANCE')
+// El Avance cuenta por el descuento final de la factura (pre-marcado o de caja).
+const efectoComisionPremarcado = computed(
+  () =>
+    textoAvance({ caso: casoTurno.value, codigo: detallePremarcado.value?.codigo }) ??
+    TEXTO_EFECTO_DESCUENTO,
+)
+const efectoComisionConfirmar = computed(() => {
+  const usaPremarcado = !!turnoMeta.descuentoId && !overrideDateoDescuento.value
+  const codigo = usaPremarcado
+    ? detallePremarcado.value?.codigo
+    : descuentosActivos.value.find((d) => d.id === descuentoIdEnCaja.value)?.codigo
+  return (
+    textoAvance({
+      caso: casoTurno.value,
+      codigo,
+      traiaAvance: premarcadoEsAvance.value ? 'DATEO' : null,
+    }) ?? TEXTO_EFECTO_DESCUENTO
+  )
 })
 
 // Los 3 documentos de INFORMATIVO_POLICIA (los sube DocumentosPoliciaCarga).

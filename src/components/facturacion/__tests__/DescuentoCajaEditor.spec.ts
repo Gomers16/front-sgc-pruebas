@@ -5,6 +5,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import DescuentoCajaEditor from '../DescuentoCajaEditor.vue'
+import {
+  TEXTO_AVANCE_ASESOR_CONVENIO,
+  TEXTO_AVANCE_CONVENIO,
+  TEXTO_EFECTO_DESCUENTO,
+} from '@/services/desgloseComision'
 
 vi.mock('@/services/facturacion_service', () => ({
   FacturacionService: {
@@ -40,6 +45,7 @@ const STUBS = Object.fromEntries(
 )
 const DESCUENTOS = [
   { id: 1, codigo: 'INFORMATIVO', nombre: 'Informativo', valorCarro: 50000, valorMoto: 30000 },
+  { id: 2, codigo: 'AVANCE', nombre: 'Avance', valorCarro: 75000, valorMoto: 45000 },
   {
     id: 3,
     codigo: 'INFORMATIVO_EMPLEADO',
@@ -123,5 +129,54 @@ describe('DescuentoCajaEditor', () => {
       documentosCargados: ['carnet', 'tarjeta_propiedad', 'cedula'],
     })
     expect(ultimo<boolean>(listos, 'update:documentosCompletos')).toBe(true)
+  })
+
+  describe('avisos de Avance (el descuento final manda)', () => {
+    it('caja, Caso 3 con Avance: el aviso de efecto dice que el convenio queda en cero', () => {
+      const w = montar({ descuentoId: 2, casoComision: 'CONVENIO_COMERCIAL' })
+      expect(w.text()).toContain(TEXTO_AVANCE_CONVENIO)
+      expect(w.find('[data-test="aviso-avance"]').exists()).toBe(false)
+    })
+
+    it('caja, otro descuento: aviso general; Caso 1 con Avance: también el general', () => {
+      expect(montar({ descuentoId: 1, casoComision: 'CONVENIO_COMERCIAL' }).text()).toContain(
+        TEXTO_EFECTO_DESCUENTO,
+      )
+      const caso1 = montar({ descuentoId: 2, casoComision: 'SIN_CONVENIO' })
+      expect(caso1.text()).toContain(TEXTO_EFECTO_DESCUENTO)
+      expect(caso1.text()).not.toContain(TEXTO_AVANCE_CONVENIO)
+    })
+
+    it('Avance del dateo quitado en caja: avisa que el convenio vuelve a cobrar', () => {
+      const w = montar({
+        descuentoId: null,
+        casoComision: 'CONVENIO_COMERCIAL',
+        traiaAvance: 'DATEO',
+      })
+      expect(w.get('[data-test="aviso-avance"]').text()).toBe(
+        'El dateo traía Avance. Si lo cambias o lo quitas, el convenio volverá a cobrar su comisión.',
+      )
+    })
+
+    it('edición (sin aviso general): Avance agregado o quitado se avisa aparte', () => {
+      const agrega = montar({
+        descuentoId: 2,
+        casoComision: 'CONVENIO_SELF',
+        mostrarEfectoComision: false,
+      })
+      expect(agrega.get('[data-test="aviso-avance"]').text()).toBe(TEXTO_AVANCE_ASESOR_CONVENIO)
+      const cambia = montar({
+        descuentoId: 1,
+        casoComision: 'CONVENIO_COMERCIAL',
+        traiaAvance: 'FACTURA',
+        mostrarEfectoComision: false,
+      })
+      expect(cambia.get('[data-test="aviso-avance"]').text()).toContain('La factura traía Avance')
+      expect(
+        montar({ descuentoId: 1, mostrarEfectoComision: false })
+          .find('[data-test="aviso-avance"]')
+          .exists(),
+      ).toBe(false)
+    })
   })
 })

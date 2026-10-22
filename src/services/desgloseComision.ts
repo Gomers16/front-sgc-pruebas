@@ -164,6 +164,64 @@ export function avisosVisibles(
  */
 export const TEXTO_EFECTO_DESCUENTO =
   'Depende del caso del dateo. Sin convenio y cliente nuevo: el asesor comercial pasa del valor nuevo directo al valor de recurrencia. ' +
-  'Asesor convenio que se datea a sí mismo: queda en $0 con avance o con un informativo especial puesto en caja. ' +
-  'Comercial con convenio: el comercial cobra igual; el convenio queda en $0 con avance, o con un informativo especial puesto en caja si el cliente es nuevo. ' +
+  'Asesor convenio que se datea a sí mismo: su comisión queda en cero con Avance o con un informativo especial puesto en caja. ' +
+  'Comercial con convenio: el comercial cobra su valor normal; el convenio queda en cero con Avance, o con un informativo especial puesto en caja si el cliente es nuevo. ' +
   'En los demás casos la comisión no cambia.'
+
+/**
+ * Avance (el código del descuento final de la factura, venga del dateo o de
+ * caja): el convenio ya cobró con el descuento. Mismo criterio que
+ * esAvanceEfectivo() del backend.
+ */
+export const CODIGO_AVANCE = 'AVANCE'
+export const TEXTO_AVANCE_CONVENIO =
+  'Avance: el convenio ya recibe su parte como descuento en esta factura, así que su comisión queda en cero. El asesor comercial cobra su valor normal.'
+export const TEXTO_AVANCE_ASESOR_CONVENIO =
+  'Avance: el asesor convenio ya recibe su parte como descuento en esta factura, así que su comisión queda en cero.'
+
+/**
+ * Aviso de Avance para caja y edición; null si no aplica (Caso 1 o caso
+ * desconocido, o ni antes ni ahora hay Avance).
+ *  - traiaAvance: el dateo (caja) o la factura (edición) traía Avance.
+ */
+export function textoAvance(p: {
+  caso: CasoComision | null
+  codigo: string | null | undefined
+  traiaAvance?: 'DATEO' | 'FACTURA' | null
+}): string | null {
+  if (!p.caso || p.caso === 'SIN_CONVENIO') return null
+  const self = p.caso === 'CONVENIO_SELF'
+  if (p.codigo === CODIGO_AVANCE) return self ? TEXTO_AVANCE_ASESOR_CONVENIO : TEXTO_AVANCE_CONVENIO
+  if (!p.traiaAvance) return null
+  const quien = self ? 'el asesor convenio' : 'el convenio'
+  const donde = p.traiaAvance === 'DATEO' ? 'El dateo' : 'La factura'
+  return `${donde} traía Avance. Si lo cambias o lo quitas, ${quien} volverá a cobrar su comisión.`
+}
+
+/** Caso del turno con lo que ve la cajera (quién datea y si hay convenio). */
+export function casoDelTurno(p: {
+  tieneComercial: boolean
+  tieneConvenio: boolean
+}): CasoComision | null {
+  if (p.tieneConvenio) return p.tieneComercial ? 'CONVENIO_COMERCIAL' : 'CONVENIO_SELF'
+  return p.tieneComercial ? 'SIN_CONVENIO' : null
+}
+
+/**
+ * Efecto por persona de un informativo especial puesto en caja (p. ej.
+ * Policía), sin cifras: el escenario del cliente se conoce al confirmar.
+ */
+export function impactoInformativoEspecialCaja(caso: CasoComision | null): {
+  comercial: string | null
+  convenio: string | null
+} | null {
+  if (caso === 'CONVENIO_COMERCIAL')
+    return {
+      comercial: 'cobra su valor normal (no cambia)',
+      convenio: 'queda en cero si el cliente es nuevo',
+    }
+  if (caso === 'CONVENIO_SELF') return { comercial: null, convenio: 'queda en cero' }
+  if (caso === 'SIN_CONVENIO')
+    return { comercial: 'pasa al valor de recurrencia si el cliente es nuevo', convenio: null }
+  return null
+}
