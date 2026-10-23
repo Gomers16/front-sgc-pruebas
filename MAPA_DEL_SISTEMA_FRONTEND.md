@@ -23,6 +23,7 @@ Este documento es una referencia completa del frontend, organizada por **módulo
 > Actualizado: 2026-10-16 (**Consecutivo del descuento en Facturación**, solo pruebas, commit `f6212e8`): campo obligatorio en el modal de confirmación de `FacturacionSubirTicket.vue` cuando hay descuento en uso, con verificación en vivo y bloqueo del botón; columna, detalle y corrección (SUPER_ADMIN/GERENCIA) en `FacturacionHistorico.vue`; columna en el detalle y el Excel de `ReporteDescuentos.vue`. Ver sección 3. Requiere el backend con la migración `1795000000000` desplegado antes.
 > Actualizado: 2026-10-16 (**Consecutivo del descuento en todas las pantallas con descuento**, solo pruebas, sin commit): columna/dato "Consecutivo del descuento" ("—" si no hay) en Comisiones (lista, modal de detalle y `ComisionesDetail.vue`), drill-down "Descuentos aplicados" de la Liquidación RTM, Dateos (lista y detalle), ficha del asesor (tabla y CSV), Historial de Descuentos y Meta Comercial → ingreso real por dateo. Ver sección 3, "Consecutivo del descuento — dónde se ve". Requiere el backend de la misma entrega.
 > Actualizado: 2026-10-19 (**Tickets — Fase 7, cierre**, solo pruebas): bandeja y detalle muestran el número visible del turno con su servicio (`turnoVisible.ts`); el filtro de turno pasa a ser el número visible (`turno_numero`) en vez del id interno; RESUELTO/CERRADO fuera de filtros y etiquetas; sin `asignadoA`/`cerradoAt`/`requiereAprobacionFinanciera` en los tipos. Ver sección 9.
+> Actualizado: 2026-10-23 (**commits posteriores a la Fase 7**, `855adac`…`5ccbad1`, sincronizados a producción local el 2026-10-21 `69ff83c` y el 2026-10-22 `c496683`): **Tickets** — estadísticas por asesor (`estadisticasPorAsesor.ts`) y resumen en la bandeja (`855adac`); nombre del convenio corregido (`convenioTicket.ts`) y tooltip de pendientes (`0c0b6af`); decisión de comisión también dentro de ventana (`285b35e`) con interruptores **Cobra / No cobra** (`35d06f8`, `decisionAprobacion()` reemplaza a `opcionesAprobacion()`); aviso "llegó N min tarde", botón "Volver a la bandeja" y tabla de estadísticas más clara (`88e789a`). **Comisiones** — chip de ticket sin comisión, filtro Origen y confirmación del 409 `MONTO_CONTRADICE_TICKET_SIN_COMISION` (`0481087`, `ticketOrigen.ts`); desglose de comisión (`8217d9f`, `1ea921a`, `DesgloseComisionCard.vue`). **Facturación** — el descuento del modal es el que se envía (`fb1ca5a`); filtros, resumen y exportar en el historial (`6463c13`, `filtrosHistorico.ts`); editar el descuento de un ticket CONFIRMADA desde el historial (`79a5b0c`, `7e3f137`, `DescuentoCajaEditor.vue`, `edicionDescuento.ts`); textos del Avance y del descuento con convenio según el descuento final (`3b01872`, `5ccbad1`). Ver sección 3 y sección 9.
 
 ## Índice
 
@@ -153,9 +154,14 @@ Registra el cobro (ticket/factura) de un turno ya certificado o en proceso. Un t
 - **`uploadsService.ts`**: `uploadImage(file)` → `POST /api/media/upload` (genérico, usado por otros módulos como Comprobantes/Dateos para subir imágenes sueltas); `getImageMetaByFilename`/`deleteImageByFilename`.
 - **`repGeneralService.ts`**: ver sección RTM — el botón "Importar RepGeneral" vive en `EstadoDeTurnos.vue` (RTM), no en Facturación, aunque el nombre sugiera relación directa con facturación. Es una importación de datos maestros (clientes/vehículos/conductores), no de facturas.
 
+- **🆕 (2026-10-19 → 2026-10-22)** `FacturacionHistorico.vue`: filtros server-side en la URL (`filtrosHistorico.ts`), línea resumen, **Exportar a Excel** (`FacturacionService.exportarExcel()` → `GET /exportar` vía `download()`) y botón **Editar** en cada ticket CONFIRMADA (solo SUPER_ADMIN/GERENCIA): abre `DescuentoCajaEditor.vue` con el descuento actual, previsualiza total y comisión (`previsualizarEdicionDescuento()`), exige motivo (5+) y guarda con `editarDescuentoConfirmado()`; si la comisión está PAGADA o en liquidación pide "Entiendo que ya se pagó". La edición vieja del monto por `fetch` directo sigue en el archivo.
+
 ### Componentes
 
-No usa componentes propios de `@/components` — todo el flujo (dropzone, modal confirmación, modal resultado, edición de descuento) está inline en las dos vistas.
+- **🆕** `components/facturacion/DescuentoCajaEditor.vue` — bloque de descuento compartido por el modal de confirmación (`FacturacionSubirTicket.vue`) y la edición del historial; usa `DescuentoMontoEditor.vue`, `ConsecutivoDescuentoCampo.vue` y `DocumentosPoliciaCarga.vue` (mismo directorio).
+- **🆕** `components/comisiones/DesgloseComisionCard.vue` — tarjeta del desglose de la comisión (quién cobra antes → después, diferencia, estado y avisos; "Ver cómo se calculó" plegado). Tipos en `services/desgloseComision.ts`. La usan el diálogo de edición del descuento y Comisiones (detalle y diálogo de la lista).
+- **🆕 Helpers puros:** `views/facturacion/descuentoFacturacion.ts` (descuentos activos, autorizadores y montos fijos del modal de caja), `views/facturacion/edicionDescuento.ts` (reglas del diálogo "Editar descuento"), `views/facturacion/filtrosHistorico.ts` (filtros ↔ query ↔ params).
+- **🆕 Comisiones** (`views/comercial/comisiones/`): `ticketOrigen.ts` (marca "sin comisión" y 409 `MONTO_CONTRADICE_TICKET_SIN_COMISION`), `MarcaTicketComision.vue` (chip del ticket), `MarcaAjusteFactura.vue` (chip "Ajustada por edición de factura"), `ConfirmarSinComisionDialog.vue` (confirmación del 409, solo gerencia).
 
 ### Roles
 
@@ -394,13 +400,13 @@ Login por correo/contraseña contra backend con JWT bearer; sin registro de usua
 
 **AuthStore** (`src/stores/AuthStore.ts`, Pinia): guarda `token` y `user` (con `rol.nombre`, `agenteId`, `razonSocialId`, etc.) en `state`, persistidos en `localStorage`. Getters: `isAuthenticated`, `hasRole(role)`, `hasAnyRole(roles[])`, `isSuperAdmin/isGerencia/isComercial/...`. `login()` → `AuthService.login` → guarda token → `checkAuth()` → `GET /api/auth/me` para hidratar `user` completo y **redirige según rol** si venía de `/login`: `COMERCIAL`→`FichaComercialAsesor` (con `agenteId` o `id` como asesorId), `TALENTO_HUMANO`→`Contratos`, `CONTABILIDAD`→`FacturacionHistorico`, resto→`/dashboard`. `logout()` limpia todo y redirige a `/login`.
 
-**Roles:** ruta pública (no requiere auth); la redirección post-login depende del rol (arriba). No hay `router.beforeEach` — el control de acceso a rutas protegidas es solo por ocultamiento visual en `AppSidebar.vue` (`v-if="can.xxx()"`), salvo las rutas que sí declaran `meta.roles` (Trámites, Reportes Admin, Tarifas Servicios).
+**Roles:** ruta pública (no requiere auth); la redirección post-login depende del rol (arriba). Hay un `router.beforeEach` en `src/main.ts` (encierra a TURNERO en `/turnero`, ver 10.9); el resto del control de acceso es por ocultamiento en `AppSidebar.vue` y `meta.roles`.
 
 ---
 
 ## 9. Tickets Internos
 
-> Reescrita 2026-10-16 (Fases 1–6) y cerrada con la Fase 7 (2026-10-19), solo pruebas. Reglas, endpoints, dinero y compatibilidad: sección **Tickets internos (Excepción de Dateo)** de `MAPA_DEL_SISTEMA_BACKEND.md` (mismo contenido visto desde el backend). **Esta sección manda** sobre las entradas viejas del changelog de arriba (ventana de 40 min, penalización con saldo/%, `con_comision` como único flag): ya no aplican. Producción local (`C:\dev\front-sgc`) sigue con la versión anterior; plan en `SINCRONIZAR_TICKETS_A_PRODUCCION_LOCAL.md` del backend.
+> Reescrita 2026-10-16 (Fases 1–6) y cerrada con la Fase 7 (2026-10-19), solo pruebas. Reglas, endpoints, dinero y compatibilidad: sección **Tickets internos (Excepción de Dateo)** de `MAPA_DEL_SISTEMA_BACKEND.md` (mismo contenido visto desde el backend). **Esta sección manda** sobre las entradas viejas del changelog de arriba (ventana de 40 min, penalización con saldo/%, `con_comision` como único flag): ya no aplican. Sincronizado a producción local el 2026-10-21 (`69ff83c`) y el 2026-10-22 (`c496683`).
 
 Bandeja de tickets internos para todos los roles autenticados (salvo TURNERO); el backend decide qué ve cada uno (`puedeVerTicket`). Hoy existe un solo tipo, `EXCEPCION_DATEO`: nace cuando `DateoCreate.vue` recibe 409 `REQUIERE_TICKET_DATEO` (turno de hoy ya en sede sin dateo).
 
@@ -420,13 +426,13 @@ Bandeja de tickets internos para todos los roles autenticados (salvo TURNERO); e
 - **`views/tickets/TicketExcepcionDateoCreate.vue`** — `/tickets/excepcion-dateo/nuevo` (COMERCIAL, SUPER_ADMIN, GERENCIA). Recibe `turno_id`/`placa` por query y el **intento de dateo** por `history.state` (`intentoDateo.ts`), que muestra en "Datos del dateo" de solo lectura; sin intento (acceso por URL) pide convenio asignado y teléfono. 409 `TURNO_SEGUNDA_VEZ` → aviso de que la segunda vez no lleva ticket.
 - **`views/tickets/TicketExcepcionDateoDetail.vue`** — `/tickets/:id` (route `TicketDetalle`).
   - **Datos**: placa, **turno visible** ("N° 12 · RTM", fecha e "id interno #…" en gris), asesor (y si es asesor convenio), convenio (y si gerencia lo corrigió al aprobar), **caso de comisión** (`caso_comision` del backend, no se recalcula en el front) y ventana.
-  - **Acciones** (PENDIENTE + resolutor: `roles_resuelve` del tipo o SUPER_ADMIN/GERENCIA), botones de `decisionComision.ts::opcionesAprobacion()`:
-    - dentro de ventana: un solo **Aprobar**.
-    - Caso 1: **Aprobar con / sin comisión** (solo el flag del asesor).
-    - Caso 2: **Aprobar con / sin comisión** (los dos flags iguales).
-    - Caso 3: **Con comisión (asesor y convenio)**, **Sin comisión para el asesor**, **Sin comisión para el convenio**, **Sin comisión para ninguno**.
-    - Siempre **Rechazar** con motivo obligatorio (no crea dateo ni comisión).
-    - Un solo diálogo de confirmación que dice quién pierde la comisión.
+  - **Acciones** (PENDIENTE + resolutor: `roles_resuelve` del tipo o SUPER_ADMIN/GERENCIA), botones de `decisionComision.ts::decisionAprobacion()`, con interruptores **Cobra / No cobra** por asesor y convenio según el caso, también dentro de ventana:
+    - Caso 1: interruptor del asesor.
+    - Caso 2: un solo interruptor para el asesor convenio (los dos flags iguales), con nota.
+    - Caso 3: interruptores del asesor y del convenio (las 4 combinaciones).
+    - Resumen con color según el riesgo, un solo **Aprobar** y **Rechazar** con motivo obligatorio (no crea dateo ni comisión).
+    - Un solo diálogo de confirmación que repite el resumen.
+  - **Fuera de ventana**: franja "llegó N min tarde"; botón **Volver a la bandeja** (conserva filtros si se vino de `/tickets`).
   - **Corregir convenio** al aprobar (switch + convenios asignados al asesor, o "Sin convenio"; no para asesor convenio): manda `convenio_id` y los botones se ajustan al caso nuevo con `casoConConvenioCorregido()` (el backend valida la decisión contra ese caso).
   - **Errores**: 400 `COMBINACION_COMISION_INVALIDA` y 409 `TICKET_YA_RESUELTO` con mensajes claros (`mensajeErrorResolucion()`); con 409 recarga el ticket.
   - **Decisión tomada**: `resolucionTicket.ts` lee los TINYINT 0/1/null sin `=== true/false`, con la misma regla del backend: flag del asesor `con_comision_asesor ?? con_comision`; convenio cobra si las columnas nuevas están vacías (tickets de producción local); "Aprobado (régimen anterior)" si no hay decisión guardada.
@@ -441,6 +447,8 @@ Bandeja de tickets internos para todos los roles autenticados (salvo TURNERO); e
 - **`views/tickets/decisionComision.ts`** — opciones de aprobación por caso, caso con convenio corregido, mensajes de error.
 - **`views/tickets/resolucionTicket.ts`** — decisión ya tomada y su texto según el caso.
 - **`views/tickets/intentoDateo.ts`** — intento de dateo por `history.state`.
+- **🆕 `views/tickets/convenioTicket.ts`** — nombre del convenio (y del convenio corregido / evento `CONVENIO_CORREGIDO`) a partir de los ids.
+- **🆕 `views/tickets/estadisticasPorAsesor.ts`** — filas y totales de la tabla por asesor de Estadísticas y conteos por estado para el resumen de la bandeja.
 - **`composables/useTicketsPendientes.ts`** — contador compartido (insignia del menú + bandeja); una sola llamada aunque se pida a la vez desde varios lados; `null` (sin insignia) ante 403 o error de red; se refresca al montar, cada 2 min en el menú y después de aprobar/rechazar.
 - Tests vitest: `views/tickets/__tests__/` (filtros y estados, turno visible, decisión por caso, resolución, intento) y `composables/__tests__/useTicketsPendientes.spec.ts`.
 
