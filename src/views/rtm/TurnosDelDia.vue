@@ -754,6 +754,71 @@
           📊 Estadísticas de Turnos (Hoy)
         </v-card-title>
         <v-card-text>
+          <!-- Resumen contable del día: turnosParaContadores sin cancelados ni inactivos (ver resumenContable.ts) -->
+          <v-card variant="outlined" class="pa-3 pa-sm-4 mb-4">
+            <div class="d-flex align-center justify-space-between flex-wrap ga-2 mb-2">
+              <div>
+                <div class="text-subtitle-1 text-sm-h6 text-secondary font-weight-bold">
+                  Resumen contable del día
+                </div>
+                <div class="text-caption text-grey-darken-1">
+                  {{ fechaSeleccionada }}{{ filtrosResumenTexto ? ` · ${filtrosResumenTexto}` : '' }}
+                  · sin cancelados
+                </div>
+              </div>
+              <div class="d-flex ga-2">
+                <v-btn size="small" variant="tonal" prepend-icon="mdi-content-copy" @click="copiarResumenContable">
+                  Copiar resumen
+                </v-btn>
+                <v-btn size="small" variant="tonal" color="success" prepend-icon="mdi-microsoft-excel" @click="descargarResumenExcel">
+                  Descargar Excel
+                </v-btn>
+              </div>
+            </div>
+
+            <v-table density="compact">
+              <thead>
+                <tr>
+                  <th class="text-left">Servicio</th>
+                  <th class="text-right">Motos</th>
+                  <th class="text-right">Livianos</th>
+                  <th class="text-right">Otros</th>
+                  <th class="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="fila in resumenContable.filas"
+                  :key="fila.clave"
+                  :class="{
+                    'font-weight-bold': fila.tipo !== 'detalle',
+                    'bg-grey-lighten-4': fila.tipo === 'subtotal',
+                    'bg-blue-grey-lighten-5': fila.tipo === 'total',
+                  }"
+                >
+                  <td>{{ fila.etiqueta }}</td>
+                  <td class="text-right">{{ fila.motos }}</td>
+                  <td class="text-right">{{ fila.livianos }}</td>
+                  <td class="text-right">{{ fila.otros }}</td>
+                  <td class="text-right">{{ fila.total }}</td>
+                </tr>
+              </tbody>
+            </v-table>
+
+            <div class="d-flex flex-wrap ga-4 mt-3 text-caption text-sm-body-2">
+              <div>
+                <strong>% rechazo RTM primera vez:</strong>
+                {{ textoRechazo(resumenContable.rechazo.primeraVez) }}
+                <span class="text-grey-darken-1">· {{ resumenContable.rechazo.primeraVez.sinResultado }} sin resultado</span>
+              </div>
+              <div>
+                <strong>% rechazo RTM segunda vez:</strong>
+                {{ textoRechazo(resumenContable.rechazo.segundaVez) }}
+                <span class="text-grey-darken-1">· {{ resumenContable.rechazo.segundaVez.sinResultado }} sin resultado</span>
+              </div>
+            </div>
+          </v-card>
+
           <p class="text-subtitle-1 text-sm-h6 mb-1 text-center">
             Total de turnos visibles con el filtro actual:
             <strong>{{ turnosFiltrados.length }}</strong>
@@ -929,6 +994,13 @@ import { useRouter } from 'vue-router'
 import { DateTime } from 'luxon'
 import TurnosDelDiaService, { type EstadoVisual } from '@/services/turnosdeldiaService'
 import { authSetStore } from '@/stores/AuthStore'
+import * as XLSX from 'xlsx'
+import {
+  calcularResumenContable,
+  resumenComoTabla,
+  resumenComoTexto,
+  textoRechazo,
+} from './resumenContable'
 
 import {
   Chart as ChartJS,
@@ -1047,6 +1119,8 @@ interface Turno {
   // Lista de etapas que aplican (backend) y segunda vez (0/1 → usar Boolean()).
   etapasRequeridasLista?: Array<'puerta' | 'facturacion' | 'certificacion'>
   esSegundaVez?: boolean | number | null
+  // Copia de certificaciones.resultado (null = sin resultado).
+  resultadoCertificacion?: 'APROBADA' | 'RECHAZADA' | null
 }
 
 interface Etapa {
@@ -1163,6 +1237,50 @@ const resumenSemaforo = computed(() => {
 
   return res
 })
+
+/**
+ * Resumen contable del modal "Estadísticas": mismo conjunto que los demás
+ * conteos (turnosParaContadores: fecha + servicio/placa, sin filtro de estado);
+ * el helper excluye cancelados e inactivos.
+ */
+const resumenContable = computed(() =>
+  calcularResumenContable(
+    turnosParaContadores.value.map((t) => ({
+      servicioCodigo: t.servicio?.codigoServicio ?? t.servicioCodigo ?? null,
+      tipoVehiculo: t.tipoVehiculo,
+      estado: t.estado,
+      esSegundaVez: t.esSegundaVez,
+      resultadoCertificacion: t.resultadoCertificacion ?? null,
+    }))
+  )
+)
+
+const filtrosResumenTexto = computed(() => {
+  const partes: string[] = []
+  if (servicioFiltro.value !== 'TODOS') partes.push(`Servicio ${servicioFiltro.value}`)
+  if (busquedaPlaca.value) partes.push(`Placa contiene "${busquedaPlaca.value.toUpperCase()}"`)
+  return partes.join(', ')
+})
+
+async function copiarResumenContable() {
+  const texto = resumenComoTexto(resumenContable.value, fechaSeleccionada.value, filtrosResumenTexto.value)
+  try {
+    await navigator.clipboard.writeText(texto)
+    showSnackbar('Resumen copiado al portapapeles.', 'success')
+  } catch {
+    showSnackbar('No se pudo copiar el resumen.', 'error')
+  }
+}
+
+function descargarResumenExcel() {
+  const ws = XLSX.utils.aoa_to_sheet(
+    resumenComoTabla(resumenContable.value, fechaSeleccionada.value, filtrosResumenTexto.value)
+  )
+  ws['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 10 }]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Resumen')
+  XLSX.writeFile(wb, `ResumenContable_${fechaSeleccionada.value}.xlsx`)
+}
 
 /* ===== Modal observaciones del dateo ===== */
 const modalObservacionesDateo = ref({

@@ -377,6 +377,43 @@ export async function getReconciliacionRtm(
   })
 }
 
+/** Sección 8 del Súper Informe: mismo cálculo que Turnos del Día → Estadísticas, sobre el rango. */
+export interface ResumenContableFila {
+  clave: string
+  etiqueta: string
+  motos: number
+  livianos: number
+  otros: number
+  total: number
+  tipo: 'detalle' | 'subtotal' | 'total'
+}
+
+export interface ResumenContableRechazo {
+  aprobadas: number
+  rechazadas: number
+  sin_resultado: number
+  /** null si no hay ningún turno con resultado (denominador 0). */
+  porcentaje: number | null
+}
+
+export interface ResumenContableResponse {
+  fecha_inicio: string
+  fecha_fin: string
+  filas: ResumenContableFila[]
+  rechazo: { primera_vez: ResumenContableRechazo; segunda_vez: ResumenContableRechazo }
+  /** Turnos incluidos que siguen en estado activo. */
+  sin_finalizar: number
+}
+
+export async function getResumenContable(
+  fechaInicio: string,
+  fechaFin: string
+): Promise<ResumenContableResponse> {
+  return apiFetch<ResumenContableResponse>('/reportes-admin/super-informe/resumen-contable', {
+    query: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+  })
+}
+
 export async function getReporteAsesores(
   fechaInicio: string,
   fechaFin: string

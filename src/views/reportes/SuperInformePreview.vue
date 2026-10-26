@@ -374,6 +374,58 @@
         </v-data-table>
       </v-card-text>
     </v-card>
+
+    <!-- 8. Resumen contable RTM y servicios -->
+    <v-card elevation="6" class="rounded-xl mb-4">
+      <v-card-title class="d-flex align-center py-3">
+        <v-avatar size="32" class="mr-2" color="blue-darken-3"><v-icon size="18">mdi-calculator-variant</v-icon></v-avatar>
+        <div>
+          <div class="text-subtitle-1 font-weight-bold">8. Resumen contable RTM y servicios</div>
+          <div class="text-caption text-medium-emphasis">
+            Turnos del rango por servicio y tipo de vehículo (mismo criterio que Estadísticas de Turnos del Día):
+            sin cancelados, inactivos ni placas TST; RTM separado en primera y segunda vez.
+          </div>
+        </div>
+      </v-card-title>
+      <v-divider />
+      <v-card-text>
+        <v-data-table
+          density="compact"
+          :headers="headersResumenContable"
+          :items="filasResumenContable"
+          :row-props="rowPropsResumenContable"
+          hide-default-footer
+        >
+          <template #item.motos="{ item }">{{ formatNum(item.motos) }}</template>
+          <template #item.livianos="{ item }">{{ formatNum(item.livianos) }}</template>
+          <template #item.otros="{ item }">{{ formatNum(item.otros) }}</template>
+          <template #item.total="{ item }">{{ formatNum(item.total) }}</template>
+        </v-data-table>
+        <v-row dense class="mt-3">
+          <v-col cols="12" sm="6">
+            <div class="text-caption text-medium-emphasis">% rechazo RTM primera vez</div>
+            <div class="text-body-1 font-weight-bold">{{ textoRechazoApi(datos.resumenContable.rechazo.primera_vez) }}</div>
+            <div class="text-caption text-medium-emphasis">
+              {{ formatNum(datos.resumenContable.rechazo.primera_vez.sin_resultado) }} sin resultado
+            </div>
+          </v-col>
+          <v-col cols="12" sm="6">
+            <div class="text-caption text-medium-emphasis">% rechazo RTM segunda vez</div>
+            <div class="text-body-1 font-weight-bold">{{ textoRechazoApi(datos.resumenContable.rechazo.segunda_vez) }}</div>
+            <div class="text-caption text-medium-emphasis">
+              {{ formatNum(datos.resumenContable.rechazo.segunda_vez.sin_resultado) }} sin resultado
+            </div>
+          </v-col>
+        </v-row>
+        <div class="text-caption text-medium-emphasis mt-2">
+          {{ formatNum(datos.resumenContable.sin_finalizar) }} turnos aún sin finalizar (estado activo) están
+          incluidos en esta tabla.
+        </div>
+        <div class="text-caption text-medium-emphasis">
+          Esta sección incluye las segundas veces; por eso puede diferir de otras secciones, que las excluyen.
+        </div>
+      </v-card-text>
+    </v-card>
   </div>
 </template>
 
@@ -392,7 +444,13 @@ import type {
   DescuentosPorAutorizadorResponse,
   ProduccionLiderResponse,
   ReconciliacionRtmResponse,
+  ResumenContableResponse,
 } from '@/services/reportesAdminService'
+import {
+  filasTablaResumenContable,
+  textoRechazoApi,
+  type FilaTablaResumenContable,
+} from './superInformeResumenContable'
 
 export interface SuperInformePreviewDatos {
   fechaInicio: string
@@ -408,6 +466,7 @@ export interface SuperInformePreviewDatos {
   descuentosAutorizador: DescuentosPorAutorizadorResponse
   produccionLider: ProduccionLiderResponse
   reconciliacionRtm: ReconciliacionRtmResponse
+  resumenContable: ResumenContableResponse
 }
 
 const props = defineProps<{ datos: SuperInformePreviewDatos }>()
@@ -677,4 +736,17 @@ const headersProduccionLider = [
   { title: 'Total Bruto', key: 'total_bruto' },
   { title: 'Total Neto', key: 'total_neto' },
 ]
+
+/* ===== 8. Resumen contable RTM y servicios ===== */
+const headersResumenContable = [
+  { title: 'Servicio', key: 'servicio' },
+  { title: 'Motos', key: 'motos', align: 'end' as const },
+  { title: 'Livianos', key: 'livianos', align: 'end' as const },
+  { title: 'Otros', key: 'otros', align: 'end' as const },
+  { title: 'Total', key: 'total', align: 'end' as const },
+]
+const filasResumenContable = computed(() => filasTablaResumenContable(props.datos.resumenContable))
+function rowPropsResumenContable({ item }: { item: FilaTablaResumenContable }) {
+  return item.resaltada ? { class: 'font-weight-bold' } : {}
+}
 </script>
