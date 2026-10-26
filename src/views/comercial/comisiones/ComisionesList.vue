@@ -1997,15 +1997,15 @@
           <template #item.rtm_vehiculos="{ item }">{{ item.rtm_vehiculos || 0 }}</template>
           <template #item.total_rtm="{ item }">{{ calcTotalRtm(item) }}</template>
           <template #item.meta_rtm="{ item }">
-            <span v-if="getMetaDinero(item) > 0">{{ formatCOP(getMetaDinero(item)) }}</span>
-            <span v-else>—</span>
+            <span v-if="getMetaDinero(item) !== null">{{ formatCOP(getMetaDinero(item) ?? 0) }}</span>
+            <span v-else class="text-medium-emphasis">{{ SIN_META_DEFINIDA }}</span>
           </template>
           <template #item.avance="{ item }">
-            <span v-if="getMetaDinero(item) > 0">{{ calcAvance(item).toFixed(1) }}%</span>
+            <span v-if="(getMetaDinero(item) ?? 0) > 0">{{ calcAvance(item).toFixed(1) }}%</span>
             <span v-else>—</span>
           </template>
           <template #item.faltante="{ item }">
-            <span v-if="getMetaDinero(item) > 0">{{ formatCOP(calcFaltante(item)) }}</span>
+            <span v-if="(getMetaDinero(item) ?? 0) > 0">{{ formatCOP(calcFaltante(item)) }}</span>
             <span v-else>—</span>
           </template>
           <template #item.porcentaje_comision_meta="{ item }">
@@ -3756,6 +3756,7 @@ import {
   textoDejadoDePagar,
   type ConflictoSinComision,
 } from './ticketOrigen'
+import { SIN_META_DEFINIDA, avanceMeta, bonoMeta, faltanteMeta, metaDelMes } from './metaMensual'
 import TurnoDetalleDialog, { type Turno as TurnoDetalle } from '@/components/rtm/TurnoDetalleDialog.vue'
 
 /* ── Extended types ── */
@@ -5758,10 +5759,8 @@ function calcTotalRtm(item: MetaMensualRow): number {
   return (item.rtm_motos || 0) + (item.rtm_vehiculos || 0)
 }
 
-function getMetaDinero(item: MetaMensualRow): number {
-  const ext = item as MetaMensualResumen
-  const raw = ext.meta_global_rtm ?? item.meta_rtm ?? item.meta_mensual ?? 0
-  return Number(raw) || 0
+function getMetaDinero(item: MetaMensualRow): number | null {
+  return metaDelMes(item)
 }
 
 function getTotalFacturacion(item: MetaMensualRow): number {
@@ -5771,25 +5770,16 @@ function getTotalFacturacion(item: MetaMensualRow): number {
 }
 
 function calcAvance(item: MetaMensualRow): number {
-  const metaDinero = getMetaDinero(item)
-  if (!metaDinero) return 0
-  return (getTotalFacturacion(item) / metaDinero) * 100
+  return avanceMeta(getMetaDinero(item), getTotalFacturacion(item))
 }
 
 function calcFaltante(item: MetaMensualRow): number {
-  const metaDinero = getMetaDinero(item)
-  if (!metaDinero) return 0
-  const diff = metaDinero - getTotalFacturacion(item)
-  return diff > 0 ? diff : 0
+  return faltanteMeta(getMetaDinero(item), getTotalFacturacion(item))
 }
 
 function calcComisionMeta(item: MetaMensualRow): number {
-  const metaDinero = getMetaDinero(item)
   const porcentaje = item.porcentaje_comision_meta ?? (item as MetaMensualResumen).porcentaje_comision ?? 0
-  if (!metaDinero || !porcentaje) return 0
-  const totalFacturacion = getTotalFacturacion(item)
-  if (totalFacturacion < metaDinero) return 0
-  return (totalFacturacion * porcentaje) / 100
+  return bonoMeta(getMetaDinero(item), getTotalFacturacion(item), porcentaje)
 }
 
 /* ── Diálogos simples ── */

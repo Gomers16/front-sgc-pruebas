@@ -243,7 +243,7 @@
                 </template>
                 <template v-else>
                   <span class="text-medium-emphasis text-caption">
-                    Sin configuración de meta RTM para este asesor.
+                    {{ SIN_META_DEFINIDA }} para {{ metaMes }}.
                   </span>
                 </template>
               </v-card-text>
@@ -942,15 +942,15 @@
               {{ calcTotalRtm(item) }}
             </template>
             <template #item.meta_rtm="{ item }">
-              <span v-if="getMetaDinero(item) > 0">{{ money(getMetaDinero(item)) }}</span>
-              <span v-else>—</span>
+              <span v-if="getMetaDinero(item) !== null">{{ money(getMetaDinero(item)) }}</span>
+              <span v-else class="text-medium-emphasis">{{ SIN_META_DEFINIDA }}</span>
             </template>
             <template #item.avance="{ item }">
-              <span v-if="getMetaDinero(item) > 0">{{ calcAvance(item).toFixed(1) }}%</span>
+              <span v-if="(getMetaDinero(item) ?? 0) > 0">{{ calcAvance(item).toFixed(1) }}%</span>
               <span v-else>—</span>
             </template>
             <template #item.faltante="{ item }">
-              <span v-if="getMetaDinero(item) > 0">{{ money(calcFaltante(item)) }}</span>
+              <span v-if="(getMetaDinero(item) ?? 0) > 0">{{ money(calcFaltante(item)) }}</span>
               <span v-else>—</span>
             </template>
             <template #item.porcentaje_comision_meta="{ item }">
@@ -1243,6 +1243,13 @@ import {
   listMetasMensuales,
   type MetaMensualRow,
 } from '@/services/comisionesService'
+import {
+  SIN_META_DEFINIDA,
+  avanceMeta,
+  bonoMeta,
+  faltanteMeta,
+  metaDelMes,
+} from '@/views/comercial/comisiones/metaMensual'
 import {
   listProspectos,
   type ProspectoDetail,
@@ -2109,15 +2116,8 @@ function calcTotalRtm(item: MetaMensualRow) {
   return (item.rtm_motos || 0) + (item.rtm_vehiculos || 0)
 }
 
-function getMetaDinero(item: MetaMensualRow): number {
-  const itemExtended = item as Record<string, unknown>
-  const raw =
-    item.meta_global_rtm ??
-    item.meta_rtm ??
-    itemExtended.meta_mensual ??
-    item.meta_mensual ??
-    0
-  return Number(raw) || 0
+function getMetaDinero(item: MetaMensualRow): number | null {
+  return metaDelMes(item)
 }
 
 function getTotalFacturacion(item: MetaMensualRow) {
@@ -2130,32 +2130,22 @@ function getTotalFacturacion(item: MetaMensualRow) {
 }
 
 function calcAvance(item: MetaMensualRow) {
-  const meta = getMetaDinero(item)
-  if (!meta || meta <= 0) return 0
-  return (getTotalFacturacion(item) / meta) * 100
+  return avanceMeta(getMetaDinero(item), getTotalFacturacion(item))
 }
 
 function calcFaltante(item: MetaMensualRow) {
-  const meta = getMetaDinero(item)
-  if (!meta || meta <= 0) return 0
-  const diff = meta - getTotalFacturacion(item)
-  return diff > 0 ? diff : 0
+  return faltanteMeta(getMetaDinero(item), getTotalFacturacion(item))
 }
 
 function calcComisionMeta(item: MetaMensualRow) {
-  const meta = getMetaDinero(item)
-  const pct = item.porcentaje_comision_meta ?? 0
-  if (!meta || meta <= 0 || !pct) return 0
-  const total = getTotalFacturacion(item)
-  if (total < meta) return 0
-  return (total * pct) / 100
+  return bonoMeta(getMetaDinero(item), getTotalFacturacion(item), item.porcentaje_comision_meta ?? 0)
 }
 
 const metaResumen = computed(() => {
   const row = metasRows.value[0]
   if (!row) return null
   const metaDinero = getMetaDinero(row)
-  if (!metaDinero || metaDinero <= 0) return null
+  if (metaDinero === null) return null
   return {
     mesLabel: metaMes.value,
     metaDinero,

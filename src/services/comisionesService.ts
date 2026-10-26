@@ -361,12 +361,18 @@ export interface MetaMensualRow {
   valor_rtm_moto?: number | null
   valor_rtm_vehiculo?: number | null
   fecha_actualizacion?: string | null
+  /** Solo lectura (sin `mes`): meta en pesos del mes en curso de Meta Comercial; null si no hay. */
+  meta_mes_pesos?: number | null
+  /** 'YYYY-MM' del mes en curso al que corresponde meta_mes_pesos. */
+  meta_mes_label?: string | null
 
   // Campos de resumen (para la pestaña de metas en Comisiones.vue)
   rtm_motos?: number
   rtm_vehiculos?: number
   meta_rtm?: number | null
   meta_global_rtm?: number | null
+  /** Con `mes`: 'meta_comercial' si hay meta del mes, null si no la hay. */
+  meta_fuente?: 'meta_comercial' | null
   porcentaje_comision_meta?: number | null
 
   // Totales calculados por el backend (nueva lógica)
@@ -717,12 +723,15 @@ function mapMetaMensual(api: unknown): MetaMensualRow {
       a.created_at ??
       a.createdAt ??
       null) as string | null,
+    meta_mes_pesos: a.meta_mes_pesos != null ? num(a.meta_mes_pesos) : null,
+    meta_mes_label: (a.meta_mes_label ?? null) as string | null,
 
     // Campos de resumen (cantidades)
     rtm_motos: rtmMotos,
     rtm_vehiculos: rtmVehiculos,
     meta_rtm: (a.meta_rtm ?? null) as number | null,
     meta_global_rtm: (a.meta_global_rtm ?? null) as number | null,
+    meta_fuente: (a.meta_fuente ?? null) as 'meta_comercial' | null,
     porcentaje_comision_meta:
       (a.porcentaje_comision_meta ?? a.porcentaje_extra ?? null) as number | null,
 

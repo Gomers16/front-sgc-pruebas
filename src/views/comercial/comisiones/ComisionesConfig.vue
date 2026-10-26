@@ -538,6 +538,25 @@
         v-else-if="activeSection === 'METAS'"
         class="pt-4"
       >
+        <v-alert type="info" variant="tonal" density="comfortable" class="mb-4 text-caption">
+          <div class="d-flex align-center justify-space-between flex-wrap ga-2">
+            <span>
+              La meta en pesos de cada mes se configura en
+              <strong>Reportes → Meta Comercial por Asesor</strong>. Aquí se configura el % de
+              comisión extra y los valores por RTM.
+            </span>
+            <v-btn
+              :to="{ name: 'ReporteMetaComercialAsesor' }"
+              size="small"
+              variant="tonal"
+              color="info"
+              prepend-icon="mdi-target"
+            >
+              Ir a Meta Comercial
+            </v-btn>
+          </div>
+        </v-alert>
+
         <!-- Form metas -->
         <v-row class="mb-2" dense>
           <v-col cols="12" md="4">
@@ -674,6 +693,14 @@
 
           <template #item.meta_mensual="{ item }">
             {{ item.meta_mensual ?? 0 }} RTM
+          </template>
+
+          <template #item.meta_mes_pesos="{ item }">
+            <span v-if="item.meta_mes_pesos != null">{{ formatCOP(item.meta_mes_pesos) }}</span>
+            <span v-else class="text-medium-emphasis">{{ SIN_META_DEFINIDA }}</span>
+            <div v-if="item.meta_mes_label" class="text-caption text-medium-emphasis">
+              {{ item.meta_mes_label }}
+            </div>
           </template>
 
           <template #item.valor_rtm_moto="{ item }">
@@ -1590,6 +1617,7 @@ import {
   type DescuentoItem,
 } from '@/services/comisionesService'
 import { etiquetaConvenio } from '@/services/conveniosService'
+import { SIN_META_DEFINIDA } from './metaMensual'
 
 type Scope = 'GLOBAL' | 'ASESOR'
 type Section = 'REGLAS' | 'METAS' | 'RECURRENCIA' | 'CONTINUIDAD' | 'SIMULADOR'
@@ -1604,6 +1632,8 @@ type MetaMensualConfig = {
   valor_rtm_moto?: number | null
   valor_rtm_vehiculo?: number | null
   fecha_actualizacion?: string | null
+  meta_mes_pesos?: number | null
+  meta_mes_label?: string | null
 }
 
 type MetaMensualPayload = {
@@ -1718,6 +1748,7 @@ const metaHeaders = [
   { title: 'Asesor', key: 'asesor', sortable: false },
   { title: 'Tipo meta', key: 'tipo_vehiculo', sortable: false },
   { title: 'Meta RTM (unid.)', key: 'meta_mensual', sortable: true },
+  { title: 'Meta del mes (Meta Comercial)', key: 'meta_mes_pesos', sortable: false },
   { title: 'RTM moto', key: 'valor_rtm_moto', sortable: false },
   { title: 'RTM vehículo', key: 'valor_rtm_vehiculo', sortable: false },
   { title: '% extra', key: 'porcentaje_extra', sortable: true },
