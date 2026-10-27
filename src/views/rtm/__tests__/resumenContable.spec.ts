@@ -4,6 +4,7 @@ import {
   grupoVehiculo,
   resumenComoTabla,
   resumenComoTexto,
+  resumenCompacto,
   textoRechazo,
   type TurnoParaResumen,
 } from '../resumenContable'
@@ -133,5 +134,42 @@ describe('exportación', () => {
     expect(texto).toContain('Servicio\tMotos\tLivianos\tOtros\tTotal')
     expect(texto).toContain('RTM · Primera vez\t0\t0\t0\t0')
     expect(texto).not.toContain('Filtros')
+  })
+})
+
+describe('resumenCompacto', () => {
+  it('sin turnos: sinTurnos, sin columna Otros y filas fijas en 0', () => {
+    const c = resumenCompacto(calcularResumenContable([]))
+    expect(c.sinTurnos).toBe(true)
+    expect(c.mostrarOtros).toBe(false)
+    expect(c.filas.map((f) => f.etiqueta)).toEqual(['RTM 1ª vez', 'RTM 2ª vez', 'SOAT', 'PREV', 'PERI', 'Total'])
+  })
+
+  it('solo cancelados o inactivos cuenta como sin turnos', () => {
+    const c = resumenCompacto(calcularResumenContable([turno({ estado: 'cancelado' }), turno({ estado: 'inactivo' })]))
+    expect(c.sinTurnos).toBe(true)
+  })
+
+  it('quita el subtotal RTM, agrega servicios no previstos con datos y el total cuadra', () => {
+    const c = resumenCompacto(
+      calcularResumenContable([
+        turno({}),
+        turno({ esSegundaVez: 1, tipoVehiculo: 'Motocicleta' }),
+        turno({ servicioCodigo: 'LAVADO', tipoVehiculo: null }),
+      ])
+    )
+    expect(c.sinTurnos).toBe(false)
+    expect(c.mostrarOtros).toBe(true)
+    expect(c.filas.map((f) => f.clave)).toEqual(['RTM_PRIMERA', 'RTM_SEGUNDA', 'SOAT', 'PREV', 'PERI', 'LAVADO', 'TOTAL'])
+    const detalle = c.filas.filter((f) => f.tipo === 'detalle').reduce((s, f) => s + f.total, 0)
+    expect(c.filas.at(-1)).toMatchObject({ etiqueta: 'Total', total: 3 })
+    expect(detalle).toBe(3)
+  })
+
+  it('no modifica las etiquetas del resumen completo (modal y Excel)', () => {
+    const r = calcularResumenContable([turno({})])
+    resumenCompacto(r)
+    expect(fila(r, 'RTM_PRIMERA').etiqueta).toBe('RTM · Primera vez')
+    expect(fila(r, 'TOTAL').etiqueta).toBe('TOTAL GENERAL')
   })
 })

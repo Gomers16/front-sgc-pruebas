@@ -1,4 +1,5 @@
-// Resumen contable del día (Turnos del Día → modal "Estadísticas").
+// Resumen contable del día (Turnos del Día → modal "Estadísticas", y en versión
+// compacta en la cabecera, al lado de la leyenda).
 //
 // Base: los turnos que recibe (en la vista, turnosParaContadores: fecha del
 // día + filtro de servicio/placa, sin el filtro de estado), excluyendo los
@@ -113,6 +114,37 @@ export function calcularResumenContable(turnos: TurnoParaResumen[]): ResumenCont
   const filasOtros = [...SERVICIOS_FIJOS, ...extras].map((k) => otros.get(k)!)
 
   return { filas: [rtmPrimera, rtmSegunda, rtmTotal, ...filasOtros, general], rechazo }
+}
+
+export interface ResumenCompacto {
+  filas: FilaResumen[]
+  /** La columna Otros solo se muestra si algún turno cae ahí. */
+  mostrarOtros: boolean
+  /** Sin turnos (descontados cancelados e inactivos): la vista muestra "Sin turnos". */
+  sinTurnos: boolean
+}
+
+const FILAS_COMPACTAS_FIJAS = ['RTM_PRIMERA', 'RTM_SEGUNDA', ...SERVICIOS_FIJOS]
+const ETIQUETA_CORTA: Record<string, string> = {
+  RTM_PRIMERA: 'RTM 1ª vez',
+  RTM_SEGUNDA: 'RTM 2ª vez',
+  TOTAL: 'Total',
+}
+
+/**
+ * Versión compacta para la cabecera de Turnos del Día (al lado de la leyenda):
+ * sin el subtotal RTM, con etiquetas cortas. RTM 1ª/2ª, SOAT, PREV y PERI
+ * siempre; los servicios no previstos solo si tienen turnos, para que el total
+ * cuadre con las filas visibles.
+ */
+export function resumenCompacto(resumen: ResumenContable): ResumenCompacto {
+  const general = resumen.filas.find((f) => f.tipo === 'total')!
+  const filas = resumen.filas
+    .filter(
+      (f) => f.tipo === 'total' || FILAS_COMPACTAS_FIJAS.includes(f.clave) || (f.tipo === 'detalle' && f.total > 0)
+    )
+    .map((f) => ({ ...f, etiqueta: ETIQUETA_CORTA[f.clave] ?? f.etiqueta }))
+  return { filas, mostrarOtros: general.otros > 0, sinTurnos: general.total === 0 }
 }
 
 /** "15,0% (3 de 20)" o "—" si no hay turnos con resultado. */

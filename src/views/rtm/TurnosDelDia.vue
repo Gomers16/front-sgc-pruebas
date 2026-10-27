@@ -18,132 +18,190 @@
       <!-- Panel resumen: leyenda del semáforo + contadores del día.
            Los contadores se calculan sobre turnosParaContadores (respeta el
            filtro de servicio/placa activo, pero NO el de estado) — mismo
-           criterio que usa el modal "Estadísticas" más abajo. -->
-      <v-card variant="outlined" class="pa-3 pa-sm-4 mb-4 mb-sm-6 rounded-lg">
-        <div class="d-flex flex-wrap align-center" style="gap: 8px">
-          <span class="text-caption text-sm-body-2 font-weight-bold mr-1">Leyenda:</span>
-          <v-chip size="small" color="light-blue-accent-3" variant="elevated" label>
-            🔵 En proceso
-          </v-chip>
-          <v-chip size="small" color="amber" variant="elevated" label>
-            🟡 Incompleto (falta una etapa)
-          </v-chip>
-          <v-chip size="small" color="light-green-accent-3" variant="elevated" label>
-            🟢 Finalizado
-          </v-chip>
-          <v-chip size="small" color="red-accent-2" variant="elevated" label>
-            🔴 Cancelado
-          </v-chip>
-        </div>
-
-        <v-divider class="my-3" />
-
-        <v-row dense>
-          <v-col cols="6" sm="3">
-            <div
-              class="text-center contador-clicable"
-              :class="{ 'contador-activo-en_proceso': estadoFiltro === 'en_proceso' }"
-              role="button"
-              tabindex="0"
-              @click="toggleEstadoFiltro('en_proceso')"
-              @keydown.enter="toggleEstadoFiltro('en_proceso')"
-            >
-              <div class="text-h6 text-sm-h5 font-weight-bold text-light-blue-darken-2">
-                {{ resumenSemaforo.en_proceso }}
-              </div>
-              <div class="text-caption text-sm-body-2">En proceso</div>
+           criterio que usa el modal "Estadísticas" más abajo.
+           Al lado (md+) o debajo (xs/sm): resumen del día compacto. -->
+      <v-row dense class="mb-4 mb-sm-6">
+        <v-col cols="12" md="7">
+          <v-card variant="outlined" class="pa-3 pa-sm-4 rounded-lg h-100">
+            <div class="d-flex flex-wrap align-center" style="gap: 8px">
+              <span class="text-caption text-sm-body-2 font-weight-bold mr-1">Leyenda:</span>
+              <v-chip size="small" color="light-blue-accent-3" variant="elevated" label>
+                🔵 En proceso
+              </v-chip>
+              <v-chip size="small" color="amber" variant="elevated" label>
+                🟡 Incompleto (falta una etapa)
+              </v-chip>
+              <v-chip size="small" color="light-green-accent-3" variant="elevated" label>
+                🟢 Finalizado
+              </v-chip>
+              <v-chip size="small" color="red-accent-2" variant="elevated" label>
+                🔴 Cancelado
+              </v-chip>
             </div>
-          </v-col>
-          <v-col cols="6" sm="3">
-            <div
-              class="text-center contador-clicable"
-              :class="{ 'contador-activo-incompleto': estadoFiltro === 'incompleto' }"
-              role="button"
-              tabindex="0"
-              @click="toggleEstadoFiltro('incompleto')"
-              @keydown.enter="toggleEstadoFiltro('incompleto')"
-            >
-              <div class="text-h6 text-sm-h5 font-weight-bold text-amber-darken-3">
-                {{ resumenSemaforo.incompleto }}
-              </div>
-              <div class="text-caption text-sm-body-2">Incompletos</div>
-            </div>
-          </v-col>
-          <v-col cols="6" sm="3">
-            <div
-              class="text-center contador-clicable"
-              :class="{ 'contador-activo-finalizado': estadoFiltro === 'finalizado' }"
-              role="button"
-              tabindex="0"
-              @click="toggleEstadoFiltro('finalizado')"
-              @keydown.enter="toggleEstadoFiltro('finalizado')"
-            >
-              <div class="text-h6 text-sm-h5 font-weight-bold text-green-darken-2">
-                {{ resumenSemaforo.finalizado }}
-              </div>
-              <div class="text-caption text-sm-body-2">Finalizados</div>
-            </div>
-          </v-col>
-          <v-col cols="6" sm="3">
-            <div
-              class="text-center contador-clicable"
-              :class="{ 'contador-activo-cancelado': estadoFiltro === 'cancelado' }"
-              role="button"
-              tabindex="0"
-              @click="toggleEstadoFiltro('cancelado')"
-              @keydown.enter="toggleEstadoFiltro('cancelado')"
-            >
-              <div class="text-h6 text-sm-h5 font-weight-bold text-red-darken-2">
-                {{ resumenSemaforo.cancelado }}
-              </div>
-              <div class="text-caption text-sm-body-2">Cancelados</div>
-            </div>
-          </v-col>
-        </v-row>
 
-        <!-- Sub-filtro: solo visible cuando el filtro activo es 'Incompleto' -->
-        <template v-if="estadoFiltro === 'incompleto'">
-          <v-divider class="my-3" />
-          <div class="d-flex flex-wrap align-center" style="gap: 8px">
-            <span class="text-caption text-sm-body-2 font-weight-bold mr-1">Ver solo:</span>
-            <v-chip
-              size="small"
-              color="amber-darken-3"
-              :variant="subFiltroIncompleto === 'FALTA_FACTURACION' ? 'elevated' : 'outlined'"
-              prepend-icon="mdi-receipt-text-remove-outline"
-              @click="toggleSubFiltroIncompleto('FALTA_FACTURACION')"
-            >
-              Falta facturación
-            </v-chip>
-            <v-chip
-              size="small"
-              color="amber-darken-3"
-              :variant="subFiltroIncompleto === 'FALTA_CERTIFICACION' ? 'elevated' : 'outlined'"
-              prepend-icon="mdi-certificate-outline"
-              @click="toggleSubFiltroIncompleto('FALTA_CERTIFICACION')"
-            >
-              Falta certificación
-            </v-chip>
-          </div>
-        </template>
+            <v-divider class="my-3" />
 
-        <v-divider class="my-3" />
+            <v-row dense>
+              <v-col cols="6" sm="3">
+                <div
+                  class="text-center contador-clicable"
+                  :class="{ 'contador-activo-en_proceso': estadoFiltro === 'en_proceso' }"
+                  role="button"
+                  tabindex="0"
+                  @click="toggleEstadoFiltro('en_proceso')"
+                  @keydown.enter="toggleEstadoFiltro('en_proceso')"
+                >
+                  <div class="text-h6 text-sm-h5 font-weight-bold text-light-blue-darken-2">
+                    {{ resumenSemaforo.en_proceso }}
+                  </div>
+                  <div class="text-caption text-sm-body-2">En proceso</div>
+                </div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div
+                  class="text-center contador-clicable"
+                  :class="{ 'contador-activo-incompleto': estadoFiltro === 'incompleto' }"
+                  role="button"
+                  tabindex="0"
+                  @click="toggleEstadoFiltro('incompleto')"
+                  @keydown.enter="toggleEstadoFiltro('incompleto')"
+                >
+                  <div class="text-h6 text-sm-h5 font-weight-bold text-amber-darken-3">
+                    {{ resumenSemaforo.incompleto }}
+                  </div>
+                  <div class="text-caption text-sm-body-2">Incompletos</div>
+                </div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div
+                  class="text-center contador-clicable"
+                  :class="{ 'contador-activo-finalizado': estadoFiltro === 'finalizado' }"
+                  role="button"
+                  tabindex="0"
+                  @click="toggleEstadoFiltro('finalizado')"
+                  @keydown.enter="toggleEstadoFiltro('finalizado')"
+                >
+                  <div class="text-h6 text-sm-h5 font-weight-bold text-green-darken-2">
+                    {{ resumenSemaforo.finalizado }}
+                  </div>
+                  <div class="text-caption text-sm-body-2">Finalizados</div>
+                </div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div
+                  class="text-center contador-clicable"
+                  :class="{ 'contador-activo-cancelado': estadoFiltro === 'cancelado' }"
+                  role="button"
+                  tabindex="0"
+                  @click="toggleEstadoFiltro('cancelado')"
+                  @keydown.enter="toggleEstadoFiltro('cancelado')"
+                >
+                  <div class="text-h6 text-sm-h5 font-weight-bold text-red-darken-2">
+                    {{ resumenSemaforo.cancelado }}
+                  </div>
+                  <div class="text-caption text-sm-body-2">Cancelados</div>
+                </div>
+              </v-col>
+            </v-row>
 
-        <div class="d-flex flex-wrap align-center justify-center" style="gap: 12px">
-          <span class="text-subtitle-2 text-sm-subtitle-1 font-weight-bold">
-            Total visible con el filtro actual: {{ turnosFiltrados.length }}
-          </span>
-          <v-chip
-            v-if="estadoFiltro !== 'TODOS'"
-            size="small"
-            variant="outlined"
-            prepend-icon="mdi-close"
-            @click="quitarFiltroEstado"
-          >
-            Quitar filtro
-          </v-chip>
-        </div>
-      </v-card>
+            <!-- Sub-filtro: solo visible cuando el filtro activo es 'Incompleto' -->
+            <template v-if="estadoFiltro === 'incompleto'">
+              <v-divider class="my-3" />
+              <div class="d-flex flex-wrap align-center" style="gap: 8px">
+                <span class="text-caption text-sm-body-2 font-weight-bold mr-1">Ver solo:</span>
+                <v-chip
+                  size="small"
+                  color="amber-darken-3"
+                  :variant="subFiltroIncompleto === 'FALTA_FACTURACION' ? 'elevated' : 'outlined'"
+                  prepend-icon="mdi-receipt-text-remove-outline"
+                  @click="toggleSubFiltroIncompleto('FALTA_FACTURACION')"
+                >
+                  Falta facturación
+                </v-chip>
+                <v-chip
+                  size="small"
+                  color="amber-darken-3"
+                  :variant="subFiltroIncompleto === 'FALTA_CERTIFICACION' ? 'elevated' : 'outlined'"
+                  prepend-icon="mdi-certificate-outline"
+                  @click="toggleSubFiltroIncompleto('FALTA_CERTIFICACION')"
+                >
+                  Falta certificación
+                </v-chip>
+              </div>
+            </template>
+
+            <v-divider class="my-3" />
+
+            <div class="d-flex flex-wrap align-center justify-center" style="gap: 12px">
+              <span class="text-subtitle-2 text-sm-subtitle-1 font-weight-bold">
+                Total visible con el filtro actual: {{ turnosFiltrados.length }}
+              </span>
+              <v-chip
+                v-if="estadoFiltro !== 'TODOS'"
+                size="small"
+                variant="outlined"
+                prepend-icon="mdi-close"
+                @click="quitarFiltroEstado"
+              >
+                Quitar filtro
+              </v-chip>
+            </div>
+          </v-card>
+        </v-col>
+
+        <!-- Resumen del día: el mismo resumenContable del modal (sin cancelados
+             ni inactivos), en versión compacta (resumenCompacto). -->
+        <v-col cols="12" md="5">
+          <v-card variant="outlined" class="pa-2 pa-sm-4 rounded-lg h-100">
+            <div class="d-flex align-center justify-space-between flex-wrap mb-2" style="gap: 8px">
+              <span class="text-caption text-sm-body-2 font-weight-bold">Resumen del día</span>
+              <span class="text-caption text-grey-darken-1">
+                {{ filtrosResumenTexto ? `${filtrosResumenTexto} · ` : '' }}sin cancelados
+              </span>
+            </div>
+
+            <div v-if="isLoading" class="text-center text-caption text-grey-darken-1 py-6">
+              Cargando turnos...
+            </div>
+            <div v-else-if="resumenDelDia.sinTurnos" class="text-center text-caption text-grey-darken-1 py-6">
+              <v-icon size="small" class="mr-1">mdi-calendar-blank-outline</v-icon>
+              Sin turnos
+            </div>
+            <template v-else>
+              <v-table density="compact" class="resumen-dia-tabla">
+                <thead>
+                  <tr>
+                    <th class="text-left">Servicio</th>
+                    <th class="text-right">Motos</th>
+                    <th class="text-right">
+                      <span class="d-none d-sm-inline">Livianos</span><span class="d-sm-none">Liv.</span>
+                    </th>
+                    <th v-if="resumenDelDia.mostrarOtros" class="text-right">Otros</th>
+                    <th class="text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="fila in resumenDelDia.filas"
+                    :key="fila.clave"
+                    :class="{ 'font-weight-bold bg-blue-grey-lighten-5': fila.tipo === 'total' }"
+                  >
+                    <td>{{ fila.etiqueta }}</td>
+                    <td class="text-right">{{ fila.motos }}</td>
+                    <td class="text-right">{{ fila.livianos }}</td>
+                    <td v-if="resumenDelDia.mostrarOtros" class="text-right">{{ fila.otros }}</td>
+                    <td class="text-right">{{ fila.total }}</td>
+                  </tr>
+                </tbody>
+              </v-table>
+              <div class="d-flex flex-wrap mt-2 text-caption" style="gap: 4px 12px">
+                <span><strong>% rechazo RTM 1ª:</strong> {{ textoRechazo(resumenContable.rechazo.primeraVez) }}</span>
+                <span><strong>2ª:</strong> {{ textoRechazo(resumenContable.rechazo.segundaVez) }}</span>
+              </div>
+            </template>
+          </v-card>
+        </v-col>
+      </v-row>
 
       <!-- Filtros y acciones - Responsive -->
       <v-row class="mb-4 align-center">
@@ -999,6 +1057,7 @@ import {
   calcularResumenContable,
   resumenComoTabla,
   resumenComoTexto,
+  resumenCompacto,
   textoRechazo,
 } from './resumenContable'
 
@@ -1254,6 +1313,9 @@ const resumenContable = computed(() =>
     }))
   )
 )
+
+/** Resumen del día de la cabecera: el mismo resumenContable, en versión compacta. */
+const resumenDelDia = computed(() => resumenCompacto(resumenContable.value))
 
 const filtrosResumenTexto = computed(() => {
   const partes: string[] = []
@@ -1955,6 +2017,22 @@ onMounted(() => {
 .contador-activo-cancelado {
   background-color: rgba(252, 165, 165, 0.2);
   box-shadow: inset 0 0 0 2px #fca5a5;
+}
+
+/* Resumen del día (cabecera): filas más bajas que density="compact". */
+.resumen-dia-tabla :deep(th),
+.resumen-dia-tabla :deep(td) {
+  height: 26px !important;
+  padding: 0 8px !important;
+  font-size: 0.8rem;
+}
+/* En pantallas angostas las cuatro columnas tienen que caber sin scroll. */
+@media (max-width: 599px) {
+  .resumen-dia-tabla :deep(th),
+  .resumen-dia-tabla :deep(td) {
+    padding: 0 3px !important;
+    font-size: 0.72rem;
+  }
 }
 
 .text-on-primary-text {
