@@ -187,6 +187,15 @@ export function usePermissions() {
         'GERENCIA'
       ]),
 
+      // ==================== TELEMERCADEO ====================
+      // Cola de trabajo (solo lectura). Mismos roles que GET
+      // /api/telemercadeo/cola y la ruta /comercial/telemercadeo.
+      verTelemercadeo: () => auth.hasAnyRole([
+        'SUPER_ADMIN',
+        'GERENCIA',
+        'COMERCIAL'
+      ]),
+
       // Configurar límite global / overrides por asesor de re-dateos
       configurarRedateos: () => auth.hasAnyRole([
         'SUPER_ADMIN',

@@ -249,6 +249,20 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: 'MainLayout' },
   },
 
+  // Telemercadeo (cola de trabajo, solo lectura). Mismos roles que
+  // GET /api/telemercadeo/cola y can.verTelemercadeo().
+  {
+    path: '/comercial/telemercadeo',
+    name: 'ComercialTelemercadeo',
+    component: () => import('@/views/comercial/telemercadeo/TelemercadeoCola.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Telemercadeo',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA', 'COMERCIAL'],
+    },
+  },
+
   // Convenios
   {
     path: '/comercial/convenios',

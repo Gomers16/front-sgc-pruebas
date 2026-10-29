@@ -126,9 +126,11 @@
         <v-list-item title="Turnos Trámites" :to="{ path: '/tramites/turnos-tramites' }" link />
       </v-list-group>
 
-      <!-- Comercial -->
+      <!-- Comercial: visible si se ve algún hijo. Los hijos de siempre llevan
+           can.verComercial() para no cambiar quién los ve; Telemercadeo usa
+           solo su propio gate. -->
       <v-list-group
-        v-if="can.verComercial()"
+        v-if="can.verComercial() || can.verTelemercadeo()"
         value="comercial"
         prepend-icon="mdi-briefcase-variant-outline"
         class="nav-item"
@@ -140,7 +142,7 @@
 
         <!-- Asesores -->
         <v-list-group
-          v-if="can.verListadoAgentes()"
+          v-if="can.verComercial() && can.verListadoAgentes()"
           value="comercial-asesores"
           prepend-icon="mdi-account-tie"
           class="nav-item"
@@ -155,7 +157,7 @@
 
         <!-- Dateos -->
         <v-list-group
-          v-if="can.verDateos()"
+          v-if="can.verComercial() && can.verDateos()"
           value="comercial-dateos"
           prepend-icon="mdi-note-text-outline"
           class="nav-item"
@@ -176,7 +178,7 @@
 
         <!-- Convenios -->
         <v-list-group
-          v-if="can.verConvenios()"
+          v-if="can.verComercial() && can.verConvenios()"
           value="comercial-convenios"
           prepend-icon="mdi-handshake-outline"
           class="nav-item"
@@ -189,9 +191,20 @@
           <v-list-item title="Listado" :to="{ path: '/comercial/convenios' }" link />
         </v-list-group>
 
+        <!-- Telemercadeo: gate propio (verTelemercadeo), no hereda verComercial -->
+        <v-list-item
+          v-if="can.verTelemercadeo()"
+          prepend-icon="mdi-phone-outgoing"
+          title="Telemercadeo"
+          :to="{ name: 'ComercialTelemercadeo' }"
+          class="nav-item"
+          color="#FACC15"
+          link
+        />
+
         <!-- Prospectos -->
         <v-list-group
-          v-if="can.verProspectos()"
+          v-if="can.verComercial() && can.verProspectos()"
           value="comercial-prospectos"
           prepend-icon="mdi-account-search-outline"
           class="nav-item"
@@ -212,6 +225,7 @@
 
         <!-- Clientes -->
         <v-list-group
+          v-if="can.verComercial()"
           value="comercial-clientes"
           prepend-icon="mdi-account-multiple-outline"
           class="nav-item"
@@ -226,7 +240,7 @@
 
         <!-- Comisiones -->
         <v-list-group
-          v-if="can.verComisiones()"
+          v-if="can.verComercial() && can.verComisiones()"
           value="comercial-comisiones"
           prepend-icon="mdi-cash-multiple"
           class="nav-item"
@@ -247,7 +261,7 @@
 
         <!-- 🧾 Comprobantes -->
         <v-list-group
-          v-if="can.verComisiones()"
+          v-if="can.verComercial() && can.verComisiones()"
           value="comercial-comprobantes"
           prepend-icon="mdi-receipt-text-outline"
           class="nav-item"
@@ -266,7 +280,7 @@
 
         <!-- 🆕 Descuentos -->
         <v-list-group
-          v-if="can.verComisiones()"
+          v-if="can.verComercial() && can.verComisiones()"
           value="comercial-descuentos"
           prepend-icon="mdi-tag-multiple"
           class="nav-item"
