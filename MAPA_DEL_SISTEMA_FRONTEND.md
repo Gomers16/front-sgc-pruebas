@@ -28,6 +28,8 @@ Este documento es una referencia completa del frontend, organizada por **módulo
 > Actualizado: 2026-10-23 (**meta del mes en Ficha Comercial**, sincronizado a producción local el 2026-10-27, commits `0f3bfed` / `f97011c`): la meta de "🎯 Metas mensuales" en `FichaComercialAsesor.vue` y de la pestaña Metas de `ComisionesList.vue` es ahora la de "Meta Comercial por Asesor" (pesos, por mes); sin meta del mes muestran "Sin meta definida" y no calculan bono. Helpers en `views/comercial/comisiones/metaMensual.ts`. Ver sección 3.
 >
 > Actualizado: 2026-10-26 (**Súper Informe — sección 8 "Resumen contable RTM y servicios"**, sincronizado a producción local el 2026-10-27, commits `ad17d53` / `f7a2820`): `SuperInforme.vue` pide además `getResumenContable()` (`GET /reportes-admin/super-informe/resumen-contable`) y `SuperInformePreview.vue` agrega la tarjeta 8 al final (tabla por servicio y tipo de vehículo, % rechazo RTM primera/segunda vez con `textoRechazo` de Turnos del Día, notas de segundas veces y de turnos sin finalizar). Helper `views/reportes/superInformeResumenContable.ts`. Las tarjetas 1 a 7 no cambian.
+>
+> Actualizado: 2026-11-10 (**convenio obligatorio en tickets de Excepción de Dateo + corrección posterior + Telemercadeo**; pruebas `0c6ae60`, `18eee1d`, `84b3636` y telemercadeo `9d81a51`; sincronizado a producción local el 2026-11-10, commit `5074cb4`; servidor pendiente): bloque obligatorio de convenio al crear y al aprobar, botón **Corregir convenio** en tickets aprobados con vista previa (`/convenio/simular`), buscador de convenios en servidor (`useBuscadorConvenios.ts`) y vista **Telemercadeo** (`/comercial/telemercadeo`). Ver secciones 4.9 y 9.
 
 ## Índice
 
@@ -287,6 +289,12 @@ Catálogo de descuentos informativos que se pueden aplicar en Facturación (ver 
 
 **Servicio:** `descuentosService.ts` — `getAll/getActivos/getById/create/update/delete` → `/api/descuentos*`.
 
+### 4.9 Telemercadeo (2026-10-29)
+
+- **`views/comercial/telemercadeo/TelemercadeoCola.vue`** — `/comercial/telemercadeo` (route `ComercialTelemercadeo`, `meta.roles` SUPER_ADMIN, GERENCIA, COMERCIAL). Cola de trabajo de solo lectura: pestañas **Por vencer** (Próximos 30 días / Vencidas) y **Clientes** por tiempo sin venir (2-5, 6-11, 12-23, 24+ meses, Sin fecha de visita) con contadores, búsqueda, orden (antigüedad, reciente, nombre) y paginación. Botón **Datear** → `ComercialDateosNuevo` con `placa` y `telefono` en la query.
+- **Servicio:** `services/telemercadeoService.ts::getColaTelemercadeo(params, signal?)` → `GET /api/telemercadeo/cola` (reglas en `MAPA_DEL_SISTEMA_BACKEND.md`, *Telemercadeo — cola de trabajo*).
+- **Menú:** `AppSidebar.vue` lo muestra con su propio gate `can.verTelemercadeo()`; el grupo Comercial se ve con `verComercial() || verTelemercadeo()`.
+
 ### Roles (Comercial, todos)
 
 - `verComercial` (menú padre) → `SUPER_ADMIN, GERENCIA, CONTABILIDAD`.
@@ -296,6 +304,7 @@ Catálogo de descuentos informativos que se pueden aplicar en Facturación (ver 
 - `verDateos` → `SUPER_ADMIN, GERENCIA, CONTABILIDAD, COMERCIAL`; `crearDateo` → `SUPER_ADMIN, GERENCIA, COMERCIAL`; `gestionarDateos` (editar/eliminar) → `SUPER_ADMIN, GERENCIA`. **🆕** `configurarRedateos` (límite global/overrides por asesor de re-dateos, en `DateosList.vue`) → `SUPER_ADMIN, GERENCIA`.
 - `verConvenios/crearConvenio/editarConvenio` → `SUPER_ADMIN, GERENCIA, CONTABILIDAD`.
 - `verComisiones` → `SUPER_ADMIN, GERENCIA, CONTABILIDAD, COMERCIAL`; `gestionarComisiones/aprobarComisiones/pagarComisiones` → `SUPER_ADMIN, GERENCIA, CONTABILIDAD`; `configurarComisiones` → solo `SUPER_ADMIN, GERENCIA`.
+- **🆕** `verTelemercadeo` → `SUPER_ADMIN, GERENCIA, COMERCIAL` (mismos roles que la ruta y que `GET /api/telemercadeo/cola`).
 - Comprobantes y Descuentos comparten el gate `can.verComisiones()` en el sidebar (sin permiso propio en `usePermissions.ts`).
 - Clientes no tiene gate propio — visible para cualquiera que vea el grupo Comercial.
 
@@ -428,6 +437,7 @@ Bandeja de tickets internos para todos los roles autenticados (salvo TURNERO); e
   - **Configuración de la ventana** con comisión completa (global + overrides por asesor; gerencia): guardar, eliminar override con confirmación.
 - **`views/tickets/TicketsEstadisticas.vue`** — pestaña de la bandeja (`GET /api/tickets/estadisticas`, con los filtros de fecha/asesor/convenio). Tarjetas de totales (creados, dentro/fuera, aprobados por decisión, rechazados, pendientes, tasa de aprobación, resolución promedio); dinero: **comisión real** con su estado, **en proceso** marcado "estimado", **dejado de pagar** separado en **exacto** (foto del valor calculado) y **estimado** (tickets sin foto: anteriores a la foto o de producción local); dos gráficos Chart.js; tabla por asesor (en el Caso 2 el asesor es el propio asesor convenio). Aviso si `meta.tope_aplicado`. 403 → mensaje de permiso.
 - **`views/tickets/TicketExcepcionDateoCreate.vue`** — `/tickets/excepcion-dateo/nuevo` (COMERCIAL, SUPER_ADMIN, GERENCIA). Recibe `turno_id`/`placa` por query y el **intento de dateo** por `history.state` (`intentoDateo.ts`), que muestra en "Datos del dateo" de solo lectura; sin intento (acceso por URL) pide convenio asignado y teléfono. 409 `TURNO_SEGUNDA_VEZ` → aviso de que la segunda vez no lleva ticket.
+  - **🆕 Convenio obligatorio (2026-11-10):** bloque con autocompletar de convenios (búsqueda en servidor, `useBuscadorConvenios.ts`) **o** casilla "Sin convenio (directo)"; sin una de las dos no se puede crear (el backend responde 400 `CONVENIO_NO_DECIDIDO`). SUPER_ADMIN/GERENCIA ven también convenios no asignados al asesor, marcados y con aviso. Si el intento trae convenio, se verifica que esté asignado (`verificarConvenioDelDateo()`). El asesor convenio no elige (usa el suyo).
 - **`views/tickets/TicketExcepcionDateoDetail.vue`** — `/tickets/:id` (route `TicketDetalle`).
   - **Datos**: placa, **turno visible** ("N° 12 · RTM", fecha e "id interno #…" en gris), asesor (y si es asesor convenio), convenio (y si gerencia lo corrigió al aprobar), **caso de comisión** (`caso_comision` del backend, no se recalcula en el front) y ventana.
   - **Acciones** (PENDIENTE + resolutor: `roles_resuelve` del tipo o SUPER_ADMIN/GERENCIA), botones de `decisionComision.ts::decisionAprobacion()`, con interruptores **Cobra / No cobra** por asesor y convenio según el caso, también dentro de ventana:
@@ -437,7 +447,8 @@ Bandeja de tickets internos para todos los roles autenticados (salvo TURNERO); e
     - Resumen con color según el riesgo, un solo **Aprobar** y **Rechazar** con motivo obligatorio (no crea dateo ni comisión).
     - Un solo diálogo de confirmación que repite el resumen.
   - **Fuera de ventana**: franja "llegó N min tarde"; botón **Volver a la bandeja** (conserva filtros si se vino de `/tickets`).
-  - **Corregir convenio** al aprobar (switch + convenios asignados al asesor, o "Sin convenio"; no para asesor convenio): manda `convenio_id` y los botones se ajustan al caso nuevo con `casoConConvenioCorregido()` (el backend valida la decisión contra ese caso).
+  - **🆕 Convenio al aprobar (2026-11-10):** siempre visible y editable (convenios asignados; SUPER_ADMIN/GERENCIA también no asignados, con aviso), o "Sin convenio". Si el ticket queda sin convenio y nadie lo decidió al crear, pide la casilla de confirmación (`confirmar_sin_convenio`; el backend responde 409 `CONFIRMAR_SIN_CONVENIO`). Avisos: la observación menciona "convenio" y el ticket no tiene (`observacion_menciona_convenio`), convenio no asignado, y el texto de la regla del motor (con convenio, un descuento final deja al convenio en $0; solo informativo). Manda `convenio_id` y los botones se ajustan al caso nuevo con `casoConConvenioCorregido()`.
+  - **🆕 Corregir convenio después de aprobar:** botón en tickets APROBADOS para el resolutor (no en Caso 2; el backend exige SUPER_ADMIN/GERENCIA). Habilitado solo si `comision_ticket` está PENDIENTE y fuera de liquidación, o aún no hay comisión (`puedeCorregirConvenio()`; si no, muestra el motivo). Diálogo con convenio nuevo o sin convenio, Cobra/No cobra, **motivo** obligatorio y **vista previa** de montos antes/después (`simularCorreccionConvenio()` → `POST .../convenio/simular`); guarda con `corregirConvenioTicket()` → `PATCH .../convenio`. El historial muestra el `CONVENIO_CORREGIDO` posterior con su motivo (`textoEventoConvenioCorregido()`).
   - **Errores**: 400 `COMBINACION_COMISION_INVALIDA` y 409 `TICKET_YA_RESUELTO` con mensajes claros (`mensajeErrorResolucion()`); con 409 recarga el ticket.
   - **Decisión tomada**: `resolucionTicket.ts` lee los TINYINT 0/1/null sin `=== true/false`, con la misma regla del backend: flag del asesor `con_comision_asesor ?? con_comision`; convenio cobra si las columnas nuevas están vacías (tickets de producción local); "Aprobado (régimen anterior)" si no hay decisión guardada.
   - **Historial**: `v-timeline` con `eventos`; los `sintetico` (tickets creados o resueltos por producción local, que no escribe eventos) se marcan "reconstruido".
@@ -446,6 +457,10 @@ Bandeja de tickets internos para todos los roles autenticados (salvo TURNERO); e
 ### Servicio y helpers
 
 - **`services/ticketsService.ts`**: `listTiposTicket()`, `listTickets(params)` → `{ data, meta }` (con `resumen.turnoNumero`/`turnoFecha`/`servicioCodigo`), `getTicket(id)` (con `caso_comision`, `eventos`, `detalle.turno.servicio`), `agregarComentario()`, `crearTicketExcepcionDateo()`, `aprobarTicketExcepcionDateo(id, { con_comision_asesor, con_comision_convenio, convenio_id? })`, `rechazarTicketExcepcionDateo()`, `getEstadisticasTickets(params)`, `exportarTicketsExcel(params)` (Blob), `getContadorPendientesTickets()`, y los de configuración de ventana. `TicketEstado` = PENDIENTE | APROBADO | RECHAZADO; ya no tipa `asignadoA`, `cerradoAt` ni `requiereAprobacionFinanciera` (el backend de pruebas no los envía).
+- **🆕** `ticketsService.ts` (2026-11-10): `crearTicketExcepcionDateo()` manda `sin_convenio`; `aprobarTicketExcepcionDateo()` acepta `confirmar_sin_convenio`; `getTicket()` trae `observacion_menciona_convenio`, `convenio_asignado` y `comision_ticket` (`ComisionTicketResumen`); nuevas `corregirConvenioTicket()` y `simularCorreccionConvenio()` (`CorregirConvenioBody`, `CorreccionConvenioResponse`).
+- **🆕** `conveniosService.ts::buscarConveniosParaTicket(asesorId, q, { incluirNoAsignados, limit = 50 })` → `GET /api/convenios/asignados` (`ConvenioTicketOpcion` con `asignado`).
+- **🆕 `views/tickets/decisionConvenio.ts`** — decisión del convenio al crear/aprobar (`camposConvenioCrear`, `camposConvenioAprobar`, `sinConvenioDecidido`), avisos (`avisoConvenioEnObservacion`, `textoReglaDescuentoConvenio`), `etiquetaOpcionConvenio`, `puedeCorregirConvenio`, `cobraGuardado`, `casoTrasCorreccion`, `asignadoSegunBusqueda`.
+- **🆕 `views/tickets/useBuscadorConvenios.ts`** — buscador en servidor con pausa de 300 ms; conserva el seleccionado entre los resultados.
 - **`views/tickets/filtrosTickets.ts`** — filtros ↔ query de la URL ↔ params del API, chips y quitar filtro.
 - **`views/tickets/turnoVisible.ts`** — texto del turno: número del día + servicio, fecha aparte, id interno solo como respaldo.
 - **`views/tickets/decisionComision.ts`** — opciones de aprobación por caso, caso con convenio corregido, mensajes de error.
@@ -454,7 +469,7 @@ Bandeja de tickets internos para todos los roles autenticados (salvo TURNERO); e
 - **🆕 `views/tickets/convenioTicket.ts`** — nombre del convenio (y del convenio corregido / evento `CONVENIO_CORREGIDO`) a partir de los ids.
 - **🆕 `views/tickets/estadisticasPorAsesor.ts`** — filas y totales de la tabla por asesor de Estadísticas y conteos por estado para el resumen de la bandeja.
 - **`composables/useTicketsPendientes.ts`** — contador compartido (insignia del menú + bandeja); una sola llamada aunque se pida a la vez desde varios lados; `null` (sin insignia) ante 403 o error de red; se refresca al montar, cada 2 min en el menú y después de aprobar/rechazar.
-- Tests vitest: `views/tickets/__tests__/` (filtros y estados, turno visible, decisión por caso, resolución, intento) y `composables/__tests__/useTicketsPendientes.spec.ts`.
+- Tests vitest: `views/tickets/__tests__/` (filtros y estados, turno visible, decisión por caso, resolución, intento, **🆕 `decisionConvenio.spec.ts`**, `convenioTicket.spec.ts`) y `composables/__tests__/useTicketsPendientes.spec.ts`.
 
 ### Integración con Comercial → Dateos
 
@@ -465,8 +480,15 @@ Bandeja de tickets internos para todos los roles autenticados (salvo TURNERO); e
 - Bandeja y detalle: cualquier rol autenticado salvo TURNERO; el backend filtra (403 en el detalle si no es creador, comercial del ticket o resolutor). Otros roles (p. ej. CONTABILIDAD) ven la bandeja vacía.
 - Crear: `COMERCIAL, SUPER_ADMIN, GERENCIA` (`meta.roles` + backend).
 - Aprobar/Rechazar: `SUPER_ADMIN, GERENCIA` o `roles_resuelve` del tipo (gating dentro del componente, reforzado por el backend).
+- **🆕** Corregir convenio después de aprobar: `SUPER_ADMIN, GERENCIA` (backend); convenios no asignados en los buscadores: solo `SUPER_ADMIN, GERENCIA` (403 a los demás).
 - Estadísticas, exportar y contador de pendientes: `usePermissions.ts::verEstadisticasTickets()` → `SUPER_ADMIN, GERENCIA` (gating visual; el backend responde 403 a los demás).
 - Configurar ventana: `can.configurarVentanaTicket()` → `SUPER_ADMIN, GERENCIA` (leerla también pueden CONTABILIDAD y COMERCIAL en el backend).
+
+### Pendientes conocidos (2026-11-10)
+
+- **`TicketExcepcionDateoCreate.vue`** (líneas 514–518): gerencia elige el comercial solo entre `ASESOR_COMERCIAL` y `ASESOR_CONVENIO` (`listAgentesCaptacion` por tipo); los `ASESOR_TELEMERCADEO` quedan fuera, aunque el backend acepta tickets a su nombre.
+- **Buscador de convenios**: `limit` 50 sin aviso de que hay más resultados.
+- Backend: `busquedas_controller.ts:480` compara `tipo === 'TELEMERCADEO'` en vez de `ASESOR_TELEMERCADEO` (ver mapa del backend).
 
 ### Columnas sin uso (solo en la BD)
 
