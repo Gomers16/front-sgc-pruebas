@@ -324,6 +324,43 @@ export async function crearDateoAutoPorConvenio(body: CrearDateoAutoInput) {
   return post<unknown, CrearDateoPayload>(`${API}/captacion-dateos`, payload)
 }
 
+/* ===== Convenios para el ticket de Excepción de Dateo (búsqueda en el servidor) ===== */
+export interface ConvenioTicketOpcion {
+  id: number
+  nombre: string
+  establecimiento: string | null
+  /** false = no asignado al asesor (solo SUPER_ADMIN/GERENCIA lo ven). */
+  asignado: boolean
+}
+
+/**
+ * GET /convenios/asignados?asesor_id&q&limit&incluir_no_asignados.
+ * incluirNoAsignados solo para SUPER_ADMIN/GERENCIA (el backend responde 403
+ * a los demás): todos los activos, primero los asignados.
+ */
+export async function buscarConveniosParaTicket(
+  asesorId: number,
+  q = '',
+  o: { incluirNoAsignados?: boolean; limit?: number } = {},
+): Promise<ConvenioTicketOpcion[]> {
+  if (!asesorId) return []
+  const r = await get<unknown>(`${API}/convenios/asignados`, {
+    params: {
+      asesor_id: asesorId,
+      q: q.trim() || undefined,
+      limit: o.limit ?? 50,
+      incluir_no_asignados: o.incluirNoAsignados ? 1 : undefined,
+    },
+  })
+  const filas = Array.isArray(r) ? r : []
+  return filas.map((c: Record<string, unknown>) => ({
+    id: Number(c.id),
+    nombre: String(c.nombre ?? ''),
+    establecimiento: (c.establecimiento as string | null) ?? null,
+    asignado: c.asignado !== false,
+  }))
+}
+
 /* ===== Convenios asignados a un asesor comercial ===== */
 export async function listConveniosAsignados(asesorId: number): Promise<ConvenioSimple[]> {
   if (!asesorId) return []

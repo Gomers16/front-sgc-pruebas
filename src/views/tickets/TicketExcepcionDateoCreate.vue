@@ -43,7 +43,7 @@
                 </td>
               </tr>
               <tr>
-                <td class="text-medium-emphasis">Convenio</td>
+                <td class="text-medium-emphasis">Convenio del dateo</td>
                 <td>
                   <template v-if="intento.convenio_id">
                     {{ etiquetaConvenio({ nombre: intento.convenio_nombre ?? '—', establecimiento: intento.convenio_establecimiento }) }}
@@ -67,37 +67,11 @@
           </v-table>
         </v-card>
 
-        <!-- Sin datos del dateo (se entró por URL): se pide el convenio a mano. -->
+        <!-- Sin datos del dateo (se entró por URL): teléfono a mano. -->
         <template v-else>
           <v-alert type="info" variant="tonal" density="compact" class="mb-3">
-            No llegaron los datos del dateo. Indica si el cliente vino por un
-            convenio; si no, queda como nuevo directo.
+            No llegaron los datos del dateo. Indica abajo el convenio del cliente.
           </v-alert>
-          <v-alert
-            v-if="comercialEsAsesorConvenio"
-            type="info"
-            variant="outlined"
-            density="compact"
-            class="mb-3"
-          >
-            Es asesor convenio: el dateo queda con su propio convenio.
-          </v-alert>
-          <v-autocomplete
-            v-else
-            v-model="convenioFallbackId"
-            :items="conveniosFallback"
-            :item-title="etiquetaConvenio"
-            item-value="id"
-            label="Convenio"
-            placeholder="Sin convenio (nuevo directo)"
-            variant="outlined"
-            density="compact"
-            class="mb-2"
-            :loading="loadingConvenios"
-            clearable
-            hint="Solo los convenios asignados a este asesor"
-            persistent-hint
-          />
           <v-text-field
             v-model="telefonoFallback"
             label="Teléfono del cliente (opcional)"
@@ -106,6 +80,74 @@
             class="mb-4"
           />
         </template>
+
+        <!-- Convenio: decisión obligatoria (convenio o "Sin convenio (directo)"). -->
+        <div class="mb-4" data-test="decision-convenio">
+          <div class="text-subtitle-2 font-weight-bold mb-2">Convenio del cliente</div>
+          <v-alert
+            v-if="comercialEsAsesorConvenio"
+            type="info"
+            variant="outlined"
+            density="compact"
+          >
+            Es asesor convenio: el dateo queda con su propio convenio.
+          </v-alert>
+          <template v-else>
+            <v-autocomplete
+              v-model="convenioSel"
+              v-model:search="busquedaConvenio"
+              :items="opcionesConvenio"
+              :item-title="etiquetaOpcionConvenio"
+              item-value="id"
+              return-object
+              no-filter
+              label="Convenio"
+              placeholder="Busca por nombre o negocio"
+              variant="outlined"
+              density="compact"
+              :loading="loadingConvenios"
+              :disabled="sinConvenio || !agenteDelTicketId"
+              clearable
+              :hint="
+                puedeElegirComercial
+                  ? 'Primero los asignados al asesor; también puedes elegir otro convenio activo.'
+                  : 'Solo los convenios asignados a este asesor'
+              "
+              persistent-hint
+            />
+            <v-checkbox
+              v-model="sinConvenio"
+              label="Sin convenio (directo)"
+              color="primary"
+              density="compact"
+              hide-details
+              data-test="sin-convenio"
+            />
+            <v-alert
+              v-if="convenioSel?.asignado === false"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mt-2"
+            >
+              Este convenio no está asignado al asesor. Se permite y queda registrado en el
+              historial del ticket.
+            </v-alert>
+            <v-alert
+              v-if="sinConvenio && observacionMencionaConvenio(observacion)"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mt-2"
+            >
+              La observación menciona un convenio y marcaste "Sin convenio". Revísalo antes de
+              enviar.
+            </v-alert>
+            <div v-if="camposConvenio === null" class="text-caption text-error mt-1">
+              Elige el convenio o marca "Sin convenio (directo)".
+            </div>
+          </template>
+        </div>
 
         <v-textarea
           v-model="observacion"
@@ -213,12 +255,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/AuthStore'
 import { crearTicketExcepcionDateo } from '@/services/ticketsService'
 import { uploadImage } from '@/services/uploadsService'
-import {
-  listAgentesCaptacion,
-  listConveniosAsignados,
-  etiquetaConvenio,
-  type ConvenioSimple,
-} from '@/services/conveniosService'
+import { listAgentesCaptacion, etiquetaConvenio } from '@/services/conveniosService'
 import { HttpError } from '@/services/http'
 import { getMiFicha } from '@/services/asesoresService'
 import {
@@ -228,6 +265,13 @@ import {
   etiquetaCanalIntento,
   esConflictoSegundaVez,
 } from './intentoDateo'
+import {
+  camposConvenioCrear,
+  convenioElegido,
+  etiquetaOpcionConvenio,
+  observacionMencionaConvenio,
+} from './decisionConvenio'
+import { useBuscadorConvenios } from './useBuscadorConvenios'
 
 interface AgenteLight { id: number; nombre: string; tipo?: string }
 
@@ -250,35 +294,57 @@ const loadingAgentes = ref(false)
 const intento = leerIntentoDeHistorial(window.history.state)
 const comercialId = ref<number | null>(intento?.agente_id ?? null)
 
-// Fallback sin intento: convenio (de los asignados al asesor) y teléfono.
-const convenioFallbackId = ref<number | null>(null)
+// Fallback sin intento: teléfono a mano.
 const telefonoFallback = ref('')
-const conveniosFallback = ref<ConvenioSimple[]>([])
-const loadingConvenios = ref(false)
-// COMERCIAL: su propio agente (GET /agentes-captacion/me), solo para el fallback.
+// COMERCIAL: su propio agente (GET /agentes-captacion/me).
 const miAgente = ref<{ id: number; tipo?: string } | null>(null)
 const agenteDelTicket = computed(() =>
   puedeElegirComercial.value
     ? (agentes.value.find((a) => a.id === comercialId.value) ?? null)
     : miAgente.value
 )
-const agenteDelTicketId = computed(() => agenteDelTicket.value?.id ?? null)
-const comercialEsAsesorConvenio = computed(() => agenteDelTicket.value?.tipo === 'ASESOR_CONVENIO')
+const agenteDelTicketId = computed(() => agenteDelTicket.value?.id ?? intento?.agente_id ?? null)
+const comercialEsAsesorConvenio = computed(
+  () => agenteDelTicket.value?.tipo === 'ASESOR_CONVENIO' || intento?.canal === 'ASESOR_CONVENIO'
+)
 
-async function cargarConveniosFallback() {
-  convenioFallbackId.value = null
-  conveniosFallback.value = []
-  if (intento || !agenteDelTicketId.value) return
-  loadingConvenios.value = true
-  try {
-    conveniosFallback.value = await listConveniosAsignados(agenteDelTicketId.value)
-  } catch (err) {
-    console.error('Error cargando convenios asignados:', err)
-  } finally {
-    loadingConvenios.value = false
+/* Convenio: obligatorio decidir (convenio o "Sin convenio (directo)"). Búsqueda
+   en el servidor; SUPER_ADMIN/GERENCIA ven también los no asignados. */
+const {
+  seleccionado: convenioSel,
+  busqueda: busquedaConvenio,
+  items: opcionesConvenio,
+  cargando: loadingConvenios,
+} = useBuscadorConvenios(agenteDelTicketId, puedeElegirComercial)
+const sinConvenio = ref(false)
+// El convenio del dateo viene elegido (se puede cambiar); sin convenio en el
+// dateo no se marca solo: alguien tiene que decidirlo.
+if (intento?.convenio_id) {
+  convenioSel.value = {
+    id: intento.convenio_id,
+    nombre: intento.convenio_nombre ?? `convenio #${intento.convenio_id}`,
+    establecimiento: intento.convenio_establecimiento,
+    asignado: true,
   }
 }
-watch(agenteDelTicketId, cargarConveniosFallback)
+watch(sinConvenio, (v) => {
+  if (v) convenioSel.value = null
+})
+watch(convenioSel, (v) => {
+  if (v) sinConvenio.value = false
+})
+// Cambió el comercial (solo sin intento): la decisión era para el otro.
+watch(agenteDelTicketId, () => {
+  if (intento) return
+  convenioSel.value = null
+  sinConvenio.value = false
+})
+const camposConvenio = computed(() =>
+  camposConvenioCrear(
+    convenioElegido(convenioSel.value?.id, sinConvenio.value),
+    comercialEsAsesorConvenio.value
+  )
+)
 
 const observacion = ref('')
 const enviando = ref(false)
@@ -373,6 +439,7 @@ const puedeEnviar = computed(() => {
   if (!observacion.value.trim()) return false
   if (!evidencias.chat.url || !evidencias.whatsapp.url || !evidencias.bloqueo.url) return false
   if (puedeElegirComercial.value && !comercialId.value) return false
+  if (camposConvenio.value === null) return false
   if (Object.values(evidencias).some((e) => e.uploading)) return false
   return true
 })
@@ -392,10 +459,8 @@ async function enviar() {
       evidencia_calamidad_url: evidencias.calamidad.url,
       ...(intento
         ? camposIntentoParaTicket(intento)
-        : camposFallbackParaTicket(
-            comercialEsAsesorConvenio.value ? null : convenioFallbackId.value,
-            telefonoFallback.value
-          )),
+        : camposFallbackParaTicket(null, telefonoFallback.value)),
+      ...camposConvenio.value,
     })
     router.push({ name: 'TicketDetalle', params: { id: ticket.id } }).catch(() => {})
   } catch (err) {
@@ -413,7 +478,7 @@ async function enviar() {
 
 onMounted(async () => {
   window.addEventListener('paste', onPaste)
-  if (!intento && !puedeElegirComercial.value) {
+  if (!puedeElegirComercial.value) {
     try {
       const yo = await getMiFicha()
       miAgente.value = { id: yo.id, tipo: yo.tipo ?? undefined }

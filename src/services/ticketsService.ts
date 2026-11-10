@@ -55,6 +55,10 @@ export interface Ticket {
   detalle?: TicketDetalleExcepcionDateo | null
   /** Solo en GET /tickets/:id de EXCEPCION_DATEO: caso que aplica (o aplicó) aprobar(). */
   caso_comision?: CasoComision | null
+  /** Solo en GET /tickets/:id de EXCEPCION_DATEO: la observación dice "convenio". */
+  observacion_menciona_convenio?: boolean
+  /** Solo en GET /tickets/:id: convenio asignado al comercial (null = no aplica). */
+  convenio_asignado?: boolean | null
   /** Solo en GET /tickets/:id: línea de tiempo. */
   eventos?: EventoTicket[]
   /** Solo en GET /tickets (bandeja). */
@@ -107,6 +111,12 @@ export interface TicketDetalleExcepcionDateo {
   convenioId: number | null
   /** Convenio con el que se pidió el ticket (si gerencia lo corrige, convenioId cambia). */
   convenioIdOriginal: number | null
+  /**
+   * Decisión del convenio: true = sin convenio elegido (al crear o confirmado
+   * al aprobar), false = con convenio, null = nadie decidió (ticket anterior
+   * o de producción local). TINYINT(1): puede llegar 0/1.
+   */
+  sinConvenioExplicito?: boolean | number | null
   /** Intento de dateo; null en tickets anteriores a 2026-10. */
   canal: string | null
   servicioId: number | null
@@ -292,6 +302,8 @@ export interface CrearTicketExcepcionDateoPayload {
   es_avance?: boolean
   comprobante_avance_url?: string | null
   telefono?: string | null
+  /** "Sin convenio (directo)": obligatorio si no hay convenio_id (salvo asesor convenio). */
+  sin_convenio?: boolean
 }
 
 export function crearTicketExcepcionDateo(payload: CrearTicketExcepcionDateoPayload) {
@@ -312,18 +324,22 @@ export interface AprobarTicketExcepcionDateoResponse {
   conComisionAsesor: boolean | null
   conComisionConvenio: boolean | null
   convenioCorregido: boolean
+  convenioNoAsignado?: boolean
+  sinConvenioConfirmado?: boolean
 }
 
 /**
  * Body de PATCH /aprobar. Fuera de ventana: con_comision_asesor siempre y
  * con_comision_convenio en Caso 2/3 (ver decisionComision.ts). Dentro de
  * ventana se manda vacío. convenio_id solo si gerencia corrige el convenio
- * (null = sin convenio).
+ * (null = sin convenio). confirmar_sin_convenio: el ticket queda sin
+ * convenio y nadie lo decidió al crear (si falta, 409 CONFIRMAR_SIN_CONVENIO).
  */
 export interface AprobarTicketBody {
   con_comision_asesor?: boolean
   con_comision_convenio?: boolean
   convenio_id?: number | null
+  confirmar_sin_convenio?: boolean
 }
 
 export function aprobarTicketExcepcionDateo(id: number, body: AprobarTicketBody = {}) {

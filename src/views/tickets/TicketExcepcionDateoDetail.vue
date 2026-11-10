@@ -173,29 +173,74 @@
           <template v-else-if="ticket.estado === 'PENDIENTE' && esResolutor">
             <div class="text-subtitle-2 font-weight-bold mb-2">Resolver ticket</div>
 
-            <!-- Corregir el convenio (solo comercial: el asesor convenio queda con el suyo) -->
-            <div v-if="ticket.caso_comision !== 'CONVENIO_SELF'" class="mb-3">
-              <v-switch
-                v-model="corregirConvenio"
-                color="primary"
-                density="compact"
-                hide-details
-                label="Corregir el convenio antes de aprobar"
-              />
-              <v-autocomplete
-                v-if="corregirConvenio"
-                v-model="convenioCorregidoId"
-                :items="opcionesConvenio"
-                :item-title="(c: OpcionConvenio) => c.etiqueta"
-                item-value="id"
-                label="Convenio con el que se aprueba"
+            <!-- Convenio con el que se aprueba: visible y editable (el asesor convenio queda con el suyo) -->
+            <div class="mb-3" data-test="convenio-aprobar">
+              <div class="text-subtitle-2 font-weight-bold mb-2">Convenio</div>
+              <v-alert
+                v-if="ticket.caso_comision === 'CONVENIO_SELF'"
+                type="info"
                 variant="outlined"
                 density="compact"
-                class="mt-2"
-                :loading="cargandoConvenios"
-                hint="Solo los convenios asignados al asesor. El original queda registrado."
-                persistent-hint
-              />
+              >
+                Asesor convenio: se aprueba con su propio convenio.
+              </v-alert>
+              <template v-else>
+                <v-autocomplete
+                  v-model="convenioSel"
+                  v-model:search="busquedaConvenio"
+                  :items="opcionesConvenio"
+                  :item-title="etiquetaOpcionConvenio"
+                  item-value="id"
+                  return-object
+                  no-filter
+                  label="Convenio con el que se aprueba"
+                  placeholder="Busca por nombre o negocio"
+                  variant="outlined"
+                  density="compact"
+                  :loading="cargandoConvenios"
+                  :disabled="sinConvenioMarcado"
+                  clearable
+                  hint="Primero los asignados al asesor. Si lo cambias, el original queda registrado."
+                  persistent-hint
+                />
+                <v-checkbox
+                  v-model="sinConvenioMarcado"
+                  :label="
+                    sinConvenioDecidido(detalle.sinConvenioExplicito)
+                      ? 'Sin convenio (directo)'
+                      : 'Confirmo: sin convenio (directo)'
+                  "
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  data-test="sin-convenio-aprobar"
+                />
+                <v-alert
+                  v-if="avisoObservacion"
+                  type="warning"
+                  variant="tonal"
+                  density="compact"
+                  class="mt-2"
+                  data-test="aviso-observacion-convenio"
+                >
+                  La observación menciona un convenio y el ticket está sin convenio. Revisa
+                  la observación antes de aprobar.
+                </v-alert>
+                <v-alert
+                  v-if="convenioSel?.asignado === false"
+                  type="warning"
+                  variant="tonal"
+                  density="compact"
+                  class="mt-2"
+                  data-test="aviso-no-asignado"
+                >
+                  Este convenio no está asignado al asesor. Se permite y queda registrado en el
+                  historial.
+                </v-alert>
+                <div v-if="camposConvenio === null" class="text-caption text-error mt-1">
+                  Elige el convenio o marca "Sin convenio (directo)".
+                </div>
+              </template>
             </div>
 
             <v-card
@@ -215,6 +260,13 @@
                 class="text-caption text-medium-emphasis mt-1"
               >
                 Sin convenio: solo se decide la comisión del asesor.
+              </div>
+              <div
+                v-if="textoReglaDescuentoConvenio(casoEfectivo)"
+                class="text-caption text-medium-emphasis mt-1"
+                data-test="regla-descuento-convenio"
+              >
+                {{ textoReglaDescuentoConvenio(casoEfectivo) }}
               </div>
 
               <div class="mt-3">
@@ -266,7 +318,7 @@
                 variant="flat"
                 prepend-icon="mdi-check"
                 :loading="aprobando"
-                :disabled="corregirConvenio && convenioCorregidoId === undefined"
+                :disabled="camposConvenio === null"
                 data-test="btn-aprobar"
                 @click="confirmando = true"
               >
@@ -373,9 +425,12 @@
         <v-card-title class="text-subtitle-1 font-weight-bold">{{ decision.titulo }}</v-card-title>
         <v-card-text>
           {{ decision.mensaje }}
-          <div v-if="corregirConvenio" class="mt-2">
-            <strong>Convenio:</strong> {{ etiquetaConvenioCorregido }} (el original queda
+          <div v-if="camposConvenio && 'convenio_id' in camposConvenio" class="mt-2">
+            <strong>Convenio:</strong> {{ etiquetaConvenioElegido }} (el original queda
             registrado).
+          </div>
+          <div v-else-if="camposConvenio?.confirmar_sin_convenio" class="mt-2">
+            <strong>Convenio:</strong> sin convenio (directo), confirmado ahora.
           </div>
         </v-card-text>
         <v-card-actions class="justify-end">
@@ -446,12 +501,7 @@ import {
   type UsuarioLight,
 } from '@/services/ticketsService'
 import { formatDateTime } from '@/services/dateosService'
-import {
-  etiquetaConvenio,
-  getConvenio,
-  listConveniosAsignados,
-  listConveniosLight,
-} from '@/services/conveniosService'
+import { etiquetaConvenio, getConvenio, listConveniosLight } from '@/services/conveniosService'
 import { HttpError } from '@/services/http'
 import { usePermissions } from '@/composables/usePermissions'
 import { useTicketsPendientes } from '@/composables/useTicketsPendientes'
@@ -469,6 +519,15 @@ import {
   decisionAprobacion,
   mensajeErrorResolucion,
 } from './decisionComision'
+import {
+  avisoConvenioEnObservacion,
+  camposConvenioAprobar,
+  convenioElegido,
+  etiquetaOpcionConvenio,
+  sinConvenioDecidido,
+  textoReglaDescuentoConvenio,
+} from './decisionConvenio'
+import { useBuscadorConvenios } from './useBuscadorConvenios'
 
 const props = defineProps<{ id: string | number }>()
 const router = useRouter()
@@ -571,41 +630,64 @@ const textoDecision = computed(() => {
   return textoResolucion(resolucionComision(d), ticket.value?.caso_comision ?? null)
 })
 
-/* ═══════════ Corrección de convenio al aprobar ═══════════ */
-interface OpcionConvenio {
-  id: number | null
-  etiqueta: string
-}
-const corregirConvenio = ref(false)
-// undefined = todavía no eligió; null = sin convenio.
-const convenioCorregidoId = ref<number | null | undefined>(undefined)
-const opcionesConvenio = ref<OpcionConvenio[]>([])
-const cargandoConvenios = ref(false)
-
-watch(corregirConvenio, async (activo) => {
-  convenioCorregidoId.value = undefined
-  if (!activo || !detalle.value || opcionesConvenio.value.length) return
-  cargandoConvenios.value = true
-  try {
-    const asignados = await listConveniosAsignados(detalle.value.comercialId)
-    opcionesConvenio.value = [
-      { id: null, etiqueta: 'Sin convenio (nuevo directo)' },
-      ...asignados.map((c) => ({ id: c.id, etiqueta: etiquetaConvenio(c) })),
-    ]
-  } finally {
-    cargandoConvenios.value = false
-  }
+/* ═══════════ Convenio al aprobar: visible, editable y obligatorio de decidir ═══════════ */
+// Solo resolutores (SUPER_ADMIN/GERENCIA): ven también los no asignados.
+const comercialDelTicketId = computed(() =>
+  ticket.value?.estado === 'PENDIENTE' && esResolutor.value
+    ? (detalle.value?.comercialId ?? null)
+    : null,
+)
+const {
+  seleccionado: convenioSel,
+  busqueda: busquedaConvenio,
+  items: opcionesConvenio,
+  cargando: cargandoConvenios,
+} = useBuscadorConvenios(comercialDelTicketId, ref(true))
+const sinConvenioMarcado = ref(false)
+watch(sinConvenioMarcado, (v) => {
+  if (v) convenioSel.value = null
+})
+watch(convenioSel, (v) => {
+  if (v) sinConvenioMarcado.value = false
 })
 
-const etiquetaConvenioCorregido = computed(
-  () => opcionesConvenio.value.find((c) => c.id === convenioCorregidoId.value)?.etiqueta ?? '—',
+/** Al cargar: el convenio actual elegido; sin convenio decidido al crear, marcado. */
+function iniciarConvenioAprobar() {
+  const d = detalle.value
+  convenioSel.value = d?.convenio
+    ? {
+        id: d.convenio.id,
+        nombre: d.convenio.nombre,
+        establecimiento: d.convenio.establecimiento ?? null,
+        asignado: ticket.value?.convenio_asignado !== false,
+      }
+    : null
+  sinConvenioMarcado.value = !d?.convenio && sinConvenioDecidido(d?.sinConvenioExplicito)
+}
+
+const elegido = computed(() => convenioElegido(convenioSel.value?.id, sinConvenioMarcado.value))
+const convenioActual = computed(() => detalle.value?.convenioId ?? null)
+// null = falta decidir (no se puede aprobar).
+const camposConvenio = computed(() =>
+  camposConvenioAprobar({
+    caso: ticket.value?.caso_comision ?? null,
+    convenioActual: convenioActual.value,
+    elegido: elegido.value,
+    sinConvenioExplicito: detalle.value?.sinConvenioExplicito,
+  }),
+)
+const avisoObservacion = computed(() =>
+  avisoConvenioEnObservacion(Boolean(ticket.value?.observacion_menciona_convenio), elegido.value),
+)
+const etiquetaConvenioElegido = computed(() =>
+  convenioSel.value ? etiquetaOpcionConvenio(convenioSel.value) : 'sin convenio (directo)',
 )
 
-// El caso cambia si gerencia corrige el convenio (casoConConvenioCorregido).
+// El caso cambia si gerencia cambia el convenio (casoConConvenioCorregido).
 const casoEfectivo = computed<CasoComision | null>(() =>
   casoConConvenioCorregido(
     ticket.value?.caso_comision ?? null,
-    corregirConvenio.value ? convenioCorregidoId.value : undefined,
+    elegido.value !== undefined && elegido.value !== convenioActual.value ? elegido.value : undefined,
   ),
 )
 
@@ -727,6 +809,7 @@ async function cargar() {
     const data = await getTicket(Number(props.id))
     ticket.value = data
     detalle.value = data.detalle ?? null
+    iniciarConvenioAprobar()
     cargarNombresConvenio()
   } catch (err) {
     ticket.value = null
@@ -745,13 +828,10 @@ async function aprobar() {
   if (!ticket.value) return
   aprobando.value = true
   try {
-    const body = { ...decision.value.body }
-    if (corregirConvenio.value && convenioCorregidoId.value !== undefined) {
-      body.convenio_id = convenioCorregidoId.value
-    }
+    if (camposConvenio.value === null) return
+    const body = { ...decision.value.body, ...camposConvenio.value }
     await aprobarTicketExcepcionDateo(ticket.value.id, body)
     confirmando.value = false
-    corregirConvenio.value = false
     snackbar.value = { show: true, color: 'success', text: 'Ticket aprobado correctamente.' }
     await cargar()
     refrescarPendientes()
