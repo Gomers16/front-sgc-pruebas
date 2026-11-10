@@ -72,7 +72,13 @@
                 <template v-else>Sin convenio (nuevo directo)</template>
               </div>
               <div v-if="convenioFueCorregido" class="text-caption text-warning">
-                {{ textoConvenioCorregido(detalle.convenioIdOriginal ?? null, nombresConvenio) }}
+                {{
+                  textoConvenioCorregido(
+                    detalle.convenioIdOriginal ?? null,
+                    nombresConvenio,
+                    corregidoDespuesDeAprobar,
+                  )
+                }}
               </div>
             </v-col>
             <v-col cols="12" sm="6">
@@ -160,6 +166,26 @@
               Aprobado por {{ nombreUsuario(detalle.aprobadoPor) }} el
               {{ formatDateTime(detalle.aprobadoAt) }} · <strong>{{ textoDecision }}</strong>
             </v-alert>
+            <!-- Corrección posterior del convenio: solo con la comisión PENDIENTE -->
+            <div
+              v-if="esResolutor && ticket.caso_comision !== 'CONVENIO_SELF'"
+              class="d-flex align-center flex-wrap ga-2 mt-3"
+              data-test="corregir-convenio"
+            >
+              <v-btn
+                size="small"
+                variant="outlined"
+                color="primary"
+                prepend-icon="mdi-swap-horizontal"
+                :disabled="!correccionPermitida.puede"
+                @click="abrirCorreccion"
+              >
+                Corregir convenio
+              </v-btn>
+              <span v-if="!correccionPermitida.puede" class="text-caption text-medium-emphasis">
+                {{ correccionPermitida.motivo }}
+              </span>
+            </div>
           </template>
           <template v-else-if="ticket.estado === 'RECHAZADO'">
             <v-alert type="error" variant="tonal" density="compact">
@@ -446,6 +472,182 @@
       </v-card>
     </v-dialog>
 
+    <!-- Corregir el convenio de un ticket aprobado (vista previa con el mismo cálculo) -->
+    <v-dialog v-model="corrigiendo" max-width="600" scrollable>
+      <v-card v-if="ticket && detalle" data-test="dialogo-corregir-convenio">
+        <v-card-title class="text-subtitle-1 font-weight-bold titulo"
+          >Corregir el convenio de un ticket aprobado</v-card-title
+        >
+        <v-card-text>
+          <div class="text-caption text-medium-emphasis mb-3">
+            Actual:
+            <strong>{{
+              detalle.convenio ? etiquetaConvenio(detalle.convenio) : 'sin convenio (directo)'
+            }}</strong>
+            · {{ etiquetaCaso(ticket.caso_comision ?? null) }}
+          </div>
+          <v-autocomplete
+            v-model="corrSel"
+            v-model:search="corrBusqueda"
+            :items="corrOpciones"
+            :item-title="etiquetaOpcionConvenio"
+            item-value="id"
+            return-object
+            no-filter
+            label="Convenio correcto"
+            placeholder="Busca por nombre o negocio"
+            variant="outlined"
+            density="compact"
+            :loading="corrCargando"
+            :disabled="corrSinConvenio"
+            clearable
+            hint="Primero los asignados al asesor."
+            persistent-hint
+          />
+          <v-checkbox
+            v-model="corrSinConvenio"
+            label="Sin convenio (directo)"
+            color="primary"
+            density="compact"
+            hide-details
+          />
+          <v-alert
+            v-if="corrElegido !== undefined && !corrCambia"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-2"
+          >
+            Es el convenio que ya tiene el ticket.
+          </v-alert>
+          <v-alert
+            v-if="corrSel?.asignado === false"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-2"
+          >
+            Este convenio no está asignado al asesor. Se permite y queda registrado en el
+            historial.
+          </v-alert>
+
+          <template v-if="casoCorr">
+            <div class="text-subtitle-2 font-weight-bold mt-4">Decisión de comisión</div>
+            <div class="text-caption text-medium-emphasis">
+              La que se tomó al aprobar; puedes cambiarla para el caso nuevo.
+            </div>
+            <div class="mt-2">
+              <div v-for="i in interruptoresCorr" :key="i.clave" class="interruptor">
+                <span class="text-body-2 font-weight-medium">{{ i.etiqueta }}</span>
+                <v-btn-toggle
+                  :model-value="i.cobra ? 'cobra' : 'no'"
+                  mandatory
+                  divided
+                  density="compact"
+                  variant="outlined"
+                  rounded="lg"
+                  :color="i.cobra ? 'success' : 'error'"
+                  @update:model-value="(v: string) => i.cambiar(v === 'cobra')"
+                >
+                  <v-btn value="cobra" prepend-icon="mdi-check" size="small">Cobra</v-btn>
+                  <v-btn value="no" prepend-icon="mdi-close" size="small">No cobra</v-btn>
+                </v-btn-toggle>
+              </div>
+            </div>
+            <div
+              v-if="textoReglaDescuentoConvenio(casoCorr)"
+              class="text-caption text-medium-emphasis mt-1"
+            >
+              {{ textoReglaDescuentoConvenio(casoCorr) }}
+            </div>
+          </template>
+
+          <!-- Vista previa: POST /convenio/simular (mismo motor, sin guardar) -->
+          <div v-if="bodyCorr" class="mt-4" data-test="vista-previa-correccion">
+            <div class="text-subtitle-2 font-weight-bold mb-1">Qué cambia</div>
+            <v-progress-linear v-if="simulando" indeterminate color="primary" class="mb-2" />
+            <v-alert v-if="errorVista" type="error" variant="tonal" density="compact">
+              {{ errorVista }}
+            </v-alert>
+            <template v-else-if="vista">
+              <div class="text-caption mb-1">
+                {{ etiquetaCaso(vista.caso_anterior) }} → <strong>{{ etiquetaCaso(vista.caso_nuevo) }}</strong>
+              </div>
+              <v-table v-if="vista.montos_antes && vista.montos_despues" density="compact">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th class="text-right">Antes</th>
+                    <th class="text-right">Después</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Asesor</td>
+                    <td class="text-right">{{ formatCOP(vista.montos_antes.monto_asesor) }}</td>
+                    <td class="text-right">{{ formatCOP(vista.montos_despues.monto_asesor) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Convenio</td>
+                    <td class="text-right">{{ formatCOP(vista.montos_antes.monto_convenio) }}</td>
+                    <td class="text-right">{{ formatCOP(vista.montos_despues.monto_convenio) }}</td>
+                  </tr>
+                </tbody>
+              </v-table>
+              <div v-if="vista.montos_despues" class="text-caption text-medium-emphasis mt-1">
+                {{ vista.montos_despues.regla_aplicada }}
+              </div>
+              <v-alert
+                v-if="vista.comision_id === null"
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mt-2"
+              >
+                Todavía no hay comisión: se calculará con este convenio cuando se confirme la
+                factura.
+              </v-alert>
+              <v-alert
+                v-if="vista.convenio_en_cero_por_descuento"
+                type="warning"
+                variant="tonal"
+                density="compact"
+                class="mt-2"
+                data-test="aviso-convenio-cero-descuento"
+              >
+                La factura tiene un descuento: por la regla del motor la comisión del convenio
+                queda en $0.
+              </v-alert>
+            </template>
+          </div>
+
+          <v-textarea
+            v-model="corrMotivo"
+            label="Motivo de la corrección"
+            variant="outlined"
+            density="compact"
+            rows="2"
+            auto-grow
+            class="mt-4"
+            hide-details="auto"
+          />
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="corrigiendo = false">Cancelar</v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="guardandoCorreccion"
+            :disabled="!bodyCorr || !corrMotivo.trim() || simulando || !!errorVista"
+            data-test="btn-guardar-correccion"
+            @click="guardarCorreccion"
+          >
+            Guardar corrección
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Rechazar -->
     <v-dialog v-model="mostrarRechazo" max-width="480">
       <v-card>
@@ -492,6 +694,10 @@ import {
   agregarComentario,
   aprobarTicketExcepcionDateo,
   rechazarTicketExcepcionDateo,
+  corregirConvenioTicket,
+  simularCorreccionConvenio,
+  type CorreccionConvenioResponse,
+  type CorregirConvenioBody,
   type CasoComision,
   type EventoTicket,
   type Ticket,
@@ -501,6 +707,7 @@ import {
   type UsuarioLight,
 } from '@/services/ticketsService'
 import { formatDateTime } from '@/services/dateosService'
+import { formatCOP } from '@/services/comisionesService'
 import { etiquetaConvenio, getConvenio, listConveniosLight } from '@/services/conveniosService'
 import { HttpError } from '@/services/http'
 import { usePermissions } from '@/composables/usePermissions'
@@ -522,8 +729,11 @@ import {
 import {
   avisoConvenioEnObservacion,
   camposConvenioAprobar,
+  casoTrasCorreccion,
+  cobraGuardado,
   convenioElegido,
   etiquetaOpcionConvenio,
+  puedeCorregirConvenio,
   sinConvenioDecidido,
   textoReglaDescuentoConvenio,
 } from './decisionConvenio'
@@ -624,6 +834,13 @@ const convenioFueCorregido = computed(() => {
   return (d.convenioIdOriginal ?? null) !== (d.convenioId ?? null)
 })
 
+const corregidoDespuesDeAprobar = computed(
+  () =>
+    ticket.value?.eventos?.some(
+      (e) => e.tipo === 'CONVENIO_CORREGIDO' && e.datos?.momento === 'POST_APROBACION',
+    ) ?? false,
+)
+
 const textoDecision = computed(() => {
   const d = detalle.value
   if (!d) return ''
@@ -723,6 +940,128 @@ const interruptores = computed(() => {
   return lista
 })
 
+/* ═══════════ Corrección del convenio después de aprobar ═══════════ */
+const correccionPermitida = computed(() => puedeCorregirConvenio(ticket.value?.comision_ticket))
+const corrigiendo = ref(false)
+const guardandoCorreccion = ref(false)
+const asesorCorreccionId = computed(() =>
+  corrigiendo.value ? (detalle.value?.comercialId ?? null) : null,
+)
+const {
+  seleccionado: corrSel,
+  busqueda: corrBusqueda,
+  items: corrOpciones,
+  cargando: corrCargando,
+} = useBuscadorConvenios(asesorCorreccionId, ref(true))
+const corrSinConvenio = ref(false)
+watch(corrSinConvenio, (v) => {
+  if (v) corrSel.value = null
+})
+watch(corrSel, (v) => {
+  if (v) corrSinConvenio.value = false
+})
+const corrCobraAsesor = ref(true)
+const corrCobraConvenio = ref(true)
+const corrMotivo = ref('')
+const corrElegido = computed(() => convenioElegido(corrSel.value?.id, corrSinConvenio.value))
+const corrCambia = computed(
+  () => corrElegido.value !== undefined && corrElegido.value !== (detalle.value?.convenioId ?? null),
+)
+const casoCorr = computed(() => (corrCambia.value ? casoTrasCorreccion(corrElegido.value) : null))
+const interruptoresCorr = computed(() => {
+  const lista = [
+    {
+      clave: 'asesor',
+      etiqueta: 'Comisión del asesor',
+      cobra: corrCobraAsesor.value,
+      cambiar: (v: boolean) => (corrCobraAsesor.value = v),
+    },
+  ]
+  if (casoCorr.value === 'CONVENIO_COMERCIAL') {
+    lista.push({
+      clave: 'convenio',
+      etiqueta: 'Comisión del convenio',
+      cobra: corrCobraConvenio.value,
+      cambiar: (v: boolean) => (corrCobraConvenio.value = v),
+    })
+  }
+  return lista
+})
+// null = nada que corregir todavía. Flags explícitos: los interruptores.
+const bodyCorr = computed<CorregirConvenioBody | null>(() => {
+  if (!corrCambia.value) return null
+  const flags = decisionAprobacion(
+    casoCorr.value,
+    corrCobraAsesor.value,
+    corrCobraConvenio.value,
+  ).body
+  return { convenio_id: corrElegido.value as number | null, ...flags }
+})
+
+function abrirCorreccion() {
+  corrSel.value = null
+  corrSinConvenio.value = false
+  corrMotivo.value = ''
+  vista.value = null
+  errorVista.value = null
+  corrCobraAsesor.value = cobraGuardado(detalle.value?.conComisionAsesor)
+  corrCobraConvenio.value = cobraGuardado(detalle.value?.conComisionConvenio)
+  corrigiendo.value = true
+}
+
+function mensajeError(err: unknown, porDefecto: string): string {
+  const data = err instanceof HttpError ? (err.data as { message?: string } | undefined) : undefined
+  return data?.message || porDefecto
+}
+
+// Vista previa: el mismo cálculo del backend, sin guardar.
+const vista = ref<CorreccionConvenioResponse | null>(null)
+const errorVista = ref<string | null>(null)
+const simulando = ref(false)
+let pedidoVista = 0
+watch(bodyCorr, async (body) => {
+  vista.value = null
+  errorVista.value = null
+  const id = ticket.value?.id
+  if (!body || !id) return
+  const mio = ++pedidoVista
+  simulando.value = true
+  try {
+    const r = await simularCorreccionConvenio(id, body)
+    if (mio === pedidoVista) vista.value = r
+  } catch (err) {
+    if (mio === pedidoVista) errorVista.value = mensajeError(err, 'No se pudo calcular la corrección.')
+  } finally {
+    if (mio === pedidoVista) simulando.value = false
+  }
+})
+
+async function guardarCorreccion() {
+  if (!ticket.value || !bodyCorr.value || !corrMotivo.value.trim()) return
+  guardandoCorreccion.value = true
+  try {
+    await corregirConvenioTicket(ticket.value.id, {
+      ...bodyCorr.value,
+      motivo: corrMotivo.value.trim(),
+    })
+    corrigiendo.value = false
+    snackbar.value = { show: true, color: 'success', text: 'Convenio corregido.' }
+    await cargar()
+  } catch (err) {
+    snackbar.value = {
+      show: true,
+      color: 'error',
+      text: mensajeError(err, 'No se pudo corregir el convenio.'),
+    }
+    if (err instanceof HttpError && err.status === 409) {
+      corrigiendo.value = false
+      await cargar()
+    }
+  } finally {
+    guardandoCorreccion.value = false
+  }
+}
+
 /* ═══════════ Línea de tiempo ═══════════ */
 const EVENTO: Record<TipoEventoTicket, { texto: string; icono: string; color: string }> = {
   CREADO: { texto: 'Ticket creado', icono: 'mdi-plus', color: 'primary' },
@@ -750,11 +1089,10 @@ function detalleEvento(e: EventoTicket): string {
   }
   if (e.tipo === 'RECHAZADO') return d.motivo ? `Motivo: ${d.motivo}` : ''
   if (e.tipo === 'CONVENIO_CORREGIDO') {
-    return textoEventoConvenioCorregido(
-      d.convenio_anterior_id,
-      d.convenio_nuevo_id,
-      nombresConvenio.value,
-    )
+    return textoEventoConvenioCorregido(d.convenio_anterior_id, d.convenio_nuevo_id, nombresConvenio.value, {
+      momento: d.momento,
+      motivo: d.motivo,
+    })
   }
   if (e.tipo === 'COMENTARIO') {
     const c = ticket.value?.comentarios?.find((x) => x.id === Number(d.comentario_id))

@@ -28,6 +28,9 @@ describe('convenio del ticket por nombre', () => {
     expect(textoConvenioCorregido(1450, nombres)).toBe(
       'Corregido por gerencia al aprobar (se pidió con QAT FABIO CONVENIO · PARQUEADERO).',
     )
+    expect(textoConvenioCorregido(null, nombres, true)).toBe(
+      'Corregido por gerencia después de aprobar (se pidió sin convenio).',
+    )
   })
 
   it('evento CONVENIO_CORREGIDO de la línea de tiempo', () => {
@@ -36,6 +39,14 @@ describe('convenio del ticket por nombre', () => {
     )
     expect(textoEventoConvenioCorregido(1449, null, nombres)).toBe(
       'De QAT ELENA CONVENIO TALLER a sin convenio',
+    )
+    expect(
+      textoEventoConvenioCorregido(null, 1449, nombres, {
+        momento: 'POST_APROBACION',
+        motivo: ' La observación decía convenio ',
+      }),
+    ).toBe(
+      'De sin convenio a QAT ELENA CONVENIO TALLER · después de aprobar · Motivo: La observación decía convenio',
     )
   })
 

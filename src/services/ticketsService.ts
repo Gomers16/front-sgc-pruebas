@@ -59,6 +59,8 @@ export interface Ticket {
   observacion_menciona_convenio?: boolean
   /** Solo en GET /tickets/:id: convenio asignado al comercial (null = no aplica). */
   convenio_asignado?: boolean | null
+  /** Solo en GET /tickets/:id de un ticket APROBADO: su comisión RTM (null = sin dateo). */
+  comision_ticket?: ComisionTicketResumen | null
   /** Solo en GET /tickets/:id: línea de tiempo. */
   eventos?: EventoTicket[]
   /** Solo en GET /tickets (bandeja). */
@@ -384,6 +386,69 @@ export function setVentanaTicketAsesor(asesorId: number, minutosVentana: number 
 
 export function deleteVentanaTicketAsesor(id: number) {
   return del<{ message: string }>(`/api/tickets/config/ventana/asesores/${id}`)
+}
+
+/* ===================== Corrección del convenio después de aprobar ===================== */
+
+/** Comisión RTM del ticket aprobado; id null = todavía no hay comisión. */
+export interface ComisionTicketResumen {
+  id: number | null
+  estado: string | null
+  en_liquidacion: boolean
+  monto_asesor: number | null
+  monto_convenio: number | null
+}
+
+export interface MontosComisionCorreccion {
+  asesor_id: number | null
+  convenio_id: number | null
+  asesor_secundario_id: number | null
+  monto: number
+  monto_asesor: number
+  monto_convenio: number
+  regla_aplicada: string | null
+}
+
+/** Respuesta de PATCH /convenio y de /convenio/simular (= datos del evento CONVENIO_CORREGIDO). */
+export interface CorreccionConvenioResponse {
+  momento: 'POST_APROBACION'
+  convenio_anterior_id: number | null
+  convenio_nuevo_id: number | null
+  caso_anterior: CasoComision
+  caso_nuevo: CasoComision
+  con_comision_asesor: boolean | null
+  con_comision_convenio: boolean | null
+  comision_id: number | null
+  montos_antes: MontosComisionCorreccion | null
+  montos_despues: MontosComisionCorreccion | null
+  convenio_no_asignado: boolean
+  /** Regla del motor: con convenio, cualquier descuento final deja al convenio en $0. */
+  convenio_en_cero_por_descuento: boolean | null
+  motivo: string | null
+  simulado: boolean
+}
+
+export interface CorregirConvenioBody {
+  convenio_id: number | null
+  motivo?: string
+  con_comision_asesor?: boolean
+  con_comision_convenio?: boolean
+}
+
+/** Solo SUPER_ADMIN/GERENCIA; 409 COMISION_NO_EDITABLE si la comisión no está PENDIENTE. */
+export function corregirConvenioTicket(id: number, body: CorregirConvenioBody) {
+  return patch<CorreccionConvenioResponse, CorregirConvenioBody>(
+    `/api/tickets-excepcion-dateo/${id}/convenio`,
+    body
+  )
+}
+
+/** Mismo cálculo que corregirConvenioTicket() sin guardar (vista previa). */
+export function simularCorreccionConvenio(id: number, body: CorregirConvenioBody) {
+  return post<CorreccionConvenioResponse, CorregirConvenioBody>(
+    `/api/tickets-excepcion-dateo/${id}/convenio/simular`,
+    body
+  )
 }
 
 export function rechazarTicketExcepcionDateo(id: number, motivo: string) {

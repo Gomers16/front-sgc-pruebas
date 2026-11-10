@@ -13,10 +13,15 @@ export function nombreConvenio(id: unknown, nombres: NombresConvenio): string {
   return nombres.get(n) ?? `convenio #${n}`
 }
 
-/** Aviso debajo del convenio cuando gerencia lo corrigió al aprobar. */
-export function textoConvenioCorregido(original: number | null, nombres: NombresConvenio): string {
+/** Aviso debajo del convenio cuando gerencia lo corrigió (al aprobar o después). */
+export function textoConvenioCorregido(
+  original: number | null,
+  nombres: NombresConvenio,
+  despuesDeAprobar = false,
+): string {
   const pedido = original === null ? 'sin convenio' : `con ${nombreConvenio(original, nombres)}`
-  return `Corregido por gerencia al aprobar (se pidió ${pedido}).`
+  const cuando = despuesDeAprobar ? 'después de aprobar' : 'al aprobar'
+  return `Corregido por gerencia ${cuando} (se pidió ${pedido}).`
 }
 
 /** Detalle del evento CONVENIO_CORREGIDO de la línea de tiempo. */
@@ -24,8 +29,12 @@ export function textoEventoConvenioCorregido(
   anterior: unknown,
   nuevo: unknown,
   nombres: NombresConvenio,
+  extra: { momento?: unknown; motivo?: unknown } = {},
 ): string {
-  return `De ${nombreConvenio(anterior, nombres)} a ${nombreConvenio(nuevo, nombres)}`
+  let t = `De ${nombreConvenio(anterior, nombres)} a ${nombreConvenio(nuevo, nombres)}`
+  if (extra.momento === 'POST_APROBACION') t += ' · después de aprobar'
+  if (typeof extra.motivo === 'string' && extra.motivo.trim()) t += ` · Motivo: ${extra.motivo.trim()}`
+  return t
 }
 
 /** Ids de convenio que hace falta nombrar: el original y los de los eventos de corrección. */

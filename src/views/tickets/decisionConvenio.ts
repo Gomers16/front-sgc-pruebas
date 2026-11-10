@@ -8,7 +8,7 @@
 //    (sinConvenioExplicito distinto de true), se manda confirmar_sin_convenio.
 
 import { etiquetaConvenio } from '@/services/conveniosService'
-import type { CasoComision } from '@/services/ticketsService'
+import type { CasoComision, ComisionTicketResumen } from '@/services/ticketsService'
 
 /** undefined = todavía no eligió; null = "Sin convenio (directo)". */
 export type ConvenioElegido = number | null | undefined
@@ -91,4 +91,37 @@ export function textoReglaDescuentoConvenio(caso: CasoComision | null): string |
     return 'Con convenio, si la factura final lleva cualquier descuento (incluido Avance), la comisión del asesor convenio queda en $0.'
   }
   return null
+}
+
+/* ═══════════ Corrección del convenio después de aprobar ═══════════ */
+
+/**
+ * ¿Se puede corregir el convenio de un ticket aprobado? Solo con la comisión
+ * PENDIENTE y fuera de liquidaciones, o sin comisión todavía (mismo criterio
+ * que PATCH /tickets-excepcion-dateo/:id/convenio).
+ */
+export function puedeCorregirConvenio(
+  c: ComisionTicketResumen | null | undefined,
+): { puede: boolean; motivo: string | null } {
+  if (!c) return { puede: false, motivo: 'El ticket no tiene dateo vinculado.' }
+  if (c.id === null) return { puede: true, motivo: null }
+  if (c.en_liquidacion) {
+    return { puede: false, motivo: 'La comisión ya está en una liquidación: requiere un ajuste aparte.' }
+  }
+  if (c.estado !== 'PENDIENTE') {
+    return { puede: false, motivo: `La comisión está ${c.estado}: requiere un ajuste aparte.` }
+  }
+  return { puede: true, motivo: null }
+}
+
+/** Decisión guardada al aprobar como interruptor: null (dentro de ventana sin decisión) = Cobra. */
+export function cobraGuardado(v: unknown): boolean {
+  if (v === null || v === undefined) return true
+  return v === true || v === 1 || v === '1'
+}
+
+/** Caso al que pasa el ticket con el convenio elegido (el backend lo confirma). */
+export function casoTrasCorreccion(elegido: ConvenioElegido): CasoComision | null {
+  if (elegido === undefined) return null
+  return elegido === null ? 'SIN_CONVENIO' : 'CONVENIO_COMERCIAL'
 }

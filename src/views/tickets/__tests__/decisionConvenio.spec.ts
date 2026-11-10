@@ -3,7 +3,10 @@ import {
   avisoConvenioEnObservacion,
   camposConvenioAprobar,
   camposConvenioCrear,
+  casoTrasCorreccion,
+  cobraGuardado,
   convenioElegido,
+  puedeCorregirConvenio,
   etiquetaOpcionConvenio,
   observacionMencionaConvenio,
   sinConvenioDecidido,
@@ -120,5 +123,40 @@ describe('textos', () => {
     expect(textoReglaDescuentoConvenio(null)).toBeNull()
     expect(textoReglaDescuentoConvenio('CONVENIO_COMERCIAL')).toMatch(/convenio queda en \$0/)
     expect(textoReglaDescuentoConvenio('CONVENIO_SELF')).toMatch(/asesor convenio queda en \$0/)
+  })
+})
+
+describe('corrección del convenio después de aprobar', () => {
+  const com = (estado: string | null, o: { id?: number | null; liq?: boolean } = {}) => ({
+    id: o.id === undefined ? 7 : o.id,
+    estado,
+    en_liquidacion: o.liq ?? false,
+    monto_asesor: 0,
+    monto_convenio: 0,
+  })
+
+  it('solo con la comisión PENDIENTE fuera de liquidaciones, o sin comisión todavía', () => {
+    expect(puedeCorregirConvenio(com('PENDIENTE')).puede).toBe(true)
+    expect(puedeCorregirConvenio(com(null, { id: null })).puede).toBe(true)
+    expect(puedeCorregirConvenio(com('APROBADA'))).toEqual({
+      puede: false,
+      motivo: 'La comisión está APROBADA: requiere un ajuste aparte.',
+    })
+    expect(puedeCorregirConvenio(com('PAGADA')).puede).toBe(false)
+    expect(puedeCorregirConvenio(com('PENDIENTE', { liq: true })).motivo).toMatch(/liquidación/)
+    expect(puedeCorregirConvenio(null).puede).toBe(false)
+  })
+
+  it('la decisión guardada se lee como interruptor (null = Cobra)', () => {
+    expect(cobraGuardado(null)).toBe(true)
+    expect(cobraGuardado(1)).toBe(true)
+    expect(cobraGuardado(0)).toBe(false)
+    expect(cobraGuardado(false)).toBe(false)
+  })
+
+  it('caso tras la corrección', () => {
+    expect(casoTrasCorreccion(undefined)).toBeNull()
+    expect(casoTrasCorreccion(null)).toBe('SIN_CONVENIO')
+    expect(casoTrasCorreccion(40)).toBe('CONVENIO_COMERCIAL')
   })
 })
