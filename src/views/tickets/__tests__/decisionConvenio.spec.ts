@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  asignadoSegunBusqueda,
   avisoConvenioEnObservacion,
   camposConvenioAprobar,
   camposConvenioCrear,
@@ -158,5 +159,22 @@ describe('corrección del convenio después de aprobar', () => {
     expect(casoTrasCorreccion(undefined)).toBeNull()
     expect(casoTrasCorreccion(null)).toBe('SIN_CONVENIO')
     expect(casoTrasCorreccion(40)).toBe('CONVENIO_COMERCIAL')
+  })
+})
+
+describe('convenio que trae el dateo: ¿asignado?', () => {
+  const filas = [
+    { id: 40, asignado: true },
+    { id: 41, asignado: false },
+  ]
+  it('si aparece en la búsqueda, manda su marca', () => {
+    expect(asignadoSegunBusqueda(40, filas, true)).toBe(true)
+    expect(asignadoSegunBusqueda(41, filas, true)).toBe(false)
+  })
+  it('COMERCIAL (solo asignados): si no aparece, no está asignado', () => {
+    expect(asignadoSegunBusqueda(99, filas, false)).toBe(false)
+  })
+  it('gerencia (con no asignados): si no aparece, no se sabe', () => {
+    expect(asignadoSegunBusqueda(99, filas, true)).toBeNull()
   })
 })

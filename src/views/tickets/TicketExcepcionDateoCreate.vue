@@ -255,7 +255,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/AuthStore'
 import { crearTicketExcepcionDateo } from '@/services/ticketsService'
 import { uploadImage } from '@/services/uploadsService'
-import { listAgentesCaptacion, etiquetaConvenio } from '@/services/conveniosService'
+import {
+  listAgentesCaptacion,
+  etiquetaConvenio,
+  buscarConveniosParaTicket,
+} from '@/services/conveniosService'
 import { HttpError } from '@/services/http'
 import { getMiFicha } from '@/services/asesoresService'
 import {
@@ -266,6 +270,7 @@ import {
   esConflictoSegundaVez,
 } from './intentoDateo'
 import {
+  asignadoSegunBusqueda,
   camposConvenioCrear,
   convenioElegido,
   etiquetaOpcionConvenio,
@@ -318,13 +323,29 @@ const {
 } = useBuscadorConvenios(agenteDelTicketId, puedeElegirComercial)
 const sinConvenio = ref(false)
 // El convenio del dateo viene elegido (se puede cambiar); sin convenio en el
-// dateo no se marca solo: alguien tiene que decidirlo.
+// dateo no se marca solo: alguien tiene que decidirlo. Si está asignado al
+// asesor se comprueba en el servidor (verificarConvenioDelDateo).
 if (intento?.convenio_id) {
   convenioSel.value = {
     id: intento.convenio_id,
     nombre: intento.convenio_nombre ?? `convenio #${intento.convenio_id}`,
     establecimiento: intento.convenio_establecimiento,
     asignado: true,
+  }
+}
+async function verificarConvenioDelDateo() {
+  const id = intento?.convenio_id
+  const nombre = intento?.convenio_nombre
+  const asesorId = agenteDelTicketId.value
+  if (!id || !nombre || !asesorId || comercialEsAsesorConvenio.value) return
+  const incluyeNoAsignados = puedeElegirComercial.value
+  try {
+    const filas = await buscarConveniosParaTicket(asesorId, nombre, { incluirNoAsignados: incluyeNoAsignados })
+    const asignado = asignadoSegunBusqueda(id, filas, incluyeNoAsignados)
+    const sel = convenioSel.value
+    if (asignado !== null && sel && sel.id === id) convenioSel.value = { ...sel, asignado }
+  } catch (err) {
+    console.error('Error comprobando el convenio del dateo:', err)
   }
 }
 watch(sinConvenio, (v) => {
@@ -478,6 +499,7 @@ async function enviar() {
 
 onMounted(async () => {
   window.addEventListener('paste', onPaste)
+  verificarConvenioDelDateo()
   if (!puedeElegirComercial.value) {
     try {
       const yo = await getMiFicha()

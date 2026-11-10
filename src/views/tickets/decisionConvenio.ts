@@ -125,3 +125,19 @@ export function casoTrasCorreccion(elegido: ConvenioElegido): CasoComision | nul
   if (elegido === undefined) return null
   return elegido === null ? 'SIN_CONVENIO' : 'CONVENIO_COMERCIAL'
 }
+
+/**
+ * ¿El convenio que trae el dateo está asignado al asesor? Según la búsqueda
+ * por su nombre en GET /convenios/asignados: si aparece, su `asignado`; si no
+ * aparece y la búsqueda era solo de asignados (COMERCIAL), no lo está; si
+ * incluía los no asignados (gerencia) y no aparece, no se sabe (null).
+ */
+export function asignadoSegunBusqueda(
+  id: number,
+  filas: { id: number; asignado: boolean }[],
+  incluyeNoAsignados: boolean,
+): boolean | null {
+  const fila = filas.find((c) => c.id === id)
+  if (fila) return fila.asignado
+  return incluyeNoAsignados ? null : false
+}
