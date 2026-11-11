@@ -1747,7 +1747,7 @@ const tipoAsesorItems = [
 const metaHeaders = [
   { title: 'Asesor', key: 'asesor', sortable: false },
   { title: 'Tipo meta', key: 'tipo_vehiculo', sortable: false },
-  { title: 'Meta RTM (unid.)', key: 'meta_mensual', sortable: true },
+  { title: 'Meta heredada (no usada en Ficha ni reportes)', key: 'meta_mensual', sortable: true },
   { title: 'Meta del mes (Meta Comercial)', key: 'meta_mes_pesos', sortable: false },
   { title: 'RTM moto', key: 'valor_rtm_moto', sortable: false },
   { title: 'RTM vehículo', key: 'valor_rtm_vehiculo', sortable: false },

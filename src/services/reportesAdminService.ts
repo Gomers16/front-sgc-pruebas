@@ -1127,6 +1127,10 @@ export interface SuperInformeMetaComercialAsesor {
   pesos_total: number
   /** meta_pesos/pct_avance/cumplio/faltante se comparan contra ingreso_rtm_generado (abajo), NO contra pesos_total (comisión). */
   meta_pesos: number | null
+  /** Hay fila en meta_comercial_asesor en al menos un mes del periodo. */
+  tiene_meta: boolean
+  /** Todos los meses del periodo tienen fila; si no, meta_pesos/meta_vehiculos vienen en null (no se suma parcial). */
+  meta_completa: boolean
   pct_avance: number | null
   cumplio: boolean | null
   faltante: number | null
@@ -1179,6 +1183,8 @@ export interface SuperInformeMetaComercialResponse {
     pct_proyeccion: number | null
   }
   asesores: SuperInformeMetaComercialAsesor[]
+  /** Algún asesor tiene meta en unidades; si no, se ocultan Meta (Veh) y Faltante (Veh). */
+  hay_meta_vehiculos: boolean
   descuentosPorAsesor: SuperInformeDescuentoAsesorFila[]
 }
 

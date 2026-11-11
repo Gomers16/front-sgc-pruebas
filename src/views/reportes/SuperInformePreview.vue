@@ -451,6 +451,7 @@ import {
   textoRechazoApi,
   type FilaTablaResumenContable,
 } from './superInformeResumenContable'
+import { textoMetaPesos, textoMetaVehiculos } from './superInformeMetaComercial'
 
 export interface SuperInformePreviewDatos {
   fechaInicio: string
@@ -542,20 +543,25 @@ const filasMetaComercial = computed(() =>
 )
 
 /* Tabla B — Unidades e Ingreso RTM Generado por Asesor */
-const headersMetaComercialVehiculos = [
-  { title: 'Asesor', key: 'asesor' },
-  { title: 'Meta (Veh)', key: 'metaVeh' },
-  { title: 'Motos', key: 'motos' },
-  { title: 'Vehículos', key: 'vehiculos' },
-  { title: 'Faltante (Veh)', key: 'faltanteVeh' },
-  { title: 'Costo Base Moto', key: 'costoBaseMoto' },
-  { title: 'Costo Base Vehículo', key: 'costoBaseVehiculo' },
-  { title: 'Ingreso RTM Generado', key: 'ingreso' },
-]
+// Meta (Veh) / Faltante (Veh) solo si algún asesor del periodo tiene meta en unidades.
+const headersMetaComercialVehiculos = computed(() =>
+  [
+    { title: 'Asesor', key: 'asesor' },
+    { title: 'Meta (Veh)', key: 'metaVeh', soloConMetaVeh: true },
+    { title: 'Motos', key: 'motos' },
+    { title: 'Vehículos', key: 'vehiculos' },
+    { title: 'Faltante (Veh)', key: 'faltanteVeh', soloConMetaVeh: true },
+    { title: 'Costo Base Moto', key: 'costoBaseMoto' },
+    { title: 'Costo Base Vehículo', key: 'costoBaseVehiculo' },
+    { title: 'Ingreso RTM Generado', key: 'ingreso' },
+  ]
+    .filter((h) => !h.soloConMetaVeh || props.datos.metaComercial.hay_meta_vehiculos)
+    .map(({ title, key }) => ({ title, key }))
+)
 const filasMetaComercialVehiculos = computed(() =>
   props.datos.metaComercial.asesores.map((a) => ({
     asesor: a.asesor_nombre,
-    metaVeh: a.meta_vehiculos === null ? 'Sin meta' : formatNum(a.meta_vehiculos),
+    metaVeh: textoMetaVehiculos(a, formatNum),
     motos: formatNum(a.logrado_motos),
     vehiculos: formatNum(a.logrado_vehiculos),
     faltanteVeh: a.faltante_vehiculos === null ? '—' : formatNum(a.faltante_vehiculos),
@@ -579,7 +585,7 @@ const filasIngresoRtmAsesor = computed(() =>
   props.datos.metaComercial.asesores.map((a) => ({
     asesor: a.asesor_nombre,
     ingreso: formatPeso(a.ingreso_rtm_generado),
-    meta: a.meta_pesos === null ? 'Sin meta' : formatPeso(a.meta_pesos),
+    meta: textoMetaPesos(a, formatPeso),
     pctAvance: a.pct_avance === null ? '—' : formatPct(a.pct_avance),
     cumplio: a.cumplio === null ? '—' : a.cumplio ? 'Sí' : 'No',
     faltante: a.faltante === null ? '—' : formatPeso(a.faltante),
