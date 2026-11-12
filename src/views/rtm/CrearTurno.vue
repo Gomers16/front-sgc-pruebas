@@ -480,10 +480,17 @@
                 density="comfortable"
                 class="rounded-lg"
               >
-                <strong>⚠️ {{ alertaVentanaServicio.servicio }} próxima a vencer</strong><br />
-                Estás dentro de los {{ DIAS_VENTANA_PRE_VENCIMIENTO }} días antes del vencimiento
-                ({{ alertaVentanaServicio.vencimiento }}).
-                El turno se puede crear con normalidad.
+                <template v-if="alertaVentanaServicio.tipo === 'EN_VENTANA'">
+                  <strong>⚠️ {{ alertaVentanaServicio.servicio }} próxima a vencer</strong><br />
+                  Estás dentro de los {{ DIAS_VENTANA_PRE_VENCIMIENTO }} días antes del vencimiento
+                  ({{ alertaVentanaServicio.vencimiento }}).
+                  El turno se puede crear con normalidad.
+                </template>
+                <template v-else>
+                  <strong>⚠️ {{ servicioAnterior(alertaVentanaServicio.servicio) }} vigente hasta {{ alertaVentanaServicio.vencimiento }}</strong><br />
+                  Faltan {{ alertaVentanaServicio.diasRestantes }} días para el vencimiento.
+                  Puedes crear el turno, pero al crearlo se pedirá confirmación.
+                </template>
               </v-alert>
             </v-col>
 
@@ -636,6 +643,60 @@
             class="bordered-dialog-button"
           >
             {{ confirmDialogConfirmText }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- RTM/SOAT antes de la ventana previa al vencimiento (409 WINDOW_BLOCK_CONFIRMABLE) -->
+    <v-dialog
+      v-model="showVentanaVigenciaDialog"
+      :max-width="$vuetify.display.xs ? '100%' : '500'"
+      :fullscreen="$vuetify.display.xs"
+      persistent
+    >
+      <v-card class="rounded-xl">
+        <v-card-title class="d-flex align-center justify-center py-4 py-sm-6">
+          <v-icon color="warning" :size="$vuetify.display.xs ? 48 : 60">mdi-calendar-alert</v-icon>
+        </v-card-title>
+        <v-card-text class="text-center px-3 px-sm-4">
+          <div class="text-subtitle-1 text-sm-h5 font-weight-bold mb-3">
+            {{ servicioAnterior(ventanaVigenciaInfo?.servicio) }} sigue vigente
+          </div>
+          <div class="text-caption text-sm-body-1 text-left mx-auto" style="max-width: 360px">
+            <div>Placa: <strong>{{ ventanaVigenciaInfo?.placa }}</strong></div>
+            <div>
+              Turno anterior de {{ ventanaVigenciaInfo?.servicio ?? 'este servicio' }}:
+              <strong>{{ ventanaVigenciaInfo?.lastFinalizedOn }}</strong>
+            </div>
+            <div>Vence el: <strong>{{ ventanaVigenciaInfo?.vencimientoDate }}</strong></div>
+            <div>
+              Faltan <strong>{{ ventanaVigenciaInfo?.diasAntesDelVencimiento }}</strong>
+              día{{ ventanaVigenciaInfo?.diasAntesDelVencimiento === 1 ? '' : 's' }} para el vencimiento.
+            </div>
+          </div>
+          <div class="text-body-2 text-sm-subtitle-1 font-weight-medium mt-4">
+            ¿Crear el turno de todas formas?
+          </div>
+        </v-card-text>
+        <v-card-actions class="justify-center pb-4 pb-sm-6 gap-2">
+          <v-btn
+            variant="text"
+            :size="$vuetify.display.xs ? 'small' : 'default'"
+            :disabled="enviandoVentanaVigencia"
+            @click="cancelarVentanaVigencia"
+          >
+            Cancelar
+          </v-btn>
+          <v-btn
+            color="warning"
+            variant="elevated"
+            :size="$vuetify.display.xs ? 'small' : 'default'"
+            :loading="enviandoVentanaVigencia"
+            :disabled="enviandoVentanaVigencia"
+            @click="confirmarVentanaVigencia"
+          >
+            Crear turno
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -855,7 +916,10 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { DateTime } from 'luxon'
 import { authSetStore } from '@/stores/AuthStore'
 import type { VForm } from 'vuetify/components'
-import TurnosDelDiaService from '@/services/turnosdeldiaService'
+import TurnosDelDiaService, {
+  type CreateTurnoPayload,
+  type VentanaVigenciaConfirmable,
+} from '@/services/turnosdeldiaService'
 import { HttpError } from '@/services/http'
 import { BusquedasService } from '@/services/busquedas_service'
 import { TramitesService } from '@/services/tramitesService'
@@ -979,7 +1043,26 @@ const lastSearched = ref<{ placa: string, tel: string }>({ placa: '', tel: '' })
 
 // 👇 NUEVA VARIABLE para el modal de observaciones
 const mostrarObservacionesDateo = ref(false)
-const alertaVentanaServicio = ref<{ servicio: string; vencimiento: string } | null>(null)
+/**
+ * Aviso de vigencia RTM/SOAT del servicio que se está creando:
+ *  - EN_VENTANA:   dentro de los 16 días previos al vencimiento → se crea normal.
+ *  - CONFIRMABLE:  RTM o SOAT antes de la ventana → al crear se pedirá
+ *                  confirmación (409 WINDOW_BLOCK_CONFIRMABLE).
+ */
+const alertaVentanaServicio = ref<{
+  tipo: 'EN_VENTANA' | 'CONFIRMABLE'
+  servicio: string
+  vencimiento: string
+  diasRestantes: number
+} | null>(null)
+
+/** ===== WINDOW_BLOCK_CONFIRMABLE (RTM/SOAT antes de la ventana) ===== **/
+// El backend responde 409 con los datos del turno anterior; el operador
+// confirma en el modal y se reenvía el MISMO payload con confirmar_ventana_vigencia.
+const showVentanaVigenciaDialog = ref(false)
+const ventanaVigenciaInfo = ref<VentanaVigenciaConfirmable | null>(null)
+const ventanaVigenciaPayloadPendiente = ref<CreateTurnoPayload | null>(null)
+const enviandoVentanaVigencia = ref(false)
 
 /** ===== Segunda vez (backend: segunda_vez_service.ts) ===== **/
 // La ventana llega en la búsqueda unificada (ventanasSegundaVez) o en el 409
@@ -1201,6 +1284,13 @@ const captacionChipText = computed(() => {
 const MESES_VIGENCIA_RTM_SOAT = 12
 const DIAS_VENTANA_PRE_VENCIMIENTO = 16
 
+/** "La RTM anterior" / "El SOAT anterior" (mismo texto que el 409 del backend). */
+function servicioAnterior(codigo?: string | null): string {
+  const c = (codigo ?? '').toUpperCase()
+  if (c === 'RTM') return 'La RTM anterior'
+  return c ? `El ${c} anterior` : 'El servicio anterior'
+}
+
 async function refreshAlertaVentanaServicio() {
   alertaVentanaServicio.value = null
 
@@ -1237,10 +1327,22 @@ async function refreshAlertaVentanaServicio() {
 
     const vencimiento = fechaUltima.plus({ months: MESES_VIGENCIA_RTM_SOAT }).startOf('day')
     const ventanaDesde = vencimiento.minus({ days: DIAS_VENTANA_PRE_VENCIMIENTO })
-    const hoy = DateTime.now().setZone('America/Bogota').startOf('day')
+    // Misma referencia que el backend: la fecha del turno (hoy si no hay).
+    const fechaForm = form.value.fecha
+      ? DateTime.fromISO(form.value.fecha, { zone: 'America/Bogota' })
+      : null
+    const hoy = (fechaForm?.isValid ? fechaForm : DateTime.now().setZone('America/Bogota')).startOf('day')
+    if (hoy >= vencimiento) return
 
-    if (hoy >= ventanaDesde && hoy < vencimiento) {
-      alertaVentanaServicio.value = { servicio: cod, vencimiento: vencimiento.toISODate()! }
+    const base = {
+      servicio: cod,
+      vencimiento: vencimiento.toISODate()!,
+      diasRestantes: Math.round(vencimiento.diff(hoy, 'days').days),
+    }
+    if (hoy >= ventanaDesde) {
+      alertaVentanaServicio.value = { tipo: 'EN_VENTANA', ...base }
+    } else {
+      alertaVentanaServicio.value = { tipo: 'CONFIRMABLE', ...base }
     }
   } catch (err) {
     console.error('Error calculando ventana de vigencia RTM/SOAT:', err)
@@ -1638,9 +1740,23 @@ async function submitForm() {
       ...segundaVezPayload,
     }
 
+    await enviarTurno(payload)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido al crear el turno.'
+    console.error('Error al crear turno:', err)
+    showSnackbar(`❌ ${message}`, 'error')
+  }
+}
+
+/**
+ * POST del turno con el manejo de respuestas. Lo usan submitForm() y el
+ * reenvío confirmado de WINDOW_BLOCK_CONFIRMABLE (mismo payload + flag).
+ */
+async function enviarTurno(payload: CreateTurnoPayload) {
+  try {
     await TurnosDelDiaService.createTurno(payload)
     showSnackbar(
-      'segundaVezOrigenId' in segundaVezPayload
+      'segundaVezOrigenId' in payload
         ? '✅ Turno de segunda vez creado (sin facturación)'
         : '✅ Turno creado exitosamente',
       'success'
@@ -1651,6 +1767,13 @@ async function submitForm() {
     // devolvió el backend y el operador confirma y vuelve a crear.
     const data = err instanceof HttpError ? (err.data as Record<string, unknown> | undefined) : undefined
     const code = data?.code
+    // RTM/SOAT antes de la ventana previa al vencimiento: advertencia confirmable.
+    if (code === 'WINDOW_BLOCK_CONFIRMABLE' && !payload.confirmar_ventana_vigencia) {
+      ventanaVigenciaInfo.value = data as unknown as VentanaVigenciaConfirmable
+      ventanaVigenciaPayloadPendiente.value = { ...payload }
+      showVentanaVigenciaDialog.value = true
+      return
+    }
     if (code === 'SEGUNDA_VEZ_DISPONIBLE' || code === 'SEGUNDA_VEZ_NO_DISPONIBLE') {
       ventanaSV409.value = (data?.ventana as VentanaSegundaVezDTO | null) ?? null
       segundaVezConfirmada.value = false
@@ -1667,5 +1790,31 @@ async function submitForm() {
     console.error('Error al crear turno:', err)
     showSnackbar(`❌ ${message}`, 'error')
   }
+}
+
+/** El operador confirmó: se reenvía el mismo payload con confirmar_ventana_vigencia. */
+async function confirmarVentanaVigencia() {
+  // Lock anti doble click: un solo reenvío en vuelo.
+  if (enviandoVentanaVigencia.value || !ventanaVigenciaPayloadPendiente.value) return
+  enviandoVentanaVigencia.value = true
+  isSubmitting.value = true
+  const payload = { ...ventanaVigenciaPayloadPendiente.value, confirmar_ventana_vigencia: true }
+  try {
+    await enviarTurno(payload)
+  } finally {
+    showVentanaVigenciaDialog.value = false
+    ventanaVigenciaPayloadPendiente.value = null
+    ventanaVigenciaInfo.value = null
+    enviandoVentanaVigencia.value = false
+    isSubmitting.value = false
+  }
+}
+
+function cancelarVentanaVigencia() {
+  if (enviandoVentanaVigencia.value) return
+  showVentanaVigenciaDialog.value = false
+  ventanaVigenciaPayloadPendiente.value = null
+  ventanaVigenciaInfo.value = null
+  showSnackbar('Creación de turno cancelada.', 'info')
 }
 </script>

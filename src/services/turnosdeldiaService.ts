@@ -254,6 +254,24 @@ export interface CreateTurnoPayload {
   /** 👇 Excepción manual (solo SUPER_ADMIN / GERENCIA), con motivo obligatorio */
   segundaVezExcepcion?: 'FORZADA' | 'NO_APLICADA' | null
   segundaVezMotivo?: string | null
+
+  /** 👇 RTM/SOAT antes de la ventana previa al vencimiento: el operador
+   * confirmó el 409 WINDOW_BLOCK_CONFIRMABLE y se reenvía el mismo payload.
+   * El backend acepta también el alias viejo confirmar_ventana_rtm. */
+  confirmar_ventana_vigencia?: boolean
+}
+
+/** Cuerpo del 409 WINDOW_BLOCK_CONFIRMABLE (turno RTM/SOAT antes de la ventana). */
+export interface VentanaVigenciaConfirmable {
+  code: 'WINDOW_BLOCK_CONFIRMABLE'
+  message?: string
+  placa?: string
+  servicio?: string
+  lastFinalizedOn?: string
+  nextAllowedDate?: string
+  vencimientoDate?: string
+  diasVentana?: number
+  diasAntesDelVencimiento?: number
 }
 
 export interface UpdateTurnoPayload {
@@ -366,6 +384,7 @@ class TurnosDelDiaService {
             segundaVezMotivo: payload.segundaVezMotivo ?? '',
           }
         : {}),
+      ...(payload.confirmar_ventana_vigencia ? { confirmar_ventana_vigencia: true } : {}),
     }
 
     try {
