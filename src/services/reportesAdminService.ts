@@ -749,14 +749,24 @@ export interface LiquidacionComercial extends ComisionComercial {
   monto_pagable: number
 }
 
-export interface LiquidacionAsesorConvenio extends ComisionAsesorConvenio {
+/**
+ * Cédula del convenio (convenios.doc_numero, por convenio_id). Solo la traen
+ * /liquidacion-rtm, /trazabilidad-rtm y /liquidacion-rtm/detalle-placas — no
+ * /comisiones (ReporteComisiones), por eso no va en ComisionAsesorConvenio /
+ * ComisionConvenio. Se muestra con formatearCedulaConvenio() (@/utils/cedulaConvenio).
+ */
+export interface ConCedulaConvenio {
+  convenio_doc_numero: string | null
+}
+
+export interface LiquidacionAsesorConvenio extends ComisionAsesorConvenio, ConCedulaConvenio {
   asesor_id: number
   comision_ids: number[]
   comision_ids_pagables: number[]
   monto_pagable: number
 }
 
-export interface LiquidacionConvenio extends ComisionConvenio {
+export interface LiquidacionConvenio extends ComisionConvenio, ConCedulaConvenio {
   comision_ids: number[]
   comision_ids_pagables: number[]
   monto_pagable: number
@@ -808,6 +818,7 @@ export interface LiquidacionPlacaComision {
   estado_continuidad: 'CONTINUA' | 'ROTA' | 'SIN_EVIDENCIA' | null
   asesor_nombre: string | null
   convenio_nombre: string | null
+  convenio_doc_numero: string | null
 }
 
 export interface LiquidacionPlacaCanal {
@@ -980,8 +991,8 @@ export interface TrazabilidadRtmResponse {
   aviso_canal?: AvisoCanal
   por_canal: LiquidacionPorCanal[]
   comerciales: ComisionComercial[]
-  asesores_convenio: ComisionAsesorConvenio[]
-  convenios: ComisionConvenio[]
+  asesores_convenio: (ComisionAsesorConvenio & ConCedulaConvenio)[]
+  convenios: (ComisionConvenio & ConCedulaConvenio)[]
 }
 
 export async function getTrazabilidadRtm(

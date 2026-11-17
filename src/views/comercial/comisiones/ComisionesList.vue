@@ -754,6 +754,7 @@
                     </th>
                     <th>Asesor</th>
                     <th>Convenio</th>
+                    <th>Cédula convenio</th>
                     <th class="text-right">Turnos</th>
                     <th class="text-right">Monto asesor</th>
                     <th class="text-right">Monto convenio</th>
@@ -783,6 +784,16 @@
                       </td>
                       <td>{{ r.asesor_nombre }}</td>
                       <td>{{ r.convenio_nombre ?? '—' }}</td>
+                      <td class="text-no-wrap">
+                        <v-chip
+                          v-if="formatearCedulaConvenio(r.convenio_doc_numero, !!r.convenio_nombre) === CEDULA_PENDIENTE"
+                          size="x-small"
+                          variant="tonal"
+                          color="amber-darken-3"
+                          :title="CEDULA_PENDIENTE_AYUDA"
+                        >{{ CEDULA_PENDIENTE }}</v-chip>
+                        <span v-else>{{ formatearCedulaConvenio(r.convenio_doc_numero, !!r.convenio_nombre) }}</span>
+                      </td>
                       <td class="text-right">{{ r.cantidad_vehiculos }}</td>
                       <td class="text-right">{{ formatCOP(r.total_asesor) }}</td>
                       <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
@@ -791,7 +802,7 @@
                       </td>
                     </tr>
                     <tr v-if="liquidacionExpandido.asesoresConvenio.has(i)" v-show="filaVisibleBusqueda('asesoresConvenio', i)">
-                      <td colspan="9" class="pa-0">
+                      <td colspan="10" class="pa-0">
                         <div class="pa-3" style="background:rgba(0,0,0,0.03)">
                           <div v-if="liquidacionDetalleLoading[`asesoresConvenio-${i}`]" class="text-center py-2">
                             <v-progress-circular indeterminate color="primary" size="20" width="2" />
@@ -844,12 +855,12 @@
                     </tr>
                   </template>
                   <tr v-if="!liquidacion.data.asesores_convenio.length">
-                    <td colspan="9" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
+                    <td colspan="10" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
                   </tr>
                 </tbody>
                 <tfoot>
                   <tr class="font-weight-bold" style="background:rgba(0,0,0,0.06)">
-                    <td colspan="5" class="text-right">TOTAL</td>
+                    <td colspan="6" class="text-right">TOTAL</td>
                     <td class="text-right">{{ totalesAsesoresConvenio.cantidad }}</td>
                     <td class="text-right">{{ formatCOP(totalesAsesoresConvenio.montoAsesor) }}</td>
                     <td class="text-right">{{ formatCOP(totalesAsesoresConvenio.montoConvenio) }}</td>
@@ -910,6 +921,7 @@
                       </div>
                     </th>
                     <th>Convenio</th>
+                    <th>Cédula convenio</th>
                     <th>Asesor comercial</th>
                     <th class="text-right">Turnos</th>
                     <th class="text-right">Monto convenio</th>
@@ -938,6 +950,16 @@
                         />
                       </td>
                       <td>{{ r.convenio_nombre }}</td>
+                      <td class="text-no-wrap">
+                        <v-chip
+                          v-if="formatearCedulaConvenio(r.convenio_doc_numero) === CEDULA_PENDIENTE"
+                          size="x-small"
+                          variant="tonal"
+                          color="amber-darken-3"
+                          :title="CEDULA_PENDIENTE_AYUDA"
+                        >{{ CEDULA_PENDIENTE }}</v-chip>
+                        <span v-else>{{ formatearCedulaConvenio(r.convenio_doc_numero) }}</span>
+                      </td>
                       <td>{{ r.asesor_comercial_nombre }}</td>
                       <td class="text-right">{{ r.cantidad_vehiculos }}</td>
                       <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
@@ -946,7 +968,7 @@
                       </td>
                     </tr>
                     <tr v-if="liquidacionExpandido.convenios.has(i)" v-show="filaVisibleBusqueda('convenios', i)">
-                      <td colspan="8" class="pa-0">
+                      <td colspan="9" class="pa-0">
                         <div class="pa-3" style="background:rgba(0,0,0,0.03)">
                           <div v-if="liquidacionDetalleLoading[`convenios-${i}`]" class="text-center py-2">
                             <v-progress-circular indeterminate color="primary" size="20" width="2" />
@@ -997,12 +1019,12 @@
                     </tr>
                   </template>
                   <tr v-if="!liquidacion.data.convenios.length">
-                    <td colspan="8" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
+                    <td colspan="9" class="text-center text-medium-emphasis">Sin comisiones RTM en este período</td>
                   </tr>
                 </tbody>
                 <tfoot>
                   <tr class="font-weight-bold" style="background:rgba(0,0,0,0.06)">
-                    <td colspan="5" class="text-right">TOTAL</td>
+                    <td colspan="6" class="text-right">TOTAL</td>
                     <td class="text-right">{{ totalesConvenios.cantidad }}</td>
                     <td class="text-right">{{ formatCOP(totalesConvenios.monto) }}</td>
                     <td></td>
@@ -2299,19 +2321,29 @@
             </div>
             <v-table density="compact" class="mb-4">
               <thead>
-                <tr><th>Asesor</th><th>Convenio</th><th class="text-right">Turnos</th><th class="text-right">Monto asesor</th><th class="text-right">Monto convenio</th><th>Estados</th></tr>
+                <tr><th>Asesor</th><th>Convenio</th><th>Cédula convenio</th><th class="text-right">Turnos</th><th class="text-right">Monto asesor</th><th class="text-right">Monto convenio</th><th>Estados</th></tr>
               </thead>
               <tbody>
                 <tr v-for="(r, i) in trazabilidad.data.asesores_convenio" :key="`${r.asesor_id}-${i}`">
                   <td>{{ r.asesor_nombre }}</td>
                   <td>{{ r.convenio_nombre ?? '—' }}</td>
+                  <td class="text-no-wrap">
+                    <v-chip
+                      v-if="formatearCedulaConvenio(r.convenio_doc_numero, !!r.convenio_nombre) === CEDULA_PENDIENTE"
+                      size="x-small"
+                      variant="tonal"
+                      color="amber-darken-3"
+                      :title="CEDULA_PENDIENTE_AYUDA"
+                    >{{ CEDULA_PENDIENTE }}</v-chip>
+                    <span v-else>{{ formatearCedulaConvenio(r.convenio_doc_numero, !!r.convenio_nombre) }}</span>
+                  </td>
                   <td class="text-right">{{ r.cantidad_vehiculos }}</td>
                   <td class="text-right">{{ formatCOP(r.total_asesor) }}</td>
                   <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
                   <td>{{ r.estados }}</td>
                 </tr>
                 <tr v-if="!trazabilidad.data.asesores_convenio.length">
-                  <td colspan="6" class="text-center text-medium-emphasis">Sin comisiones PAGADAS en este rango</td>
+                  <td colspan="7" class="text-center text-medium-emphasis">Sin comisiones PAGADAS en este rango</td>
                 </tr>
               </tbody>
             </v-table>
@@ -2321,18 +2353,28 @@
             </div>
             <v-table density="compact" class="mb-4">
               <thead>
-                <tr><th>Convenio</th><th>Asesor comercial</th><th class="text-right">Turnos</th><th class="text-right">Monto convenio</th><th>Estados</th></tr>
+                <tr><th>Convenio</th><th>Cédula convenio</th><th>Asesor comercial</th><th class="text-right">Turnos</th><th class="text-right">Monto convenio</th><th>Estados</th></tr>
               </thead>
               <tbody>
                 <tr v-for="(r, i) in trazabilidad.data.convenios" :key="`${r.convenio_id}-${i}`">
                   <td>{{ r.convenio_nombre }}</td>
+                  <td class="text-no-wrap">
+                    <v-chip
+                      v-if="formatearCedulaConvenio(r.convenio_doc_numero) === CEDULA_PENDIENTE"
+                      size="x-small"
+                      variant="tonal"
+                      color="amber-darken-3"
+                      :title="CEDULA_PENDIENTE_AYUDA"
+                    >{{ CEDULA_PENDIENTE }}</v-chip>
+                    <span v-else>{{ formatearCedulaConvenio(r.convenio_doc_numero) }}</span>
+                  </td>
                   <td>{{ r.asesor_comercial_nombre }}</td>
                   <td class="text-right">{{ r.cantidad_vehiculos }}</td>
                   <td class="text-right">{{ formatCOP(r.total_convenio) }}</td>
                   <td>{{ r.estados }}</td>
                 </tr>
                 <tr v-if="!trazabilidad.data.convenios.length">
-                  <td colspan="5" class="text-center text-medium-emphasis">Sin comisiones PAGADAS en este rango</td>
+                  <td colspan="6" class="text-center text-medium-emphasis">Sin comisiones PAGADAS en este rango</td>
                 </tr>
               </tbody>
             </v-table>
@@ -3757,6 +3799,7 @@ import {
   type ConflictoSinComision,
 } from './ticketOrigen'
 import { SIN_META_DEFINIDA, avanceMeta, bonoMeta, faltanteMeta, metaDelMes } from './metaMensual'
+import { CEDULA_PENDIENTE, formatearCedulaConvenio } from '@/utils/cedulaConvenio'
 import TurnoDetalleDialog, { type Turno as TurnoDetalle } from '@/components/rtm/TurnoDetalleDialog.vue'
 
 /* ── Extended types ── */
@@ -4696,6 +4739,11 @@ function applyFilters() {
 /* ── Modal Liquidación RTM ── */
 // El desglose "por canal" es "¿Cómo se enteró de nosotros?" del turno: el
 // backend manda las filas en orden fijo con su nombre (nombreCanalReporte).
+
+/** Ayuda del chip "Pendiente" de la columna "Cédula convenio" (modal
+ * Liquidación RTM y Trazabilidad; regla en formatearCedulaConvenio). */
+const CEDULA_PENDIENTE_AYUDA =
+  'Cédula sin registrar o temporal (9999…): hay que actualizarla en el convenio'
 
 /** Clasificación de negocio de la placa en el drill-down (Comerciales /
  * Asesores Convenio / Convenios) — derivada de turnos_rtms.es_recurrente/
