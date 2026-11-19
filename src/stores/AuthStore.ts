@@ -184,11 +184,17 @@ export const useAuthStore = defineStore('auth', {
                 router.push({ name: 'TelemercadeoMiGestion' })
                 break
               }
-              const asesorId = this.user.agenteId || this.user.id
-              router.push({
-                name: 'FichaComercialAsesor',
-                params: { id: asesorId },
-              })
+              // La ficha va por id de AGENTE. Sin agente vinculado no hay
+              // ficha propia: antes se usaba user.id como si fuera un id de
+              // agente y abría la ficha de otro agente (o una vacía).
+              if (this.user.agenteId) {
+                router.push({
+                  name: 'FichaComercialAsesor',
+                  params: { id: this.user.agenteId },
+                })
+              } else {
+                router.push({ name: 'ComercialDateos' })
+              }
               break
             }
 
