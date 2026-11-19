@@ -736,6 +736,7 @@ import {
 } from './descuentoFacturacion'
 // ✅ FIX 2: obtenerUsuarios existe en UserService → no hace falta crear usuariosService
 import { obtenerUsuarios } from '@/services/UserService'
+import { upload } from '@/services/http'
 
 /* ===================== Interfaces y tipos ===================== */
 interface FacturacionResult {
@@ -1830,9 +1831,8 @@ async function startLocalOCR(file: File) {
     const fd = new FormData()
     fd.append('archivo', blob, file.name || 'ticket.jpg')
 
-    const resp = await fetch('/api/ocr/parse-ticket', { method: 'POST', body: fd })
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-    const json = await resp.json() as OCRResponse
+    // Vía http.ts: manda el token (el endpoint exige sesión desde multi-sede Fase 0).
+    const json = await upload<OCRResponse>('/api/ocr/parse-ticket', fd)
     if (!json?.ok || (!json.text && !json.campos)) throw new Error(json?.message || 'OCR vacío')
 
     ocr.status = 'done'
