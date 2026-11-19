@@ -3,12 +3,14 @@
     <v-card elevation="10" class="rounded-2xl">
       <!-- Header -->
       <v-card-title class="d-flex justify-space-between align-center flex-wrap pa-4 pa-sm-5">
-        <div class="d-flex align-center mb-3 mb-sm-0">
+        <div v-if="!embebida" class="d-flex align-center mb-3 mb-sm-0">
           <v-avatar class="mr-3 mr-sm-4" :size="$vuetify.display.xs ? 36 : 46" color="primary">
             <v-icon>mdi-account-tie</v-icon>
           </v-avatar>
           <div>
-            <div class="text-h6 text-sm-h5 font-weight-bold">Ficha comercial</div>
+            <div class="text-h6 text-sm-h5 font-weight-bold">
+              {{ secciones.modoTelemercadeo ? 'Ficha de telemercadeo' : 'Ficha comercial' }}
+            </div>
             <div class="text-caption text-sm-body-2 text-medium-emphasis">
               <template v-if="asesor">
                 {{ asesor.nombre }} • {{ humanTipo(asesor.tipo) }}
@@ -149,12 +151,13 @@
 
           <v-col cols="6" md="3">
             <div class="kpi-card-compact">
-              <div class="kpi-title-compact">Dateos exitosos</div>
+              <div class="kpi-title-compact">{{ secciones.kpiDateosExitosos.titulo }}</div>
               <div class="kpi-value-compact text-success">{{ kpi.dateosExitosos }}</div>
-              <div class="kpi-sub-compact">en el rango</div>
+              <div class="kpi-sub-compact">{{ secciones.kpiDateosExitosos.sub }}</div>
             </div>
           </v-col>
 
+          <template v-if="secciones.kpisComisiones">
           <v-col cols="6" md="3">
             <div class="kpi-card-compact">
               <div class="kpi-title-compact">Total generado</div>
@@ -209,9 +212,10 @@
               <div class="kpi-sub-compact">completo</div>
             </div>
           </v-col>
+          </template>
 
           <!-- Metas mensuales: SOLO si es asesor comercial -->
-          <v-col cols="12" sm="6" v-if="esAsesorComercial">
+          <v-col cols="12" sm="6" v-if="secciones.metaComercial">
             <v-card variant="outlined" rounded="lg" class="h-100">
               <v-card-title class="text-subtitle-2 font-weight-bold d-flex justify-space-between align-center py-3">
                 🎯 Metas mensuales
@@ -251,7 +255,7 @@
           </v-col>
 
           <!-- Info del periodo -->
-          <v-col cols="12" :sm="esAsesorComercial ? 6 : 12">
+          <v-col cols="12" :sm="secciones.metaComercial ? 6 : 12">
             <v-alert type="info" variant="tonal" density="compact" class="mb-0">
               <div class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center gap-2">
                 <span class="text-caption text-sm-body-2">
@@ -275,7 +279,7 @@
           </v-tab>
 
           <!-- Ocultar pestaña Convenios si es asesor convenio -->
-          <v-tab v-if="!esAsesorConvenio" value="convenios" prepend-icon="mdi-handshake">
+          <v-tab v-if="secciones.tabConvenios" value="convenios" prepend-icon="mdi-handshake">
             <span :class="$vuetify.display.xs ? 'd-none' : ''">Convenios</span>
             <span :class="$vuetify.display.xs ? '' : 'd-none'">
               <v-icon>mdi-handshake</v-icon>
@@ -289,7 +293,7 @@
             </span>
           </v-tab>
 
-          <v-tab value="new-dateos" prepend-icon="mdi-refresh">
+          <v-tab v-if="secciones.tabNewDateos" value="new-dateos" prepend-icon="mdi-refresh">
             <span :class="$vuetify.display.xs ? 'd-none' : ''">NEW-DATEOS</span>
             <span :class="$vuetify.display.xs ? '' : 'd-none'">
               <v-icon>mdi-refresh</v-icon>
@@ -406,7 +410,7 @@
           </v-window-item>
           <!-- FIN TAB PROSPECTOS -->
 <!-- ==================== TAB CONVENIOS ==================== -->
-          <v-window-item value="convenios" v-if="!esAsesorConvenio">
+          <v-window-item value="convenios" v-if="secciones.tabConvenios">
             <v-data-table
               :items="convenios"
               :headers="headersConvenios"
@@ -434,9 +438,12 @@
             <div class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center mb-3 gap-2">
               <div class="text-caption text-sm-body-2 text-medium-emphasis">
                 <strong>{{ totalDateosFiltrados }}</strong> dateo(s) ·
-                Exitosos: <strong>{{ totalExitosos }}</strong> ·
-                {{ esAsesorConvenio ? 'Monto total (comisión convenio):' : 'Monto total (comisión asesor):' }}
-                <strong>{{ money(totalComisionAsesor) }}</strong>
+                Exitosos: <strong>{{ totalExitosos }}</strong>
+                <template v-if="secciones.comisionesEnDateos">
+                  ·
+                  {{ esAsesorConvenio ? 'Monto total (comisión convenio):' : 'Monto total (comisión asesor):' }}
+                  <strong>{{ money(totalComisionAsesor) }}</strong>
+                </template>
               </div>
             </div>
 
@@ -446,7 +453,7 @@
                 color="primary"
                 prepend-icon="mdi-plus-circle"
                 @click="irACrearDateo"
-                v-if="puedeCrearDateo"
+                v-if="puedeCrearDateo && secciones.crearYRedatearDateos"
                 :block="$vuetify.display.xs"
               >
                 Crear dateo
@@ -505,7 +512,7 @@
 
             <v-data-table
               :items="dateosFiltrados"
-              :headers="headersDateosResponsive"
+              :headers="headersDateosVisibles"
               :loading="loading"
               class="elevation-1"
               item-key="id"
@@ -572,7 +579,7 @@
               <template #item.resultado="{ item }">
                 <div class="d-flex align-center justify-center" style="gap:4px">
                   <v-chip
-                    v-if="item.resultado === 'RE_DATEAR'"
+                    v-if="item.resultado === 'RE_DATEAR' && secciones.crearYRedatearDateos"
                     :color="chipColorResultado(item.resultado)"
                     size="small"
                     variant="flat"
@@ -592,7 +599,7 @@
                     {{ textoResultado(item.resultado) }}
                   </v-chip>
                   <v-tooltip
-                    v-if="(item.numero_redateos_usados ?? 0) > 0"
+                    v-if="(item.numero_redateos_usados ?? 0) > 0 && secciones.crearYRedatearDateos"
                     :text="`Ver historial de re-dateos (${item.numero_redateos_usados})`"
                     location="top"
                   >
@@ -733,7 +740,7 @@
           <!-- FIN TAB DATEOS -->
 
           <!-- ==================== TAB NEW-DATEOS ==================== -->
-          <v-window-item value="new-dateos">
+          <v-window-item v-if="secciones.tabNewDateos" value="new-dateos">
             <div class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center mb-3 gap-2">
               <div class="text-caption text-sm-body-2 text-medium-emphasis">
                 <strong>{{ totalDateosRedatear }}</strong> dateo(s) para re-datear
@@ -1256,6 +1263,15 @@ import {
   formatDate as formatFechaDocBase,
 } from '@/services/prospectosService'
 import { etiquetaConvenio } from '@/services/conveniosService'
+import { columnasDateos, seccionesFicha, TIPO_TELE_EMBEBIDA } from './fichaSecciones'
+
+const props = withDefaults(
+  defineProps<{
+    /** Embebida en "Mi gestión" del asesor de Telemercadeo (sin título propio). */
+    embebida?: boolean
+  }>(),
+  { embebida: false },
+)
 
 /* ===== Tipos locales ===== */
 type Asesor = {
@@ -1491,6 +1507,15 @@ const headersDateosResponsive = computed(() => {
   }
   return headersDateos.value
 })
+
+// Sin columnas de comisión cuando no aplican (telemercadeo).
+const headersDateosVisibles = computed(
+  () =>
+    columnasDateos(
+      headersDateosResponsive.value as readonly { key?: string }[],
+      secciones.value,
+    ) as unknown as typeof headersDateosResponsive.value,
+)
 
 // 🆕 Headers de la pestaña NEW-DATEOS: sin comisión/pago, esos dateos no aplican
 const headersNewDateos = computed(() => {
@@ -2033,6 +2058,11 @@ const esAsesorComercial = computed(() => {
   const t = normalizeTipoAgente(asesor.value?.tipo)
   return t.includes('COMERCIAL')
 })
+
+/** Qué se muestra según el tipo del agente visto (ver fichaSecciones.ts). */
+const secciones = computed(() =>
+  seccionesFicha(asesor.value?.tipo ?? (props.embebida ? TIPO_TELE_EMBEBIDA : null)),
+)
 
 const esAsesorConvenio = computed(() => {
   const t = normalizeTipoAgente(asesor.value?.tipo)

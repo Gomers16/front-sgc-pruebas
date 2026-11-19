@@ -7,6 +7,7 @@ import App from './App.vue'
 import router from './router'
 import { useAuthStore } from './stores/AuthStore'
 import { cumpleAgenteTipoRuta } from './utils/permisosTelemercadeo'
+import { redirigirFichaAMiGestion } from './views/comercial/asesores/fichaSecciones'
 
 import { createVuetify } from 'vuetify'
 import 'vuetify/styles'
@@ -59,6 +60,13 @@ router.beforeEach((to, _from, next) => {
   const roles = to.meta.roles
   if (roles?.length && !auth.hasAnyRole(roles)) {
     next('/dashboard')
+    return
+  }
+
+  // El asesor de Telemercadeo ve su ficha dentro de "Mi gestión": si abre SU
+  // propia ficha comercial, va allá. Gerencia y demás roles no se redirigen.
+  if (to.name === 'FichaComercialAsesor' && redirigirFichaAMiGestion(auth.user, to.params.id)) {
+    next({ name: 'TelemercadeoMiGestion' })
     return
   }
 

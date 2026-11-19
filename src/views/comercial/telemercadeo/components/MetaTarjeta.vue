@@ -8,7 +8,10 @@ Sin meta: "Sin meta definida", sin % ni semáforo (nunca 0%).
     <v-card-text>
       <div class="d-flex align-center mb-1">
         <v-icon class="mr-2" :color="p.color ?? undefined">{{ icono }}</v-icon>
-        <span class="text-subtitle-2 font-weight-bold">{{ titulo }}</span>
+        <div>
+          <div class="text-subtitle-2 font-weight-bold">{{ titulo }}</div>
+          <div v-if="nota" class="text-caption text-medium-emphasis">{{ nota }}</div>
+        </div>
         <v-spacer />
         <v-chip v-if="!p.sinMeta" size="x-small" :color="p.color ?? undefined" variant="flat">
           {{ p.etiqueta }}
@@ -39,6 +42,12 @@ import { computed } from 'vue'
 import type { AvanceMeta } from '@/services/telemercadeoService'
 import { presentarMeta } from '../telemercadeoHelpers'
 
-const props = defineProps<{ titulo: string; icono: string; meta: AvanceMeta | null | undefined }>()
+const props = defineProps<{
+  titulo: string
+  icono: string
+  meta: AvanceMeta | null | undefined
+  /** Aclaración de qué se cuenta (p. ej. "de tus gestiones · por fecha de la gestión"). */
+  nota?: string
+}>()
 const p = computed(() => presentarMeta(props.meta))
 </script>

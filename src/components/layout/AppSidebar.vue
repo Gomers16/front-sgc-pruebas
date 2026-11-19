@@ -31,7 +31,7 @@
 
       <!-- Mi Ficha Comercial -->
       <v-list-item
-        v-if="can.verMiFichaComercial() && auth.currentAgenteId"
+        v-if="can.verMiFichaComercial() && auth.currentAgenteId && !can.gestionarTelemercadeo()"
         prepend-icon="mdi-account-star"
         title="Mi Ficha Comercial"
         :to="{

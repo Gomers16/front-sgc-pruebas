@@ -42,10 +42,23 @@ pendientes de seguimiento, historial y registro de gestiones.
     <v-row class="mb-2">
       <v-col v-for="m in METRICAS" :key="m.key" cols="12" md="4">
         <v-skeleton-loader v-if="cargandoResumen && !resumen" type="card" />
-        <MetaTarjeta v-else :titulo="m.titulo" :icono="m.icono" :meta="resumen?.metas[m.key]" />
+        <MetaTarjeta
+          v-else
+          :titulo="m.titulo"
+          :icono="m.icono"
+          :nota="m.nota"
+          :meta="resumen?.metas[m.key]"
+        />
       </v-col>
     </v-row>
 
+    <v-tabs v-model="tab" color="primary" class="mb-3">
+      <v-tab value="seguimiento" prepend-icon="mdi-bell-ring-outline">Seguimiento</v-tab>
+      <v-tab value="ficha" prepend-icon="mdi-account-tie">Mi ficha</v-tab>
+    </v-tabs>
+
+    <v-window v-model="tab">
+    <v-window-item value="seguimiento">
     <!-- Pendientes de seguimiento -->
     <v-card class="mb-4">
       <v-card-title class="d-flex align-center">
@@ -117,6 +130,14 @@ pendientes de seguimiento, historial y registro de gestiones.
       </v-card-title>
       <GestionesTabla ref="tablaRef" modo="asesor" @datear="datear" />
     </v-card>
+    </v-window-item>
+
+    <!-- Mi ficha: FichaComercialAsesor reutilizada; para un ASESOR_TELEMERCADEO
+         no muestra comisiones, meta en pesos, Convenios ni New-dateos. -->
+    <v-window-item value="ficha">
+      <FichaComercialAsesor v-if="fichaVista" embebida />
+    </v-window-item>
+    </v-window>
 
     <RegistrarGestionDialog
       v-model="registroAbierto"
@@ -132,7 +153,7 @@ pendientes de seguimiento, historial y registro de gestiones.
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { HttpError } from '@/services/http'
 import {
@@ -157,13 +178,33 @@ import {
 import GestionesTabla from './components/GestionesTabla.vue'
 import MetaTarjeta from './components/MetaTarjeta.vue'
 import RegistrarGestionDialog from './components/RegistrarGestionDialog.vue'
+import FichaComercialAsesor from '@/views/comercial/asesores/FichaComercialAsesor.vue'
 
 const router = useRouter()
 
-const METRICAS: { key: MetricaMeta; titulo: string; icono: string }[] = [
-  { key: 'gestiones', titulo: 'Gestiones', icono: 'mdi-phone-log' },
-  { key: 'dateos', titulo: 'Dateos', icono: 'mdi-note-plus-outline' },
-  { key: 'exitosos', titulo: 'Dateos exitosos', icono: 'mdi-check-decagram' },
+/* ── Pestañas: la ficha se monta la primera vez que se abre ── */
+const tab = ref<'seguimiento' | 'ficha'>('seguimiento')
+const fichaVista = ref(false)
+watch(tab, (t) => {
+  if (t === 'ficha') fichaVista.value = true
+})
+
+// La meta cuenta solo los dateos hechos desde una gestión y por la fecha de
+// la gestión; la pestaña "Mi ficha" cuenta todos los dateos por su fecha.
+const METRICAS: { key: MetricaMeta; titulo: string; icono: string; nota: string }[] = [
+  { key: 'gestiones', titulo: 'Gestiones', icono: 'mdi-phone-log', nota: 'del mes' },
+  {
+    key: 'dateos',
+    titulo: 'Dateos',
+    icono: 'mdi-note-plus-outline',
+    nota: 'desde tus gestiones · por fecha de la gestión',
+  },
+  {
+    key: 'exitosos',
+    titulo: 'Dateos exitosos',
+    icono: 'mdi-check-decagram',
+    nota: 'desde tus gestiones · por fecha de la gestión',
+  },
 ]
 
 /* ── Mes (Bogotá) ── */
