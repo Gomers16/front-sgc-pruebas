@@ -17,6 +17,8 @@ declare module 'vue-router' {
     title?: string
     requiresAuth?: boolean
     roles?: string[]
+    /** Tipo de agente exigido (p. ej. ASESOR_TELEMERCADEO); lo valida el guard de main.ts. */
+    agenteTipo?: string
   }
 }
 
@@ -263,8 +265,8 @@ const routes: RouteRecordRaw[] = [
     },
   },
 
-  // Telemercadeo · "Mi gestión" (COMERCIAL con agente ASESOR_TELEMERCADEO;
-  // el backend responde 403 a un comercial sin ese agente).
+  // Telemercadeo · "Mi gestión": solo COMERCIAL con agente ASESOR_TELEMERCADEO.
+  // El guard de main.ts redirige al dashboard a quien no tenga ese agente.
   {
     path: '/comercial/telemercadeo/mi-gestion',
     name: 'TelemercadeoMiGestion',
@@ -274,6 +276,7 @@ const routes: RouteRecordRaw[] = [
       title: 'Mi gestión · Telemercadeo',
       requiresAuth: true,
       roles: ['COMERCIAL'],
+      agenteTipo: 'ASESOR_TELEMERCADEO',
     },
   },
   // Telemercadeo · Control (gerencia). Mismos roles que los endpoints de control.

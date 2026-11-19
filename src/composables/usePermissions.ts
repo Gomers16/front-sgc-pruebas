@@ -1,5 +1,6 @@
 // src/composables/usePermissions.ts
 import { useAuthStore } from '@/stores/AuthStore'
+import { esAsesorTelemercadeo, puedeControlTelemercadeo } from '@/utils/permisosTelemercadeo'
 
 /**
  * Composable de permisos basado en roles
@@ -199,21 +200,16 @@ export function usePermissions() {
       // Gestiones de Telemercadeo ("Mi gestión"): solo COMERCIAL cuyo agente
       // es ASESOR_TELEMERCADEO (agenteTipo de login / me). El backend exige
       // lo mismo en POST /telemercadeo/gestiones y /mi-resumen.
-      gestionarTelemercadeo: () =>
-        auth.hasRole('COMERCIAL') && auth.currentAgenteTipo === 'ASESOR_TELEMERCADEO',
+      // Reglas en utils/permisosTelemercadeo.ts (con tests).
+      gestionarTelemercadeo: () => esAsesorTelemercadeo(auth.user),
 
       // Control de Telemercadeo: resumen, gestiones de todos, autorizar
       // seguimientos extra. Mismos roles que los endpoints de control.
-      controlTelemercadeo: () => auth.hasAnyRole([
-        'SUPER_ADMIN',
-        'GERENCIA'
-      ]),
+      // SUPER_ADMIN/GERENCIA no registran gestiones.
+      controlTelemercadeo: () => puedeControlTelemercadeo(auth.user),
 
       // Metas por asesor y máximo de seguimientos / vigencia del ciclo.
-      configurarSeguimientosTele: () => auth.hasAnyRole([
-        'SUPER_ADMIN',
-        'GERENCIA'
-      ]),
+      configurarSeguimientosTele: () => puedeControlTelemercadeo(auth.user),
 
       // Configurar límite global / overrides por asesor de re-dateos
       configurarRedateos: () => auth.hasAnyRole([

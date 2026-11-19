@@ -4,6 +4,7 @@
 import router from '@/router'
 import AuthService from '@/services/AuthService'
 import { defineStore } from 'pinia'
+import { esAsesorTelemercadeo } from '@/utils/permisosTelemercadeo'
 
 /** Usuario COMPLETO del sistema (viene de /me) */
 export interface User {
@@ -91,8 +92,7 @@ export const useAuthStore = defineStore('auth', {
     currentUserId: (s) => s.user?.id || null,
     currentAgenteId: (s) => s.user?.agenteId ?? null,
     currentAgenteTipo: (s) => s.user?.agenteTipo ?? null,
-    esAsesorTelemercadeo: (s) =>
-      s.user?.rol?.nombre === 'COMERCIAL' && s.user?.agenteTipo === 'ASESOR_TELEMERCADEO',
+    esAsesorTelemercadeo: (s) => esAsesorTelemercadeo(s.user),
 
     userRole: (s) => s.user?.rol?.nombre || null,
 
@@ -180,7 +180,7 @@ export const useAuthStore = defineStore('auth', {
           switch (rol) {
             case 'COMERCIAL': {
               // Asesor de Telemercadeo: aterriza en "Mi gestión".
-              if (this.user.agenteTipo === 'ASESOR_TELEMERCADEO') {
+              if (esAsesorTelemercadeo(this.user)) {
                 router.push({ name: 'TelemercadeoMiGestion' })
                 break
               }

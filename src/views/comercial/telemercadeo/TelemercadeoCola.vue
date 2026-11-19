@@ -7,7 +7,7 @@
         <h2 class="text-h6 font-weight-bold mb-0">Telemercadeo · Cola de trabajo</h2>
         <div class="text-caption text-medium-emphasis">
           Se excluyen placas o clientes con turno hoy o con dateo RTM vigente.
-          <template v-if="can.gestionarTelemercadeo()">Registra cada contacto con “Registrar gestión”.</template>
+          <template v-if="puedeRegistrar">Registra cada contacto con “Registrar gestión”.</template>
           <span v-if="hoy">Corte: {{ fmtFecha(hoy) }}.</span>
         </div>
       </div>
@@ -207,20 +207,8 @@
 
         <template #item.acciones="{ item }">
           <div class="d-flex ga-1 justify-end">
-            <v-tooltip
-              v-if="!can.gestionarTelemercadeo()"
-              text="Solo los asesores de Telemercadeo registran gestiones"
-              location="top"
-            >
-              <template #activator="{ props }">
-                <span v-bind="props">
-                  <v-btn size="small" variant="tonal" prepend-icon="mdi-phone-log" disabled>
-                    Registrar gestión
-                  </v-btn>
-                </span>
-              </template>
-            </v-tooltip>
-            <v-menu v-else-if="item.placas.length > 1" location="bottom end">
+            <!-- Registrar gestión: solo asesores ASESOR_TELEMERCADEO; el resto no ve el botón. -->
+            <v-menu v-if="puedeRegistrar && item.placas.length > 1" location="bottom end">
               <template #activator="{ props }">
                 <v-btn
                   v-bind="props"
@@ -243,7 +231,7 @@
               </v-list>
             </v-menu>
             <v-btn
-              v-else
+              v-else-if="puedeRegistrar"
               size="small"
               variant="tonal"
               prepend-icon="mdi-phone-log"
@@ -302,6 +290,7 @@
     </v-card>
 
     <RegistrarGestionDialog
+      v-if="puedeRegistrar"
       v-model="gestionAbierta"
       :placa-inicial="gestionPlaca"
       :telefono-inicial="gestionTelefono"
@@ -345,6 +334,7 @@ import RegistrarGestionDialog from './components/RegistrarGestionDialog.vue'
 const router = useRouter()
 const { can } = usePermissions()
 const authStore = useAuthStore()
+const puedeRegistrar = computed(() => can.gestionarTelemercadeo())
 
 const TABS: { value: ListaCola; label: string }[] = [
   { value: 'POR_VENCER', label: 'Por vencer' },
@@ -526,6 +516,7 @@ const gestionTelefono = ref<string | null>(null)
 const snackbar = ref({ show: false, text: '', color: 'success' })
 
 function abrirGestion(item: FilaCola, placa: string) {
+  if (!puedeRegistrar.value) return
   gestionPlaca.value = placa
   gestionTelefono.value = item.telefono
   gestionAbierta.value = true

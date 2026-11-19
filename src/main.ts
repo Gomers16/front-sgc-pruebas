@@ -6,6 +6,7 @@ import { createPinia } from 'pinia' // Importa createPinia
 import App from './App.vue'
 import router from './router'
 import { useAuthStore } from './stores/AuthStore'
+import { cumpleAgenteTipoRuta } from './utils/permisosTelemercadeo'
 
 import { createVuetify } from 'vuetify'
 import 'vuetify/styles'
@@ -57,6 +58,12 @@ router.beforeEach((to, _from, next) => {
 
   const roles = to.meta.roles
   if (roles?.length && !auth.hasAnyRole(roles)) {
+    next('/dashboard')
+    return
+  }
+
+  // Rutas que exigen un tipo de agente (p. ej. "Mi gestión" de Telemercadeo).
+  if (!cumpleAgenteTipoRuta(to.meta.agenteTipo, auth.user)) {
     next('/dashboard')
     return
   }
