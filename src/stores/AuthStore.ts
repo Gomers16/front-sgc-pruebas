@@ -9,6 +9,8 @@ import { defineStore } from 'pinia'
 export interface User {
   id: number
   agenteId?: number | null
+  /** Tipo del agente de captación ligado (p. ej. ASESOR_TELEMERCADEO); viene en login y /me. */
+  agenteTipo?: string | null
   razonSocialId: number
   rolId: number
   epsId: number
@@ -43,6 +45,7 @@ export interface User {
 interface UserAuth {
   id: number
   agenteId?: number | null
+  agenteTipo?: string | null
   nombres: string
   apellidos: string
   correo: string
@@ -87,6 +90,9 @@ export const useAuthStore = defineStore('auth', {
     isAuthenticated: (s) => !!s.token && !!s.user,
     currentUserId: (s) => s.user?.id || null,
     currentAgenteId: (s) => s.user?.agenteId ?? null,
+    currentAgenteTipo: (s) => s.user?.agenteTipo ?? null,
+    esAsesorTelemercadeo: (s) =>
+      s.user?.rol?.nombre === 'COMERCIAL' && s.user?.agenteTipo === 'ASESOR_TELEMERCADEO',
 
     userRole: (s) => s.user?.rol?.nombre || null,
 
@@ -173,6 +179,11 @@ export const useAuthStore = defineStore('auth', {
         if (currentPath === '/login' || currentPath === '/register') {
           switch (rol) {
             case 'COMERCIAL': {
+              // Asesor de Telemercadeo: aterriza en "Mi gestión".
+              if (this.user.agenteTipo === 'ASESOR_TELEMERCADEO') {
+                router.push({ name: 'TelemercadeoMiGestion' })
+                break
+              }
               const asesorId = this.user.agenteId || this.user.id
               router.push({
                 name: 'FichaComercialAsesor',

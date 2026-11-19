@@ -263,6 +263,32 @@ const routes: RouteRecordRaw[] = [
     },
   },
 
+  // Telemercadeo · "Mi gestión" (COMERCIAL con agente ASESOR_TELEMERCADEO;
+  // el backend responde 403 a un comercial sin ese agente).
+  {
+    path: '/comercial/telemercadeo/mi-gestion',
+    name: 'TelemercadeoMiGestion',
+    component: () => import('@/views/comercial/telemercadeo/TelemercadeoMiGestion.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Mi gestión · Telemercadeo',
+      requiresAuth: true,
+      roles: ['COMERCIAL'],
+    },
+  },
+  // Telemercadeo · Control (gerencia). Mismos roles que los endpoints de control.
+  {
+    path: '/comercial/telemercadeo/control',
+    name: 'TelemercadeoControl',
+    component: () => import('@/views/comercial/telemercadeo/TelemercadeoControl.vue'),
+    meta: {
+      layout: 'MainLayout',
+      title: 'Control de Telemercadeo',
+      requiresAuth: true,
+      roles: ['SUPER_ADMIN', 'GERENCIA'],
+    },
+  },
+
   // Convenios
   {
     path: '/comercial/convenios',

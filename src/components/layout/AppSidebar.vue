@@ -130,7 +130,7 @@
            can.verComercial() para no cambiar quién los ve; Telemercadeo usa
            solo su propio gate. -->
       <v-list-group
-        v-if="can.verComercial() || can.verTelemercadeo()"
+        v-if="can.verComercial() || can.verTelemercadeo() || can.gestionarTelemercadeo() || can.controlTelemercadeo()"
         value="comercial"
         prepend-icon="mdi-briefcase-variant-outline"
         class="nav-item"
@@ -197,6 +197,24 @@
           prepend-icon="mdi-phone-outgoing"
           title="Telemercadeo"
           :to="{ name: 'ComercialTelemercadeo' }"
+          class="nav-item"
+          color="#FACC15"
+          link
+        />
+        <v-list-item
+          v-if="can.gestionarTelemercadeo()"
+          prepend-icon="mdi-headset"
+          title="Mi gestión"
+          :to="{ name: 'TelemercadeoMiGestion' }"
+          class="nav-item"
+          color="#FACC15"
+          link
+        />
+        <v-list-item
+          v-if="can.controlTelemercadeo()"
+          prepend-icon="mdi-chart-box-outline"
+          title="Control de Telemercadeo"
+          :to="{ name: 'TelemercadeoControl' }"
           class="nav-item"
           color="#FACC15"
           link

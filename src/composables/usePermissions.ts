@@ -196,6 +196,25 @@ export function usePermissions() {
         'COMERCIAL'
       ]),
 
+      // Gestiones de Telemercadeo ("Mi gestión"): solo COMERCIAL cuyo agente
+      // es ASESOR_TELEMERCADEO (agenteTipo de login / me). El backend exige
+      // lo mismo en POST /telemercadeo/gestiones y /mi-resumen.
+      gestionarTelemercadeo: () =>
+        auth.hasRole('COMERCIAL') && auth.currentAgenteTipo === 'ASESOR_TELEMERCADEO',
+
+      // Control de Telemercadeo: resumen, gestiones de todos, autorizar
+      // seguimientos extra. Mismos roles que los endpoints de control.
+      controlTelemercadeo: () => auth.hasAnyRole([
+        'SUPER_ADMIN',
+        'GERENCIA'
+      ]),
+
+      // Metas por asesor y máximo de seguimientos / vigencia del ciclo.
+      configurarSeguimientosTele: () => auth.hasAnyRole([
+        'SUPER_ADMIN',
+        'GERENCIA'
+      ]),
+
       // Configurar límite global / overrides por asesor de re-dateos
       configurarRedateos: () => auth.hasAnyRole([
         'SUPER_ADMIN',

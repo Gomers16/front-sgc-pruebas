@@ -16,6 +16,8 @@ export interface RequestOptions<TBody = unknown> {
   expectJson?: boolean
   // Permite cancelar/abortar requests
   signal?: AbortSignal
+  // Recibe las cabeceras de una respuesta OK (p. ej. avisos en descargas)
+  onHeaders?: (headers: Headers) => void
 }
 
 export class HttpError extends Error {
@@ -134,6 +136,7 @@ export async function http<TResp = unknown, TBody = unknown>(
     credentials = 'omit', // 👈 SIN cookies por defecto
     expectJson = true,
     signal,
+    onHeaders,
   }: RequestOptions<TBody> = {}
 ): Promise<TResp> {
   const url = buildUrl(path, params)
@@ -160,6 +163,7 @@ export async function http<TResp = unknown, TBody = unknown>(
     throw new HttpError(res.status, errMsg, errData)
   }
 
+  onHeaders?.(res.headers)
   return (await parseResponse(res, expectJson)) as TResp
 }
 
@@ -206,6 +210,20 @@ export function upload<T = unknown>(
 // Descargar como blob (PDF, Excel, imagen, etc.)
 export function download(path: string, params?: Params) {
   return http<Blob>(path, { params, expectJson: false })
+}
+
+// Igual que download(), pero devuelve también las cabeceras de la respuesta
+// (p. ej. Content-Disposition o avisos como X-Detalle-Truncado).
+export async function downloadConCabeceras(path: string, params?: Params) {
+  let headers: Headers = new Headers()
+  const blob = await http<Blob>(path, {
+    params,
+    expectJson: false,
+    onHeaders: (h) => {
+      headers = h
+    },
+  })
+  return { blob, headers }
 }
 
 

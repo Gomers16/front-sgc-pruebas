@@ -6,7 +6,8 @@
       <div>
         <h2 class="text-h6 font-weight-bold mb-0">Telemercadeo · Cola de trabajo</h2>
         <div class="text-caption text-medium-emphasis">
-          Solo lectura. Se excluyen placas o clientes con turno hoy o con dateo RTM vigente.
+          Se excluyen placas o clientes con turno hoy o con dateo RTM vigente.
+          <template v-if="can.gestionarTelemercadeo()">Registra cada contacto con “Registrar gestión”.</template>
           <span v-if="hoy">Corte: {{ fmtFecha(hoy) }}.</span>
         </div>
       </div>
@@ -125,10 +126,19 @@
               size="small"
               variant="tonal"
               class="mr-1 mb-1"
-              :color="p === item.placa ? 'primary' : undefined"
+              :color="rtmVigenteDe(item, p) ? 'success' : p === item.placa ? 'primary' : undefined"
+              :prepend-icon="rtmVigenteDe(item, p) ? 'mdi-calendar-check' : undefined"
             >
               {{ p }}
             </v-chip>
+            <div
+              v-for="r in item.rtm_vigentes"
+              :key="`rtm-${r.placa}`"
+              class="text-caption text-success"
+            >
+              {{ r.placa }}: RTM vigente hasta {{ fmtFecha(r.vence_el) }} · datear RTM desde
+              {{ fmtFecha(r.puede_datear_desde) }}
+            </div>
           </template>
           <span v-else class="text-medium-emphasis">Sin vehículo</span>
         </template>
@@ -170,9 +180,38 @@
           </div>
         </template>
 
+        <template #item.seguimiento="{ item }">
+          <template v-if="item.seguimiento">
+            <v-chip
+              size="small"
+              variant="tonal"
+              :color="colorSeguimiento(item)"
+            >
+              {{ item.seguimiento.ciclo_abierto ? fraccionSeguimiento(item.seguimiento.n, item.seguimiento.limite) : 'Ciclo cerrado' }}
+            </v-chip>
+            <div class="text-caption text-medium-emphasis text-no-wrap">
+              {{ item.seguimiento.placa }} · {{ fmtFechaHora(item.seguimiento.ultima_gestion.fecha) }}
+            </div>
+            <div class="text-caption text-no-wrap">
+              {{ etiquetaMedio(item.seguimiento.ultima_gestion.medio) }} ·
+              <span :class="`text-${colorResultado(item.seguimiento.ultima_gestion.resultado)}`">
+                {{ etiquetaResultado(item.seguimiento.ultima_gestion.resultado) }}
+              </span>
+            </div>
+            <div v-if="item.seguimiento.ultima_gestion.agente_nombre" class="text-caption text-medium-emphasis">
+              {{ item.seguimiento.ultima_gestion.agente_nombre }}
+            </div>
+          </template>
+          <span v-else class="text-medium-emphasis text-caption">Sin gestiones</span>
+        </template>
+
         <template #item.acciones="{ item }">
           <div class="d-flex ga-1 justify-end">
-            <v-tooltip text="Próximamente" location="top">
+            <v-tooltip
+              v-if="!can.gestionarTelemercadeo()"
+              text="Solo los asesores de Telemercadeo registran gestiones"
+              location="top"
+            >
               <template #activator="{ props }">
                 <span v-bind="props">
                   <v-btn size="small" variant="tonal" prepend-icon="mdi-phone-log" disabled>
@@ -181,6 +220,38 @@
                 </span>
               </template>
             </v-tooltip>
+            <v-menu v-else-if="item.placas.length > 1" location="bottom end">
+              <template #activator="{ props }">
+                <v-btn
+                  v-bind="props"
+                  size="small"
+                  variant="tonal"
+                  prepend-icon="mdi-phone-log"
+                  append-icon="mdi-menu-down"
+                >
+                  Registrar gestión
+                </v-btn>
+              </template>
+              <v-list density="compact">
+                <v-list-subheader>¿Qué placa?</v-list-subheader>
+                <v-list-item
+                  v-for="p in item.placas"
+                  :key="p"
+                  :title="p"
+                  @click="abrirGestion(item, p)"
+                />
+              </v-list>
+            </v-menu>
+            <v-btn
+              v-else
+              size="small"
+              variant="tonal"
+              prepend-icon="mdi-phone-log"
+              :disabled="!item.placa"
+              @click="abrirGestion(item, item.placa)"
+            >
+              Registrar gestión
+            </v-btn>
 
             <!-- Varias placas: el operador elige cuál datear. -->
             <v-menu v-if="item.placas.length > 1" location="bottom end">
@@ -229,6 +300,17 @@
         </template>
       </v-data-table-server>
     </v-card>
+
+    <RegistrarGestionDialog
+      v-model="gestionAbierta"
+      :placa-inicial="gestionPlaca"
+      :telefono-inicial="gestionTelefono"
+      @registrada="onRegistrada"
+    />
+
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="4000">
+      {{ snackbar.text }}
+    </v-snackbar>
   </v-container>
 </template>
 
@@ -236,6 +318,8 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { HttpError } from '@/services/http'
+import { usePermissions } from '@/composables/usePermissions'
+import { useAuthStore } from '@/stores/AuthStore'
 import {
   getColaTelemercadeo,
   type ContadoresCola,
@@ -243,9 +327,24 @@ import {
   type FuenteVisita,
   type ListaCola,
   type OrdenClientes,
+  type RegistrarGestionResp,
 } from '@/services/telemercadeoService'
+import {
+  colorResultado,
+  etiquetaMedio,
+  etiquetaResultado,
+  fmtFecha,
+  fmtFechaHora,
+  fraccionSeguimiento,
+  gestionIdParaDatear,
+  seguimientoAgotado,
+  textoSeguimiento,
+} from './telemercadeoHelpers'
+import RegistrarGestionDialog from './components/RegistrarGestionDialog.vue'
 
 const router = useRouter()
+const { can } = usePermissions()
+const authStore = useAuthStore()
 
 const TABS: { value: ListaCola; label: string }[] = [
   { value: 'POR_VENCER', label: 'Por vencer' },
@@ -314,6 +413,7 @@ const headers = computed(() => {
       { title: 'Última visita', key: 'ultima_visita', sortable: false },
       { title: 'Fuente', key: 'fuente_ultima_visita', sortable: false },
       { title: 'Sin venir', key: 'meses_transcurridos', sortable: false },
+      { title: 'Seguimiento', key: 'seguimiento', sortable: false },
       acciones,
     ]
   }
@@ -323,6 +423,7 @@ const headers = computed(() => {
     { title: 'Último RTM', key: 'ultima_visita', sortable: false },
     { title: 'Tiempo', key: 'meses_transcurridos', sortable: false },
     { title: 'Vencimiento RTM', key: 'vence_el', sortable: false },
+    { title: 'Seguimiento', key: 'seguimiento', sortable: false },
     acciones,
   ]
 })
@@ -396,19 +497,49 @@ onBeforeUnmount(() => {
 
 function datear(item: FilaCola, placa: string) {
   const telefono = (item.telefono || '').replace(/\D/g, '')
+  // Con una gestión abierta propia de esa placa, el dateo sale desde la
+  // gestión (canal TELE, vínculo gestión ↔ dateo). Si no, igual que antes.
+  const gestionId = gestionIdParaDatear(item.seguimiento, placa, authStore.currentAgenteId)
   router.push({
     name: 'ComercialDateosNuevo',
     query: {
       ...(placa ? { placa } : {}),
       ...(telefono ? { telefono } : {}),
+      ...(gestionId ? { gestion_id: String(gestionId) } : {}),
     },
   })
 }
 
-function fmtFecha(iso: string | null) {
-  if (!iso) return '—'
-  const [y, m, d] = iso.substring(0, 10).split('-')
-  return `${d}/${m}/${y}`
+const rtmVigenteDe = (item: FilaCola, placa: string) =>
+  item.rtm_vigentes.find((r) => r.placa === placa) ?? null
+
+function colorSeguimiento(item: FilaCola) {
+  const s = item.seguimiento
+  if (!s || !s.ciclo_abierto) return undefined
+  return seguimientoAgotado(s.n, s.limite) ? 'error' : 'primary'
+}
+
+/* ── Registrar gestión ── */
+const gestionAbierta = ref(false)
+const gestionPlaca = ref<string | null>(null)
+const gestionTelefono = ref<string | null>(null)
+const snackbar = ref({ show: false, text: '', color: 'success' })
+
+function abrirGestion(item: FilaCola, placa: string) {
+  gestionPlaca.value = placa
+  gestionTelefono.value = item.telefono
+  gestionAbierta.value = true
+}
+
+function onRegistrada(r: RegistrarGestionResp) {
+  snackbar.value = r.repetida
+    ? { show: true, color: 'info', text: 'Esa gestión ya estaba registrada; no se duplicó.' }
+    : {
+        show: true,
+        color: 'success',
+        text: `Gestión registrada · ${textoSeguimiento(r.seguimiento.n, r.seguimiento.limite)}`,
+      }
+  cargar()
 }
 
 function textoVencimiento(item: FilaCola) {

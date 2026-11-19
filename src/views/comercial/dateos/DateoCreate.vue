@@ -34,6 +34,24 @@
 
       <v-card-text class="py-4 py-sm-6 px-3 px-sm-4">
         <v-form ref="formRef" @submit.prevent="handleSubmit">
+          <!-- Dateo desde una gestión de Telemercadeo (?gestion_id=) -->
+          <v-alert
+            v-if="gestionIdQuery !== null"
+            :type="errorGestion ? 'error' : 'info'"
+            variant="tonal"
+            density="comfortable"
+            class="mb-4"
+            icon="mdi-headset"
+          >
+            <template v-if="errorGestion">{{ errorGestion }}</template>
+            <template v-else-if="!gestionTele">Cargando la gestión #{{ gestionIdQuery }}…</template>
+            <template v-else>
+              <strong>Dateo desde la gestión #{{ gestionTele.id }} de Telemercadeo.</strong>
+              El canal (Telemercadeo), la placa y el servicio de la gestión quedan fijos; el
+              asesor es tu usuario. Al guardar, la gestión queda como “Dateado”.
+            </template>
+          </v-alert>
+
           <v-row>
             <!-- Canal -->
             <v-col cols="12" md="6">
@@ -132,7 +150,8 @@
                 prepend-inner-icon="mdi-car"
                 :counter="6"
                 :maxlength="6"
-                hint="Formato válido: 3 letras + 3 dígitos, o 3 letras + 2 dígitos (+ letra opcional)"
+                :readonly="!!gestionTele"
+                :hint="gestionTele ? 'Placa de la gestión de Telemercadeo (fija).' : 'Formato válido: 3 letras + 3 dígitos, o 3 letras + 2 dígitos (+ letra opcional)'"
                 persistent-hint
               />
             </v-col>
@@ -172,7 +191,8 @@
                 prepend-inner-icon="mdi-wrench"
                 :rules="[rules.required]"
                 :loading="serviciosLoading"
-                hint="RTM preseleccionado. Cambia si es para otro servicio."
+                :disabled="!!gestionTele"
+                :hint="gestionTele ? 'Servicio de la gestión de Telemercadeo (fijo).' : 'RTM preseleccionado. Cambia si es para otro servicio.'"
                 persistent-hint
               />
             </v-col>
@@ -603,6 +623,9 @@ import descuentosService from '@/services/descuentosService'
 import type { Descuento } from '@/services/descuentosService'
 import serviciosService from '@/services/Servicios_service'
 import { useAuthStore } from '@/stores/AuthStore'
+import { getGestion } from '@/services/telemercadeoService'
+import { construirPayloadDateo, leerGestionIdQuery } from './payloadDateo'
+import { mensajeErrorDateoGestion } from '@/views/comercial/telemercadeo/telemercadeoHelpers'
 
 const router = useRouter()
 const route = useRoute()
@@ -619,24 +642,35 @@ interface FormRef {
   validate: () => Promise<{ valid: boolean }>
 }
 
-interface CreateDateoPayload {
-  canal: 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES'
-  origen: 'UI'
-  agente_id: number | null
-  convenio_id: number | null
-  placa: string | null
-  telefono: string | null
-  observacion: string | null
-  descuento_id?: number | null
-  es_avance?: boolean
-  comprobante_avance_url?: string | null
-  imagen_url?: string | null
-  imagen_mime?: string | null
-  imagen_tamano_bytes?: number | null
-  imagen_hash?: string | null
-  imagen_origen_id?: string | number | null
-   servicio_id?: number | null  // 🆕 agregar esta línea
-  confirmar_excepcion?: boolean // 🆕 excepción RTM_VIGENTE (SUPER_ADMIN/GERENCIA)
+/* ===== 🆕 Dateo desde una gestión de Telemercadeo (?gestion_id=) =====
+ * Canal TELE y servicio de la gestión fijos, sin selector de agente (el
+ * backend lo toma del token) y se envía telemercadeo_gestion_id. Sin
+ * gestion_id, nada de esto aplica y el formulario es el de siempre. */
+const gestionIdQuery = ref<number | null>(null)
+const gestionTele = ref<{ id: number; servicio_id: number; placa: string; telefono: string | null } | null>(null)
+const errorGestion = ref('')
+
+async function cargarGestionTele(id: number) {
+  try {
+    const g = await getGestion(id)
+    if (g.captacion_dateo_id) {
+      errorGestion.value = `La gestión #${id} ya tiene un dateo vinculado (#${g.captacion_dateo_id}).`
+      return
+    }
+    gestionTele.value = { id: g.id, servicio_id: g.servicio_id, placa: g.placa, telefono: g.telefono }
+    form.value.canal = 'TELE'
+    canalBloqueado.value = true
+    form.value.placa = g.placa
+    if (!form.value.telefono && g.telefono) form.value.telefono = g.telefono
+    form.value.servicio_id = g.servicio_id
+  } catch (error) {
+    errorGestion.value =
+      error instanceof HttpError && error.status === 403
+        ? 'No puedes datear desde esta gestión: es de otro asesor.'
+        : error instanceof HttpError && error.status === 404
+          ? `La gestión #${id} no existe.`
+          : `No se pudo cargar la gestión #${id}.`
+  }
 }
 
 /* ===== Contexto desde ficha ===== */
@@ -736,7 +770,8 @@ async function loadServicios() {
     servicios.value = data
     // Preseleccionar RTM
     const rtm = data.find((s: any) => s.codigoServicio?.toUpperCase() === 'RTM')
-    if (rtm) form.value.servicio_id = rtm.id
+    if (gestionTele.value) form.value.servicio_id = gestionTele.value.servicio_id
+    else if (rtm && gestionIdQuery.value === null) form.value.servicio_id = rtm.id
   } catch (e) {
     console.error('Error cargando servicios:', e)
   } finally {
@@ -1046,16 +1081,20 @@ const rules = {
 
 /* ===== Computed generales ===== */
 const showTipoAsesor = computed(() => {
+  if (gestionIdQuery.value !== null) return false
   return form.value.canal === 'ASESOR' || form.value.canal === 'TELE'
 })
 
 const mostrarAgente = computed(() => {
+  if (gestionIdQuery.value !== null) return false
   return form.value.canal === 'ASESOR' || form.value.canal === 'TELE'
 })
 
 
 
 const canSubmit = computed(() => {
+  // Con gestion_id, solo cuando la gestión cargó bien.
+  if (gestionIdQuery.value !== null && (!gestionTele.value || !!errorGestion.value)) return false
   return (
     !!form.value.placa?.trim() &&
     PLACA_REGEX.test(form.value.placa.trim()) &&
@@ -1166,31 +1205,13 @@ async function confirmCreate() {
 
 /** Arma el payload desde form.value (imágenes ya subidas) y crea el dateo. */
 async function submitDateo(confirmarExcepcion = false) {
-  const payload: CreateDateoPayload = {
-    canal: form.value.canal,
-    origen: 'UI',
-    agente_id: form.value.agente_id,
-    convenio_id: form.value.convenio_id,
-    placa: form.value.placa ? form.value.placa.toUpperCase().trim() : null,
-    telefono: form.value.telefono || null,
-    observacion: form.value.observacion || null,
-    descuento_id: puedeSeleccionarDescuento.value ? (form.value.descuento_id || null) : null,
-    es_avance: form.value.es_avance || false,
-    comprobante_avance_url: form.value.es_avance ? (form.value.comprobante_avance_url || null) : null,
-    servicio_id: form.value.servicio_id || null, // 🆕
-  }
-
-  if (form.value.imagen_url) {
-    payload.imagen_url = form.value.imagen_url
-    payload.imagen_mime = form.value.imagen_mime ?? null
-    payload.imagen_tamano_bytes = form.value.imagen_tamano_bytes ?? null
-    payload.imagen_hash = form.value.imagen_hash ?? null
-    payload.imagen_origen_id = form.value.imagen_origen_id ?? null
-  }
-
-  if (confirmarExcepcion) payload.confirmar_excepcion = true
-
-  return createDateo(payload)
+  // Payload en payloadDateo.ts (con tests): sin gestión es exactamente el de siempre.
+  const payload = construirPayloadDateo(form.value, {
+    puedeSeleccionarDescuento: puedeSeleccionarDescuento.value,
+    confirmarExcepcion,
+    gestion: gestionTele.value,
+  })
+  return createDateo(payload as Parameters<typeof createDateo>[0])
 }
 
 async function handleSubmit() {
@@ -1245,8 +1266,12 @@ async function handleSubmit() {
           } | undefined)
         : undefined
     const code = data?.code
+    const msgGestion = gestionTele.value ? mensajeErrorDateoGestion(code) : null
 
-    if (code === 'RTM_VIGENTE_EXCEPCION_DISPONIBLE' && esPrivilegiado.value) {
+    if (msgGestion) {
+      snackbar.value = { show: true, color: 'error', text: msgGestion }
+      if (code === 'GESTION_YA_DATEADA' || code === 'GESTION_AJENA') errorGestion.value = msgGestion
+    } else if (code === 'RTM_VIGENTE_EXCEPCION_DISPONIBLE' && esPrivilegiado.value) {
       excepcionRtmDias.value = data?.diasExcedidos ?? null
       showExcepcionRtmDialog.value = true
     } else if (code === 'DATEO_ACTIVO_EXCEPCION_DISPONIBLE' && esPrivilegiado.value) {
@@ -1339,7 +1364,11 @@ function irACrearTicketExcepcionDateo() {
 
 function handleConfirmSuccess() {
   showSuccessDialog.value = false
-  if (fromAsesor.value) {
+  if (gestionTele.value) {
+    router
+      .push({ name: 'TelemercadeoMiGestion' })
+      .catch(() => router.push('/comercial/telemercadeo/mi-gestion'))
+  } else if (fromAsesor.value) {
     router
       .push({ name: 'FichaComercialAsesor', params: { id: String(fromAsesor.value) } })
       .catch((err) => console.error('Error navegando a FichaComercialAsesor:', err))
@@ -1405,6 +1434,14 @@ onMounted(() => {
   const telefonoQuery = route.query.telefono as string | undefined
   if (placaQuery) form.value.placa = placaQuery.toUpperCase()
   if (telefonoQuery) form.value.telefono = telefonoQuery
+
+  // 🆕 Dateo desde una gestión de Telemercadeo
+  gestionIdQuery.value = leerGestionIdQuery(route.query.gestion_id)
+  if (gestionIdQuery.value !== null) {
+    form.value.canal = 'TELE'
+    canalBloqueado.value = true
+    cargarGestionTele(gestionIdQuery.value)
+  }
 
   loadCatalogos()
   loadDescuentos()
