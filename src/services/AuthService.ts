@@ -20,6 +20,10 @@ export interface LoginResponse {
 }
 
 export interface MeResponse {
+  // Multi-sede (Fase 6): sede propia, sedes elegibles y si puede cambiar.
+  sede?: { id: number; nombre: string } | null
+  sedesPermitidas?: { id: number; nombre: string }[]
+  puedeCambiarSede?: boolean
   user: {
     id: number
     agenteId?: number | null

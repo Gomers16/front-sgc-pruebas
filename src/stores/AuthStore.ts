@@ -5,6 +5,7 @@ import router from '@/router'
 import AuthService from '@/services/AuthService'
 import { defineStore } from 'pinia'
 import { esAsesorTelemercadeo } from '@/utils/permisosTelemercadeo'
+import { cargarSedeDesdeMe, limpiarSede } from '@/services/sedeActiva'
 
 /** Usuario COMPLETO del sistema (viene de /me) */
 export interface User {
@@ -154,6 +155,7 @@ export const useAuthStore = defineStore('auth', {
       this.token = null
       localStorage.removeItem('user')
       localStorage.removeItem('token')
+      limpiarSede()
       router.push('/login')
     },
 
@@ -172,6 +174,7 @@ export const useAuthStore = defineStore('auth', {
 
         this.user = response.user as User
         localStorage.setItem('user', JSON.stringify(this.user))
+        cargarSedeDesdeMe(response) // multi-sede: sede propia / elegibles
 
         const currentPath = router.currentRoute.value.path
         const rol = this.user.rol.nombre

@@ -5,6 +5,7 @@ import { authSetStore } from '@/stores/AuthStore'
 import { useRouter } from 'vue-router'
 import { useDrawer } from '@/composables/useDrawer'
 import { useDisplay } from 'vuetify'
+import SelectorSede from '@/components/layout/SelectorSede.vue'
 
 const authStore = authSetStore()
 const router = useRouter()
@@ -62,6 +63,9 @@ const confirmLogout = async () => {
     </div>
 
     <v-spacer />
+
+    <!-- Multi-sede: sede activa (solo SUPER_ADMIN y GERENCIA la ven y cambian) -->
+    <SelectorSede :compacto="xs" />
 
     <!-- Botón logout -->
     <v-btn
