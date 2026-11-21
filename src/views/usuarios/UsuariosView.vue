@@ -192,6 +192,25 @@
               />
             </v-col>
 
+            <!-- Multi-sede: la sede del usuario es obligatoria -->
+            <v-col cols="12" md="6">
+              <v-select
+                label="Sede"
+                v-model="sedeId"
+                :items="opcionesSede"
+                item-title="nombre"
+                item-value="id"
+                :error-messages="sedeIdError"
+                required
+                outlined
+                density="comfortable"
+                :disabled="isProcessing || !sedeAsignable"
+                :hint="sedeAsignable ? '' : 'Solo puedes asignar tu propia sede.'"
+                :persistent-hint="!sedeAsignable"
+                data-test="usuario-sede"
+              />
+            </v-col>
+
             <v-col cols="12" md="6">
               <v-select
                 label="Estado"
@@ -382,6 +401,7 @@ import {
   obtenerRazonesSociales,
 } from '@/services/UserService'
 import ConfirmDialog from '@/components/UI/ConfirmarDialogo.vue'
+import { sedeActiva } from '@/services/sedeActiva'
 
 /* =========================
  * TIPOS
@@ -602,8 +622,34 @@ const { value: direccion, errorMessage: direccionError } = useField('direccion',
   initialValue: ''
 })
 
+// Multi-sede: sede obligatoria. SUPER_ADMIN/GERENCIA eligen entre las sedes
+// activas; el resto (TALENTO_HUMANO) solo puede asignar su propia sede.
+const { value: sedeId, errorMessage: sedeIdError } = useField<number | null>(
+  'sedeId',
+  [(v: number | null) => (v ? true : 'La sede es obligatoria.')],
+  { initialValue: null }
+)
+const sedeAsignable = computed(() => sedeActiva.puedeCambiarSede)
+const opcionesSede = computed(() => {
+  const base = sedeActiva.puedeCambiarSede
+    ? [...sedeActiva.sedesPermitidas]
+    : sedeActiva.sedePropia
+      ? [sedeActiva.sedePropia]
+      : []
+  // Usuario editado de una sede que no está en la lista (p. ej. inactiva).
+  if (sedeId.value && !base.some((s) => s.id === sedeId.value)) {
+    base.push({ id: sedeId.value, nombre: `Sede ${sedeId.value}` })
+  }
+  return base
+})
+/** Sede por defecto al crear: la elegida en el encabezado o la propia. */
+function sedePorDefecto(): number | null {
+  const s = sedeActiva.seleccion
+  if (sedeActiva.puedeCambiarSede && typeof s === 'number') return s
+  return sedeActiva.sedePropia?.id ?? null
+}
+
 // ✅ Campos ocultos que preservan valores del usuario
-const { value: sedeId } = useField<number | null>('sedeId', [], { initialValue: null })
 const { value: cargoId } = useField<number | null>('cargoId', [], { initialValue: null })
 const { value: epsId } = useField<number | null>('epsId', [], { initialValue: null })
 const { value: arlId } = useField<number | null>('arlId', [], { initialValue: null })
@@ -792,6 +838,7 @@ async function handleConfirmAction() {
         contactoEmergenciaTelefono: contactoEmergenciaTelefono.value || undefined,
         rolId: rolId.value as number,
         razonSocialId: razonSocialId.value as number,
+        sedeId: sedeId.value as number,
         estado: estado.value as 'activo' | 'inactivo',
       }
       if (password.value) userData.password = password.value
@@ -820,7 +867,7 @@ async function handleConfirmAction() {
         contactoEmergenciaTelefono: contactoEmergenciaTelefono.value || undefined,
         rolId: rolId.value as number,
         razonSocialId: razonSocialId.value as number,
-        sedeId: toUndefinedIfNull(sedeId.value),
+        sedeId: sedeId.value as number,
         cargoId: toUndefinedIfNull(cargoId.value),
         epsId: toUndefinedIfNull(epsId.value),
         arlId: toUndefinedIfNull(arlId.value),
@@ -916,7 +963,7 @@ resetForm({
       contactoEmergenciaTelefono: '',
       rolId: null,
       razonSocialId: null,
-      sedeId: null,
+      sedeId: sedePorDefecto(),
       cargoId: null,
       epsId: null,
       arlId: null,
