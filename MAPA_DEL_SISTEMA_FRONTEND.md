@@ -42,6 +42,8 @@ Este documento es una referencia completa del frontend, organizada por **módulo
 > Actualizado: 2026-11-19, después (**ficha del asesor de Telemercadeo dentro de "Mi gestión"**; solo pruebas): `FichaComercialAsesor.vue` decide qué muestra con `fichaSecciones.ts` según el tipo del agente visto; para `ASESOR_TELEMERCADEO` no hay comisiones, meta en pesos, Convenios, New-dateos ni crear/re-datear. "Mi gestión" gana las pestañas Seguimiento y Mi ficha. Ver 4.1 y 4.9.
 >
 > Actualizado: 2026-11-19 (**Telemercadeo — Fase 2, gestión y control**; solo pruebas, commits `45e1649` (Fase 2), `224e081` (mapa), `fe0e1c0` (respaldo `agenteId || user.id`) y la corrección del gate por tipo de agente; backend en `MAPA_DEL_SISTEMA_BACKEND.md`; producción local y servidor pendientes): vistas nuevas **Mi gestión** (`TelemercadeoMiGestion`, asesor ASESOR_TELEMERCADEO) y **Control de Telemercadeo** (`TelemercadeoControl`, SUPER_ADMIN/GERENCIA); la cola registra gestiones y muestra el seguimiento y el RTM vigente; `DateoCreate.vue` datea desde una gestión (`?gestion_id=`); `DropzoneImagen.vue` compartido; `http.ts::downloadConCabeceras`; permisos `gestionarTelemercadeo`, `controlTelemercadeo`, `configurarSeguimientosTele`; post-login por `agenteTipo` y corrección del respaldo `agenteId || user.id`. Ver secciones 4.2, 4.9 y 8.
+>
+> Actualizado: 2026-11-21 (**Multi-sede, Fase 6**: selector de sede en el encabezado para SUPER_ADMIN/GERENCIA, cabecera `X-Sede-Id`, "Todas las sedes" solo lectura y sede obligatoria en Usuarios; ver sección `Multi-sede`).
 
 ## Índice
 
@@ -57,6 +59,7 @@ Este documento es una referencia completa del frontend, organizada por **módulo
 10. [Turnero (Pantalla de Exhibición)](#turnero-pantalla-de-exhibición)
 11. [Archivos sin usar / fuera del router](#archivos-sin-usar--fuera-del-router)
 12. [Patrones establecidos del proyecto](#10-patrones-establecidos-del-proyecto)
+13. [Multi-sede](#multi-sede-2026-11-20--2026-11-21)
 
 Roles del sistema (ver `src/stores/AuthStore.ts` y `src/composables/usePermissions.ts`): `SUPER_ADMIN`, `GERENCIA`, `OPERATIVO_TURNOS`, `TRAMITADOR`, `CONTABILIDAD`, `COMERCIAL`, `TALENTO_HUMANO`, **`TURNERO`** (🆕 — sin acceso a ningún otro módulo, ver sección `Turnero`).
 
@@ -612,6 +615,17 @@ Rol nuevo, sin acceso a ningún otro módulo del sistema. Tres piezas trabajan j
 
 - **`views/Vistadesarrollo.vue`** — pantalla genérica "🚧 ¡Estamos Mejorando! 🚧" (placeholder de módulo en construcción, con botón "Volver"). **No está registrada en `src/router/index.ts`** ni referenciada desde ningún otro archivo (`grep` de `Vistadesarrollo` no arroja resultados fuera de sí misma) — parece un componente huérfano de una funcionalidad retirada o pendiente de enlazar. No borrar sin confirmar con el equipo si estaba pensado para algo específico.
 - **`views/reportes/SuperInformePreview.vue`** — no tiene ruta propia, pero **no está huérfano**: es importado directamente como componente hijo por `SuperInforme.vue` para renderizar la previsualización antes de generar el PDF.
+
+---
+
+## Multi-sede (2026-11-20 → 2026-11-21)
+
+- `src/services/sedeActiva.ts`: estado de la sede (sede propia, sedes permitidas, selección en `localStorage`). Lo carga `AuthStore` desde `/api/auth/me` (`sede`, `sedesPermitidas`, `puedeCambiarSede`) y se limpia al cerrar sesión.
+- Cabecera `X-Sede-Id` (`cabecerasSede()` / `ponerCabeceraSede()`): solo SUPER_ADMIN/GERENCIA y **nunca para la sede propia** (el backend la usa por defecto y rechaza en la cabecera una sede inactiva, p. ej. PRUEBAS QA). La mandan `services/http.ts` y los servicios con `fetch` propio (comisiones, comprobantes, prospectos, reportes, canales, facturación, histórico de facturación/descuentos).
+- "Todas las sedes" es **solo lectura**: `frenarEscrituraEnTodas()` corta POST/PUT/PATCH/DELETE en el front con aviso (sin request); un 400 `E_SEDE_SCOPE` del backend también muestra el aviso.
+- `src/components/layout/SelectorSede.vue` en `AppNavbar`: solo SA/GER; sede propia (aunque inactiva), sedes permitidas y "Todas" con chip "Solo lectura"; cambiar recarga la pantalla. Otros roles no ven selector.
+- `views/usuarios/UsuariosView.vue`: sede obligatoria; SA/GER eligen (por defecto la del encabezado), TALENTO_HUMANO solo la suya (campo bloqueado).
+- Descargas: trámites usan `download()` de `http.ts` (llevan la sede); contratos, perfil y razón social abren archivos estáticos de `/uploads/*` (públicos, sin sede).
 
 ---
 
