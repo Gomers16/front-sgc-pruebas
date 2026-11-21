@@ -1,3 +1,4 @@
+import { AVISO_SOLO_LECTURA, cabecerasSede, frenarEscrituraEnTodas } from '@/services/sedeActiva'
 // src/services/reportesAdminService.ts
 const BASE = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/api`
@@ -26,6 +27,8 @@ async function apiFetch<T>(
   const token =
     sessionStorage.getItem('token') || localStorage.getItem('token')
   if (token) (headers as Record<string, string>).Authorization = `Bearer ${token}`
+  Object.assign(headers, cabecerasSede()) // multi-sede
+  if (frenarEscrituraEnTodas(opts.method)) throw new Error(AVISO_SOLO_LECTURA)
 
   const res = await fetch(url, {
     method: opts.method ?? 'GET',
@@ -50,6 +53,7 @@ async function apiFetchBlob(endpoint: string, query?: Record<string, unknown>): 
   const token = sessionStorage.getItem('token') || localStorage.getItem('token')
   const headers: HeadersInit = {}
   if (token) (headers as Record<string, string>).Authorization = `Bearer ${token}`
+  Object.assign(headers, cabecerasSede()) // multi-sede
 
   const res = await fetch(url, { method: 'GET', headers })
   if (!res.ok) {
@@ -70,6 +74,8 @@ async function apiFetchBlobPost(endpoint: string, body: unknown): Promise<Blob> 
   const token = sessionStorage.getItem('token') || localStorage.getItem('token')
   const headers: HeadersInit = { 'Content-Type': 'application/json' }
   if (token) (headers as Record<string, string>).Authorization = `Bearer ${token}`
+  Object.assign(headers, cabecerasSede()) // multi-sede
+  if (frenarEscrituraEnTodas('POST')) throw new Error(AVISO_SOLO_LECTURA)
 
   const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) })
   if (!res.ok) {

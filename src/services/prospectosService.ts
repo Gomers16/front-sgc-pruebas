@@ -1,5 +1,6 @@
 // src/services/prospectosService.ts
 import { listConveniosLight as listConveniosLightBase } from '@/services/conveniosService'
+import { AVISO_SOLO_LECTURA, cabecerasSede, frenarEscrituraEnTodas } from '@/services/sedeActiva'
 import type { ConvenioLight } from '@/services/conveniosService'
 
 export type { ConvenioLight }
@@ -50,8 +51,10 @@ async function apiFetch<T>(
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...getAuthHeader(),
+    ...cabecerasSede(), // multi-sede
     ...(opts.headers || {}),
   }
+  if (frenarEscrituraEnTodas(opts.method)) throw new Error(AVISO_SOLO_LECTURA)
 
   const res = await fetch(url, {
     method: opts.method || 'GET',

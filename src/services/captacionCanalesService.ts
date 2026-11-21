@@ -1,3 +1,4 @@
+import { AVISO_SOLO_LECTURA, frenarEscrituraEnTodas, ponerCabeceraSede } from '@/services/sedeActiva'
 // src/services/captacionCanalesService.ts
 type Order = 'asc' | 'desc'
 type OrderBy = 'orden' | 'codigo' | 'nombre' | 'created_at'
@@ -83,6 +84,7 @@ function buildHeaders(init?: HeadersInit, sendJson = true): Headers {
   if (sendJson && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   const token = getAuthToken()
   if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`)
+  ponerCabeceraSede(headers) // multi-sede
   return headers
 }
 
@@ -101,6 +103,7 @@ function toQuery<T extends object>(params?: T): string {
 
 /** Fetch wrapper tipado */
 async function http<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (frenarEscrituraEnTodas(init.method)) throw new Error(AVISO_SOLO_LECTURA)
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: buildHeaders(init.headers),

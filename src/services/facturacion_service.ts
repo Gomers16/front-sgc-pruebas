@@ -1,5 +1,6 @@
 // src/services/facturacion_service.ts
 import { get, upload, post, patch, download } from './http'
+import { cabecerasSede } from '@/services/sedeActiva'
 import type { DesgloseComision } from './desgloseComision'
 
 /* =========================== Tipos del dominio =========================== */
@@ -524,6 +525,7 @@ export const FacturacionService = {
         sessionStorage.getItem('token')
       const headers: Record<string, string> = {}
       if (token) headers['Authorization'] = `Bearer ${token}`
+      Object.assign(headers, cabecerasSede()) // multi-sede
       const resp = await fetch(`/api/facturacion/tickets/${id}/documentos-policia/${tipo}`, {
         headers,
         credentials: 'include',

@@ -1,5 +1,6 @@
 // src/services/comisionesService.ts
 import { listConveniosLight } from '@/services/conveniosService'
+import { AVISO_SOLO_LECTURA, cabecerasSede, frenarEscrituraEnTodas } from '@/services/sedeActiva'
 import type { CasoComision, DesgloseComision } from './desgloseComision'
 
 const BASE = import.meta.env.VITE_API_BASE_URL
@@ -47,6 +48,8 @@ async function apiFetch<T>(
   const token =
     sessionStorage.getItem('token') || localStorage.getItem('token') // fallback por si algo aún quedó en local
   if (token) (headers as Record<string, string>).Authorization = `Bearer ${token}`
+  Object.assign(headers, cabecerasSede()) // multi-sede
+  if (frenarEscrituraEnTodas(opts.method)) throw new Error(AVISO_SOLO_LECTURA)
 
   const res = await fetch(url, {
     method: opts.method || 'GET',

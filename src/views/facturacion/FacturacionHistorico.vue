@@ -922,6 +922,7 @@ import {
   type ResumenHistorial,
 } from '@/services/facturacion_service'
 import descuentosService from '@/services/descuentosService'
+import { AVISO_SOLO_LECTURA, cabecerasSede, frenarEscrituraEnTodas } from '@/services/sedeActiva'
 import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import { HttpError } from '@/services/http'
 import {
@@ -1354,6 +1355,7 @@ async function loadImageBlob(ticketId: number) {
 
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
+    Object.assign(headers, cabecerasSede()) // multi-sede
 
     const response = await fetch(`/api/facturacion/tickets/${ticketId}/imagen`, {
       headers,
@@ -1512,6 +1514,8 @@ async function saveDescuentoMonto() {
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (token) headers['Authorization'] = `Bearer ${token}`
+    Object.assign(headers, cabecerasSede()) // multi-sede
+    if (frenarEscrituraEnTodas('PATCH')) throw new Error(AVISO_SOLO_LECTURA)
 
     const montoAnterior = Number(
       dialog.item?.descuentoAplicado?.montoAplicado ??

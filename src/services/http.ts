@@ -1,5 +1,11 @@
 // src/services/http.ts
 // Motor central basado en fetch para TODOS tus services (sin "any")
+import {
+  AVISO_SOLO_LECTURA,
+  cabecerasSede,
+  frenarEscrituraEnTodas,
+  mostrarAvisoSede,
+} from './sedeActiva'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 type ParamPrimitive = string | number | boolean | null | undefined
@@ -58,6 +64,8 @@ function extractMessage(data: unknown, fallback: string): string {
 function makeHeaders(userHeaders?: Record<string, string>, body?: unknown) {
   const headers: Record<string, string> = {
     Accept: 'application/json',
+    // Multi-sede: X-Sede-Id solo para SUPER_ADMIN/GERENCIA (ver sedeActiva.ts)
+    ...cabecerasSede(),
     ...(userHeaders || {}),
   }
 
@@ -139,6 +147,11 @@ export async function http<TResp = unknown, TBody = unknown>(
     onHeaders,
   }: RequestOptions<TBody> = {}
 ): Promise<TResp> {
+  // Multi-sede: "Todas las sedes" es solo lectura (aviso en pantalla, sin request).
+  if (frenarEscrituraEnTodas(method)) {
+    throw new HttpError(400, AVISO_SOLO_LECTURA, { code: 'E_SEDE_SCOPE' })
+  }
+
   const url = buildUrl(path, params)
   const init: RequestInit = {
     method,
@@ -160,6 +173,7 @@ export async function http<TResp = unknown, TBody = unknown>(
       errData = await parseResponse(res, true)
       errMsg = extractMessage(errData, errMsg)
     } catch { /* ignore */ }
+    if ((errData as { code?: string } | undefined)?.code === 'E_SEDE_SCOPE') mostrarAvisoSede(errMsg)
     throw new HttpError(res.status, errMsg, errData)
   }
 

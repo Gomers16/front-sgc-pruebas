@@ -1,3 +1,4 @@
+import { AVISO_SOLO_LECTURA, cabecerasSede, frenarEscrituraEnTodas } from '@/services/sedeActiva'
 // src/services/comprobantesService.ts
 const BASE = import.meta.env.VITE_API_BASE_URL
   ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/api`
@@ -29,6 +30,8 @@ async function apiFetch<T>(
   const headers: HeadersInit = { 'Content-Type': 'application/json', ...(opts.headers || {}) }
   const token = sessionStorage.getItem('token') || localStorage.getItem('token')
   if (token) (headers as Record<string, string>).Authorization = `Bearer ${token}`
+  Object.assign(headers, cabecerasSede()) // multi-sede
+  if (frenarEscrituraEnTodas(opts.method)) throw new Error(AVISO_SOLO_LECTURA)
 
   const res = await fetch(url, {
     method: opts.method || 'GET',
@@ -216,6 +219,8 @@ export async function uploadImagen(file: File): Promise<string> {
   const token = sessionStorage.getItem('token') || localStorage.getItem('token')
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`
+  Object.assign(headers, cabecerasSede()) // multi-sede
+  if (frenarEscrituraEnTodas('POST')) throw new Error(AVISO_SOLO_LECTURA)
 
   const formData = new FormData()
   formData.append('image', file)

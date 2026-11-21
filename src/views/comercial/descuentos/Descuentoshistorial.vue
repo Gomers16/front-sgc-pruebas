@@ -471,6 +471,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch, onUnmounted, onMounted } from 'vue'
 import { get, download } from '@/services/http'
+import { cabecerasSede } from '@/services/sedeActiva'
 import { formatCOP, listAgentesCaptacion } from '@/services/comisionesService'
 import { TEXTO_EFECTO_DESCUENTO } from '@/services/desgloseComision'
 
@@ -589,6 +590,7 @@ async function cargarDocPolicia(ticketId: number, tipo: DocPoliciaKey) {
       sessionStorage.getItem('token')
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
+    Object.assign(headers, cabecerasSede()) // multi-sede
 
     const resp = await fetch(
       `/api/facturacion/tickets/${ticketId}/documentos-policia/${tipo}`,
