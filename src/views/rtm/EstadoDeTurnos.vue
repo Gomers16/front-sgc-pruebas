@@ -150,8 +150,26 @@
             <span v-if="$vuetify.display.xs">Importar</span>
             <span v-else>Importar RepGeneral</span>
           </v-btn>
+
+          <!-- Base histórica de una sede distinta de Ibagué (formato de Bogotá) -->
+          <v-btn
+            v-if="can.importarRepGeneral()"
+            color="teal"
+            variant="elevated"
+            prepend-icon="mdi-database-import"
+            :block="$vuetify.display.xs"
+            class="mb-2 ml-0 ml-sm-4"
+            :size="$vuetify.display.xs ? 'small' : 'default'"
+            data-test="btn-importacion-bogota"
+            @click="importacionBogota = true"
+          >
+            <span v-if="$vuetify.display.xs">Bogotá</span>
+            <span v-else>Importación Bogotá</span>
+          </v-btn>
         </v-col>
       </v-row>
+
+      <ImportacionBogotaDialog v-model="importacionBogota" @terminado="fetchTurnosFromApi()" />
 
       <v-divider class="my-4 my-sm-6" />
 
@@ -571,6 +589,11 @@ import TurnosDelDiaService from '@/services/turnosdeldiaService'
 import repGeneralService, { type RepGeneralImportResponse } from '@/services/repGeneralService'
 import { descargarDiscrepanciasRtmExcel } from '@/services/reportesAdminService'
 import TurnoDetalleDialog from '@/components/rtm/TurnoDetalleDialog.vue'
+import ImportacionBogotaDialog from '@/components/rtm/ImportacionBogotaDialog.vue'
+import { usePermissions } from '@/composables/usePermissions'
+
+const { can } = usePermissions()
+const importacionBogota = ref(false)
 
 interface ServicioEnTurno {
   id: number
