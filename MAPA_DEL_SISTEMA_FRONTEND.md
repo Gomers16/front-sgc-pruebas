@@ -44,6 +44,8 @@ Este documento es una referencia completa del frontend, organizada por **módulo
 > Actualizado: 2026-11-19 (**Telemercadeo — Fase 2, gestión y control**; solo pruebas, commits `45e1649` (Fase 2), `224e081` (mapa), `fe0e1c0` (respaldo `agenteId || user.id`) y la corrección del gate por tipo de agente; backend en `MAPA_DEL_SISTEMA_BACKEND.md`; producción local y servidor pendientes): vistas nuevas **Mi gestión** (`TelemercadeoMiGestion`, asesor ASESOR_TELEMERCADEO) y **Control de Telemercadeo** (`TelemercadeoControl`, SUPER_ADMIN/GERENCIA); la cola registra gestiones y muestra el seguimiento y el RTM vigente; `DateoCreate.vue` datea desde una gestión (`?gestion_id=`); `DropzoneImagen.vue` compartido; `http.ts::downloadConCabeceras`; permisos `gestionarTelemercadeo`, `controlTelemercadeo`, `configurarSeguimientosTele`; post-login por `agenteTipo` y corrección del respaldo `agenteId || user.id`. Ver secciones 4.2, 4.9 y 8.
 >
 > Actualizado: 2026-11-21 (**Multi-sede, Fase 6**: selector de sede en el encabezado para SUPER_ADMIN/GERENCIA, cabecera `X-Sede-Id`, "Todas las sedes" solo lectura y sede obligatoria en Usuarios; ver sección `Multi-sede`).
+>
+> Actualizado: 2026-11-21, después (**Importación Bogotá** en RTM → Estado turno; ver `Multi-sede`).
 
 ## Índice
 
@@ -628,6 +630,11 @@ Rol nuevo, sin acceso a ningún otro módulo del sistema. Tres piezas trabajan j
 - Descargas: trámites usan `download()` de `http.ts` (llevan la sede); contratos, perfil y razón social abren archivos estáticos de `/uploads/*` (públicos, sin sede).
 
 ---
+
+### Importación Bogotá (2026-11-21)
+
+- Botón **"Importación Bogotá"** en `views/rtm/EstadoDeTurnos.vue` (RTM → Estado turno), con `can.importarRepGeneral()` (SUPER_ADMIN, GERENCIA, OPERATIVO_TURNOS). Abre `components/rtm/ImportacionBogotaDialog.vue`: archivo .xls/.xlsx → vista previa (conteos, descartes por motivo con ejemplos) → importar lote por lote con barra de avance; "Reintentar" sigue desde el lote que falló. Servicio `services/importacionBogotaService.ts`.
+- Escribe en la sede activa (chip "Sede: …"); con Ibagué el backend responde 400 y en "Todas" el front frena la subida.
 
 ## 10. Patrones establecidos del proyecto
 
