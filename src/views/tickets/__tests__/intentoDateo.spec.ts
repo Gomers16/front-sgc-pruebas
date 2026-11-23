@@ -9,7 +9,8 @@ import {
   esConflictoSegundaVez,
   TIPOS_COMERCIAL_TICKET,
   camposGestionParaTicket,
-  camposConvenioConGestion,
+  camposTicketTele,
+  esTicketTele,
 } from '../intentoDateo'
 
 // Forma del campo `intento` del 409 REQUIERE_TICKET_DATEO.
@@ -109,14 +110,24 @@ describe('ticket desde una gestión de Telemercadeo', () => {
     expect(camposGestionParaTicket(null)).toEqual({})
   })
 
-  it('con gestión va siempre sin convenio; sin gestión manda la decisión del formulario', () => {
-    expect(camposConvenioConGestion(12, null)).toEqual({ convenio_id: null, sin_convenio: true })
-    expect(camposConvenioConGestion(12, { convenio_id: 40 })).toEqual({
+  it('ticket TELE: con gestión, canal TELE o asesor de Telemercadeo', () => {
+    expect(esTicketTele({ gestionId: 12 })).toBe(true)
+    expect(esTicketTele({ gestionId: null, canal: 'TELE' })).toBe(true)
+    expect(esTicketTele({ gestionId: null, tipoAgente: 'ASESOR_TELEMERCADEO' })).toBe(true)
+    expect(esTicketTele({ gestionId: null, canal: 'ASESOR_COMERCIAL', tipoAgente: 'ASESOR_COMERCIAL' })).toBe(false)
+  })
+
+  it('ticket TELE va sin convenio, descuento ni avance y con origen', () => {
+    expect({ ...camposIntentoParaTicket(normalizarIntentoDateo(intento409)!), ...camposTicketTele(3) }).toMatchObject({
+      canal: 'TELE',
       convenio_id: null,
       sin_convenio: true,
+      descuento_id: null,
+      es_avance: false,
+      comprobante_avance_url: null,
+      telemercadeo_origen_id: 3,
     })
-    expect(camposConvenioConGestion(null, null)).toBeNull()
-    expect(camposConvenioConGestion(null, { convenio_id: 40 })).toEqual({ convenio_id: 40 })
+    expect(camposTicketTele(null)).not.toHaveProperty('telemercadeo_origen_id')
   })
 
   it('gerencia puede elegir asesores de Telemercadeo y el canal TELE se lee bien', () => {

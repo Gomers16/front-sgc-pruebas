@@ -3,8 +3,8 @@
 // Sin gestión de Telemercadeo el payload es exactamente el de siempre. Con
 // gestión: canal TELE, servicio de la gestión, sin agente (el backend lo toma
 // del token), sin convenio ni descuento/avance, y telemercadeo_gestion_id.
-// Asesor de Telemercadeo (con o sin gestión): igual, más el origen que elige
-// (telemercadeo_origen_id). El bloqueo real está en el backend.
+// Con gestión, o canal TELE elegido por SUPER_ADMIN/GERENCIA, va además el
+// origen (telemercadeo_origen_id). Los bloqueos reales están en el backend.
 
 export type CanalForm = 'FACHADA' | 'ASESOR' | 'TELE' | 'REDES'
 
@@ -60,14 +60,12 @@ export function construirPayloadDateo(
     puedeSeleccionarDescuento: boolean
     confirmarExcepcion?: boolean
     gestion?: GestionOrigenDateo | null
-    /** El usuario es asesor de Telemercadeo (aunque no venga de una gestión). */
-    asesorTele?: boolean
-    /** Origen elegido (solo con Telemercadeo). */
+    /** Origen elegido (se ignora fuera de Telemercadeo). */
     origenTeleId?: number | null
   },
 ): CreateDateoPayload {
   const gestion = opts.gestion ?? null
-  if (gestion || opts.asesorTele) {
+  if (gestion) {
     const payload: CreateDateoPayload = {
       canal: 'TELE',
       origen: 'UI',
@@ -79,9 +77,9 @@ export function construirPayloadDateo(
       descuento_id: null,
       es_avance: false,
       comprobante_avance_url: null,
-      servicio_id: gestion ? gestion.servicio_id : form.servicio_id || null,
+      servicio_id: gestion.servicio_id,
+      telemercadeo_gestion_id: gestion.id,
     }
-    if (gestion) payload.telemercadeo_gestion_id = gestion.id
     if (opts.origenTeleId) payload.telemercadeo_origen_id = opts.origenTeleId
     agregarImagen(payload, form)
     if (opts.confirmarExcepcion) payload.confirmar_excepcion = true
@@ -101,6 +99,7 @@ export function construirPayloadDateo(
     comprobante_avance_url: form.es_avance ? form.comprobante_avance_url || null : null,
     servicio_id: form.servicio_id || null,
   }
+  if (form.canal === 'TELE' && opts.origenTeleId) payload.telemercadeo_origen_id = opts.origenTeleId
   agregarImagen(payload, form)
   if (opts.confirmarExcepcion) payload.confirmar_excepcion = true
   return payload
@@ -124,9 +123,18 @@ export function mostrarConvenioEnDateo(gestionId: number | null, asesorTele = fa
   return gestionId === null && !asesorTele
 }
 
-/** ¿Se muestra el selector "Origen" y el aviso de Telemercadeo? */
-export function mostrarOrigenTele(gestionId: number | null, asesorTele: boolean): boolean {
-  return gestionId !== null || asesorTele
+/** ¿Se muestra (y es obligatorio) el selector "Origen"? Con gestión, o SA/GER con canal Telemercadeo. */
+export function mostrarOrigenTele(
+  gestionId: number | null,
+  privilegiado: boolean,
+  canal: CanalForm,
+): boolean {
+  return gestionId !== null || (privilegiado && canal === 'TELE')
+}
+
+/** El asesor de Telemercadeo solo datea desde una gestión: sin ella va a "Mi gestión". */
+export function requiereGestion(gestionId: number | null, asesorTele: boolean): boolean {
+  return asesorTele && gestionId === null
 }
 
 /** Tipo de asesor y agente: siempre para el asesor de Telemercadeo (bloqueados); con gestión, nadie más. */

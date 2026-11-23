@@ -168,7 +168,7 @@
             </v-alert>
             <!-- Corrección posterior del convenio: solo con la comisión PENDIENTE -->
             <div
-              v-if="esResolutor && ticket.caso_comision !== 'CONVENIO_SELF'"
+              v-if="esResolutor && ticket.caso_comision !== 'CONVENIO_SELF' && detalle.canal !== 'TELE'"
               class="d-flex align-center flex-wrap ga-2 mt-3"
               data-test="corregir-convenio"
             >
@@ -224,7 +224,7 @@
                   variant="outlined"
                   density="compact"
                   :loading="cargandoConvenios"
-                  :disabled="sinConvenioMarcado"
+                  :disabled="sinConvenioMarcado || detalle.canal === 'TELE'"
                   clearable
                   hint="Primero los asignados al asesor. Si lo cambias, el original queda registrado."
                   persistent-hint

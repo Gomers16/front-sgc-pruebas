@@ -81,18 +81,33 @@
           />
         </template>
 
-        <!-- Ticket desde una gestión de Telemercadeo: sin convenio ni descuento. -->
-        <v-alert
-          v-if="gestionId"
-          type="info"
-          variant="tonal"
-          density="compact"
-          class="mb-4"
-          data-test="ticket-gestion-tele"
-        >
-          Viene de la gestión #{{ gestionId }} de Telemercadeo: va sin convenio ni descuento. Al
-          aprobarse, la gestión queda dateada.
-        </v-alert>
+        <!-- Ticket de Telemercadeo: sin convenio ni descuento y con origen. -->
+        <template v-if="ticketTele">
+          <v-alert
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+            data-test="ticket-gestion-tele"
+          >
+            <template v-if="gestionId">
+              Viene de la gestión #{{ gestionId }} de Telemercadeo: va sin convenio ni descuento. Al
+              aprobarse, la gestión queda dateada.
+            </template>
+            <template v-else>Ticket de Telemercadeo: va sin convenio ni descuento.</template>
+          </v-alert>
+          <v-select
+            v-model="origenId"
+            :items="origenesItems"
+            item-title="nombre"
+            item-value="id"
+            label="Origen *"
+            variant="outlined"
+            density="compact"
+            class="mb-4"
+            data-test="origen-ticket-tele"
+          />
+        </template>
         <!-- Convenio: decisión obligatoria (convenio o "Sin convenio (directo)"). -->
         <div v-else class="mb-4" data-test="decision-convenio">
           <div class="text-subtitle-2 font-weight-bold mb-2">Convenio del cliente</div>
@@ -282,9 +297,11 @@ import {
   esConflictoSegundaVez,
   TIPOS_COMERCIAL_TICKET,
   camposGestionParaTicket,
-  camposConvenioConGestion,
+  camposTicketTele,
+  esTicketTele,
 } from './intentoDateo'
-import { leerGestionIdQuery } from '@/views/comercial/dateos/payloadDateo'
+import { leerGestionIdQuery, opcionesOrigen, type OrigenItem } from '@/views/comercial/dateos/payloadDateo'
+import { getCatalogosTele, getGestion } from '@/services/telemercadeoService'
 import {
   asignadoSegunBusqueda,
   camposConvenioCrear,
@@ -379,13 +396,40 @@ watch(agenteDelTicketId, () => {
   sinConvenio.value = false
 })
 const camposConvenio = computed(() =>
-  camposConvenioConGestion(
-    gestionId.value,
-    camposConvenioCrear(
-      convenioElegido(convenioSel.value?.id, sinConvenio.value),
-      comercialEsAsesorConvenio.value
-    )
+  camposConvenioCrear(
+    convenioElegido(convenioSel.value?.id, sinConvenio.value),
+    comercialEsAsesorConvenio.value
   )
+)
+
+/* Ticket de Telemercadeo: origen obligatorio (el del intento o el de la gestión). */
+const ticketTele = computed(() =>
+  esTicketTele({
+    gestionId: gestionId.value,
+    canal: intento?.canal,
+    tipoAgente: agenteDelTicket.value?.tipo,
+  })
+)
+const origenId = ref<number | null>(intento?.telemercadeo_origen_id ?? null)
+const origenesActivos = ref<OrigenItem[]>([])
+const origenGestion = ref<OrigenItem | null>(null)
+const origenesItems = computed(() => opcionesOrigen(origenesActivos.value, origenGestion.value))
+watch(
+  ticketTele,
+  async (v) => {
+    if (!v || origenesActivos.value.length) return
+    try {
+      origenesActivos.value = (await getCatalogosTele()).origenes
+      if (gestionId.value) {
+        const g = await getGestion(gestionId.value)
+        origenGestion.value = { id: g.origen_id, nombre: g.origen_nombre ?? 'Origen de la gestión' }
+        if (origenId.value === null) origenId.value = g.origen_id
+      }
+    } catch (err) {
+      console.error('Error cargando los orígenes:', err)
+    }
+  },
+  { immediate: true }
 )
 
 const observacion = ref('')
@@ -481,7 +525,7 @@ const puedeEnviar = computed(() => {
   if (!observacion.value.trim()) return false
   if (!evidencias.chat.url || !evidencias.whatsapp.url || !evidencias.bloqueo.url) return false
   if (puedeElegirComercial.value && !comercialId.value) return false
-  if (camposConvenio.value === null) return false
+  if (ticketTele.value ? !origenId.value : camposConvenio.value === null) return false
   if (Object.values(evidencias).some((e) => e.uploading)) return false
   return true
 })
@@ -502,7 +546,7 @@ async function enviar() {
       ...(intento
         ? camposIntentoParaTicket(intento)
         : camposFallbackParaTicket(null, telefonoFallback.value)),
-      ...camposConvenio.value,
+      ...(ticketTele.value ? camposTicketTele(origenId.value) : camposConvenio.value),
       ...camposGestionParaTicket(gestionId.value),
     })
     router.push({ name: 'TicketDetalle', params: { id: ticket.id } }).catch(() => {})

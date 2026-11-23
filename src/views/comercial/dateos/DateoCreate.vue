@@ -36,7 +36,7 @@
         <v-form ref="formRef" @submit.prevent="handleSubmit">
           <!-- Telemercadeo: sin comisión -->
           <v-alert
-            v-if="usaOrigenTele"
+            v-if="gestionIdQuery !== null"
             type="info"
             variant="tonal"
             density="comfortable"
@@ -653,7 +653,7 @@ import {
 } from '@/views/tickets/intentoDateo'
 import descuentosService from '@/services/descuentosService'
 import type { Descuento } from '@/services/descuentosService'
-import serviciosService from '@/services/Servicios_service'
+import serviciosService, { servicioRtm } from '@/services/Servicios_service'
 import { useAuthStore } from '@/stores/AuthStore'
 import { getCatalogosTele, getGestion } from '@/services/telemercadeoService'
 import { esAsesorTelemercadeo, TIPO_AGENTE_TELE } from '@/utils/permisosTelemercadeo'
@@ -664,6 +664,7 @@ import {
   mostrarConvenioEnDateo,
   mostrarOrigenTele,
   opcionesOrigen,
+  requiereGestion,
   type OrigenItem,
 } from './payloadDateo'
 import { DIAS_VENTANA_PRE_VENCIMIENTO } from '@/utils/ventanaRtm'
@@ -694,9 +695,12 @@ const errorGestion = ref('')
 
 /* ===== Asesor de Telemercadeo: canal, tipo y agente bloqueados con su usuario
  * (mismas refs de bloqueo que "desde ficha") y Origen como único selector. El
- * backend lo impone igual. Los demás roles, incluidos SA/GER, no cambian. ===== */
+ * backend lo impone igual. Sin gestión no datea: va a "Mi gestión". SA/GER con
+ * canal Telemercadeo eligen también el origen; los demás no cambian. ===== */
 const esTele = computed(() => esAsesorTelemercadeo(authStore.user))
-const usaOrigenTele = computed(() => mostrarOrigenTele(gestionIdQuery.value, esTele.value))
+const usaOrigenTele = computed(() =>
+  mostrarOrigenTele(gestionIdQuery.value, esPrivilegiado.value, form.value.canal),
+)
 const origenTeleId = ref<number | null>(null)
 const origenesActivos = ref<OrigenItem[]>([])
 const origenesLoading = ref(false)
@@ -711,6 +715,7 @@ const hintOrigen = computed(() => {
 })
 
 async function cargarOrigenes() {
+  if (origenesActivos.value.length || origenesLoading.value) return
   origenesLoading.value = true
   try {
     origenesActivos.value = (await getCatalogosTele()).origenes
@@ -852,7 +857,7 @@ async function loadServicios() {
     const data = await serviciosService.getActivos() // ajusta según tu servicio
     servicios.value = data
     // Preseleccionar RTM
-    const rtm = data.find((s: any) => s.codigoServicio?.toUpperCase() === 'RTM')
+    const rtm = servicioRtm(data)
     if (gestionTele.value) form.value.servicio_id = gestionTele.value.servicio_id
     else if (rtm && gestionIdQuery.value === null) form.value.servicio_id = rtm.id
   } catch (e) {
@@ -1181,6 +1186,7 @@ const mostrarAgente = computed(() =>
 const canSubmit = computed(() => {
   // Con gestion_id, solo cuando la gestión cargó bien.
   if (gestionIdQuery.value !== null && (!gestionTele.value || !!errorGestion.value)) return false
+  if (requiereGestion(gestionIdQuery.value, esTele.value)) return false
   if (usaOrigenTele.value && !origenTeleId.value) return false
   return (
     !!form.value.placa?.trim() &&
@@ -1297,7 +1303,6 @@ async function submitDateo(confirmarExcepcion = false) {
     puedeSeleccionarDescuento: puedeSeleccionarDescuento.value,
     confirmarExcepcion,
     gestion: gestionTele.value,
-    asesorTele: esTele.value,
     origenTeleId: usaOrigenTele.value ? origenTeleId.value : null,
   })
   return createDateo(payload as Parameters<typeof createDateo>[0])
@@ -1524,6 +1529,10 @@ async function loadCatalogos() {
   }
 }
 
+watch(usaOrigenTele, (v) => {
+  if (v) cargarOrigenes()
+})
+
 onMounted(() => {
   const q = route.query.fromFicha as string | undefined
   fromAsesor.value = q ? Number(q) : null
@@ -1542,8 +1551,11 @@ onMounted(() => {
     canalBloqueado.value = true
     cargarGestionTele(gestionIdQuery.value)
   }
+  if (requiereGestion(gestionIdQuery.value, esTele.value)) {
+    router.replace({ name: 'TelemercadeoMiGestion', query: { requiere_gestion: '1' } }).catch(() => {})
+    return
+  }
   if (esTele.value) bloquearComoAsesorTele()
-  if (usaOrigenTele.value) cargarOrigenes()
 
   loadCatalogos()
   loadDescuentos()

@@ -128,13 +128,26 @@ export function camposGestionParaTicket(gestionId: number | null): { telemercade
 }
 
 /**
- * Con una gestión de Telemercadeo el ticket va siempre "Sin convenio" (el dateo
- * desde una gestión no lleva convenio ni descuento); sin gestión, la decisión
- * normal del formulario (null = todavía sin decidir).
+ * ¿Ticket de Telemercadeo? Con gestión, canal TELE o a nombre de un asesor de
+ * Telemercadeo (misma regla del backend): sin convenio, descuento ni avance.
  */
-export function camposConvenioConGestion<T extends object | null>(
-  gestionId: number | null,
-  campos: T,
-): T | { convenio_id: null; sin_convenio: true } {
-  return gestionId ? { convenio_id: null, sin_convenio: true } : campos
+export function esTicketTele(p: {
+  gestionId: number | null
+  canal?: string | null
+  tipoAgente?: string | null
+}): boolean {
+  return p.gestionId !== null || p.canal === 'TELE' || p.tipoAgente === 'ASESOR_TELEMERCADEO'
+}
+
+/** Campos que mandan en un ticket de Telemercadeo (van al final del body). */
+export function camposTicketTele(origenId: number | null) {
+  return {
+    canal: 'TELE',
+    convenio_id: null,
+    sin_convenio: true,
+    descuento_id: null,
+    es_avance: false,
+    comprobante_avance_url: null,
+    ...(origenId ? { telemercadeo_origen_id: origenId } : {}),
+  }
 }

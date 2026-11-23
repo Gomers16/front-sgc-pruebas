@@ -34,6 +34,18 @@ pendientes de seguimiento, historial y registro de gestiones.
       </v-btn>
     </div>
 
+    <v-alert
+      v-if="avisoRequiereGestion"
+      type="warning"
+      variant="tonal"
+      class="mb-4"
+      closable
+      data-test="aviso-requiere-gestion"
+      @click:close="avisoRequiereGestion = false"
+    >
+      Para datear registra primero la gestión y datea desde ella (botón “Datear”).
+    </v-alert>
+
     <v-alert v-if="errorResumen" type="error" variant="tonal" class="mb-4" closable @click:close="errorResumen = ''">
       {{ errorResumen }}
     </v-alert>
@@ -207,21 +219,22 @@ watch(tab, (t) => {
   if (t === 'ficha') fichaVista.value = true
 })
 
-// La meta cuenta solo los dateos hechos desde una gestión y por la fecha de
-// la gestión; la pestaña "Mi ficha" cuenta todos los dateos por su fecha.
+// La meta cuenta los dateos hechos desde una gestión (por la fecha de la
+// gestión) y los TELE con origen que gerencia o un ticket registran a su nombre
+// sin gestión (por la fecha del dateo); la pestaña "Mi ficha" cuenta todos los dateos por su fecha.
 const METRICAS: { key: MetricaMeta; titulo: string; icono: string; nota: string }[] = [
   { key: 'gestiones', titulo: 'Gestiones', icono: 'mdi-phone-log', nota: 'del mes' },
   {
     key: 'dateos',
     titulo: 'Dateos',
     icono: 'mdi-note-plus-outline',
-    nota: 'desde tus gestiones (por fecha de la gestión) y dateos directos',
+    nota: 'desde tus gestiones (por su fecha) y los registrados a tu nombre por gerencia o ticket',
   },
   {
     key: 'exitosos',
     titulo: 'Dateos exitosos',
     icono: 'mdi-check-decagram',
-    nota: 'desde tus gestiones (por fecha de la gestión) y dateos directos',
+    nota: 'desde tus gestiones (por su fecha) y los registrados a tu nombre por gerencia o ticket',
   },
 ]
 
@@ -242,6 +255,8 @@ const mesSel = ref(`${actual.anio}-${actual.mes}`)
 const resumen = ref<MiResumen | null>(null)
 const cargandoResumen = ref(false)
 const errorResumen = ref('')
+// Llega de "Nuevo dateo" sin gestión (?requiere_gestion=1).
+const avisoRequiereGestion = ref(router.currentRoute.value.query.requiere_gestion === '1')
 
 async function cargarResumen() {
   const [anio, mes] = mesSel.value.split('-').map(Number)
