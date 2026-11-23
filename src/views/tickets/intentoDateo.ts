@@ -22,6 +22,8 @@ export interface IntentoDateo {
   es_avance: boolean
   comprobante_avance_url: string | null
   telefono: string | null
+  /** Origen elegido por el asesor de Telemercadeo (solo en ese caso). */
+  telemercadeo_origen_id?: number
 }
 
 const num = (v: unknown): number | null => {
@@ -49,6 +51,8 @@ export function normalizarIntentoDateo(raw: unknown): IntentoDateo | null {
     comprobante_avance_url: str(r.comprobante_avance_url),
     telefono: str(r.telefono),
   }
+  const origen = num(r.telemercadeo_origen_id)
+  if (origen !== null) intento.telemercadeo_origen_id = origen
   return intento.canal ? intento : null
 }
 
@@ -72,6 +76,7 @@ type CamposIntento = Pick<
   | 'es_avance'
   | 'comprobante_avance_url'
   | 'telefono'
+  | 'telemercadeo_origen_id'
 >
 
 /** Campos del intento para el body de crearTicketExcepcionDateo(). */
@@ -84,6 +89,9 @@ export function camposIntentoParaTicket(intento: IntentoDateo): CamposIntento {
     es_avance: intento.es_avance,
     comprobante_avance_url: intento.es_avance ? intento.comprobante_avance_url : null,
     telefono: intento.telefono,
+    ...(intento.telemercadeo_origen_id
+      ? { telemercadeo_origen_id: intento.telemercadeo_origen_id }
+      : {}),
   }
 }
 

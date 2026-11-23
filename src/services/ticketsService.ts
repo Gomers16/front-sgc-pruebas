@@ -308,6 +308,8 @@ export interface CrearTicketExcepcionDateoPayload {
   sin_convenio?: boolean
   /** Gestión de Telemercadeo de la que nace el ticket: al aprobarse queda DATEADO. */
   telemercadeo_gestion_id?: number
+  /** Origen que eligió el asesor de Telemercadeo en su dateo. */
+  telemercadeo_origen_id?: number
 }
 
 export function crearTicketExcepcionDateo(payload: CrearTicketExcepcionDateoPayload) {

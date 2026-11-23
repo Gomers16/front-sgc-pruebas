@@ -52,6 +52,24 @@ pendientes de seguimiento, historial y registro de gestiones.
       </v-col>
     </v-row>
 
+    <!-- Por origen -->
+    <v-card v-if="resumen?.por_origen?.length" class="mb-4" variant="outlined" data-test="mi-gestion-por-origen">
+      <v-card-title class="text-subtitle-2 font-weight-bold">Por origen</v-card-title>
+      <v-table density="compact">
+        <thead>
+          <tr><th>Origen</th><th class="text-end">Gestiones</th><th class="text-end">Dateos</th><th class="text-end">Exitosos</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="o in resumen.por_origen" :key="o.origen_id">
+            <td>{{ o.nombre }}</td>
+            <td class="text-end">{{ o.gestiones }}</td>
+            <td class="text-end">{{ o.dateos }}</td>
+            <td class="text-end">{{ o.exitosos }}</td>
+          </tr>
+        </tbody>
+      </v-table>
+    </v-card>
+
     <v-tabs v-model="tab" color="primary" class="mb-3">
       <v-tab value="seguimiento" prepend-icon="mdi-bell-ring-outline">Seguimiento</v-tab>
       <v-tab value="ficha" prepend-icon="mdi-account-tie">Mi ficha</v-tab>

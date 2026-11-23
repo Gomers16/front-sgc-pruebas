@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   construirPayloadDateo,
   leerGestionIdQuery,
+  mostrarAsesorEnDateo,
   mostrarConvenioEnDateo,
+  mostrarOrigenTele,
+  opcionesOrigen,
   type CreateDateoPayload,
   type FormDateo,
 } from '../payloadDateo'
@@ -77,6 +80,16 @@ describe('construirPayloadDateo sin gestión (regresión: igual que antes)', () 
     })
     expect(nuevo).toStrictEqual(payloadAnterior(form, puede, confirmar))
     expect(nuevo).not.toHaveProperty('telemercadeo_gestion_id')
+    expect(nuevo).not.toHaveProperty('telemercadeo_origen_id')
+    // Un origen suelto no se cuela en el payload de los demás roles.
+    expect(
+      construirPayloadDateo(form, {
+        puedeSeleccionarDescuento: puede,
+        confirmarExcepcion: confirmar,
+        asesorTele: false,
+        origenTeleId: 3,
+      }),
+    ).toStrictEqual(payloadAnterior(form, puede, confirmar))
   })
 })
 
@@ -128,5 +141,58 @@ describe('mostrarConvenioEnDateo', () => {
   it('oculta el convenio con una gestión de Telemercadeo y lo muestra sin ella', () => {
     expect(mostrarConvenioEnDateo(77)).toBe(false)
     expect(mostrarConvenioEnDateo(null)).toBe(true)
+  })
+})
+
+describe('asesor de Telemercadeo', () => {
+  it('con gestión manda el origen elegido', () => {
+    const p = construirPayloadDateo(base, {
+      puedeSeleccionarDescuento: true,
+      gestion: { id: 77, servicio_id: 1 },
+      asesorTele: true,
+      origenTeleId: 3,
+    })
+    expect(p).toMatchObject({ canal: 'TELE', telemercadeo_gestion_id: 77, telemercadeo_origen_id: 3 })
+  })
+
+  it('sin gestión: TELE, sin agente/convenio/descuento/avance, con su servicio y el origen', () => {
+    const p = construirPayloadDateo(
+      { ...base, servicio_id: 5 },
+      { puedeSeleccionarDescuento: true, asesorTele: true, origenTeleId: 2 },
+    )
+    expect(p).toMatchObject({
+      canal: 'TELE',
+      agente_id: null,
+      convenio_id: null,
+      descuento_id: null,
+      es_avance: false,
+      comprobante_avance_url: null,
+      servicio_id: 5,
+      telemercadeo_origen_id: 2,
+    })
+    expect(p).not.toHaveProperty('telemercadeo_gestion_id')
+  })
+
+  it('selector Origen: solo con Telemercadeo', () => {
+    expect(mostrarOrigenTele(null, false)).toBe(false)
+    expect(mostrarOrigenTele(null, true)).toBe(true)
+    expect(mostrarOrigenTele(12, true)).toBe(true)
+    expect(mostrarOrigenTele(12, false)).toBe(true)
+  })
+
+  it('tipo y agente visibles para Telemercadeo; los demás, como siempre', () => {
+    expect(mostrarAsesorEnDateo('TELE', 12, true)).toBe(true)
+    expect(mostrarAsesorEnDateo('TELE', null, true)).toBe(true)
+    expect(mostrarAsesorEnDateo('TELE', 12, false)).toBe(false)
+    expect(mostrarAsesorEnDateo('ASESOR', null, false)).toBe(true)
+    expect(mostrarAsesorEnDateo('FACHADA', null, false)).toBe(false)
+    expect(mostrarConvenioEnDateo(null, true)).toBe(false)
+  })
+
+  it('opciones: los activos, más el de la gestión si ya no está activo', () => {
+    const activos = [{ id: 1, nombre: 'Recurrencia' }]
+    expect(opcionesOrigen(activos, null)).toEqual(activos)
+    expect(opcionesOrigen(activos, { id: 1, nombre: 'Recurrencia' })).toEqual(activos)
+    expect(opcionesOrigen(activos, { id: 9, nombre: 'Viejo' })).toHaveLength(2)
   })
 })

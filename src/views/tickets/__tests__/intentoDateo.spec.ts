@@ -124,3 +124,13 @@ describe('ticket desde una gestión de Telemercadeo', () => {
     expect(etiquetaCanalIntento('TELE')).toBe('Telemercadeo')
   })
 })
+
+describe('origen del asesor de Telemercadeo en el ticket', () => {
+  it('viaja del 409 al ticket; sin origen el payload no cambia', () => {
+    const con = normalizarIntentoDateo({ ...intento409, canal: 'TELE', telemercadeo_origen_id: 3 })!
+    expect(camposIntentoParaTicket(con).telemercadeo_origen_id).toBe(3)
+    expect(camposIntentoParaTicket(normalizarIntentoDateo(intento409)!)).not.toHaveProperty(
+      'telemercadeo_origen_id',
+    )
+  })
+})

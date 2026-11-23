@@ -436,6 +436,7 @@ export interface MiResumen extends Embudo {
   anio: number
   fraccion_transcurrida: number
   gestiones_hoy: number
+  por_origen?: (Embudo & { origen_id: number; codigo: string; nombre: string })[]
   metas: Record<MetricaMeta, AvanceMeta>
   semaforo: SemaforoColor
 }
