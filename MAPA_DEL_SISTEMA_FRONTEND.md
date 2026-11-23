@@ -39,17 +39,19 @@ Este documento es una referencia completa del frontend, organizada por **módulo
 >
 > Actualizado: 2026-11-17 (**columna "Cédula convenio" en el modal Liquidación RTM y en Trazabilidad RTM**, `ComisionesList.vue`; mismo dato que los Excel del backend, commit backend `d356c92`). Ver sección 4.6, "Cédula convenio".
 >
-> Actualizado: 2026-11-19, después (**ficha del asesor de Telemercadeo dentro de "Mi gestión"**; solo pruebas): `FichaComercialAsesor.vue` decide qué muestra con `fichaSecciones.ts` según el tipo del agente visto; para `ASESOR_TELEMERCADEO` no hay comisiones, meta en pesos, Convenios, New-dateos ni crear/re-datear. "Mi gestión" gana las pestañas Seguimiento y Mi ficha. Ver 4.1 y 4.9.
+> Actualizado: 2026-11-19, después (**ficha del asesor de Telemercadeo dentro de "Mi gestión"**; en producción local desde 2026-11-23): `FichaComercialAsesor.vue` decide qué muestra con `fichaSecciones.ts` según el tipo del agente visto; para `ASESOR_TELEMERCADEO` no hay comisiones, meta en pesos, Convenios, New-dateos ni crear/re-datear. "Mi gestión" gana las pestañas Seguimiento y Mi ficha. Ver 4.1 y 4.9.
 >
-> Actualizado: 2026-11-19 (**Telemercadeo — Fase 2, gestión y control**; solo pruebas, commits `45e1649` (Fase 2), `224e081` (mapa), `fe0e1c0` (respaldo `agenteId || user.id`) y la corrección del gate por tipo de agente; backend en `MAPA_DEL_SISTEMA_BACKEND.md`; producción local y servidor pendientes): vistas nuevas **Mi gestión** (`TelemercadeoMiGestion`, asesor ASESOR_TELEMERCADEO) y **Control de Telemercadeo** (`TelemercadeoControl`, SUPER_ADMIN/GERENCIA); la cola registra gestiones y muestra el seguimiento y el RTM vigente; `DateoCreate.vue` datea desde una gestión (`?gestion_id=`); `DropzoneImagen.vue` compartido; `http.ts::downloadConCabeceras`; permisos `gestionarTelemercadeo`, `controlTelemercadeo`, `configurarSeguimientosTele`; post-login por `agenteTipo` y corrección del respaldo `agenteId || user.id`. Ver secciones 4.2, 4.9 y 8.
+> Actualizado: 2026-11-19 (**Telemercadeo — Fase 2, gestión y control**; en producción local desde 2026-11-23, commits `45e1649` (Fase 2), `224e081` (mapa), `fe0e1c0` (respaldo `agenteId || user.id`) y la corrección del gate por tipo de agente; backend en `MAPA_DEL_SISTEMA_BACKEND.md`; servidor pendiente): vistas nuevas **Mi gestión** (`TelemercadeoMiGestion`, asesor ASESOR_TELEMERCADEO) y **Control de Telemercadeo** (`TelemercadeoControl`, SUPER_ADMIN/GERENCIA); la cola registra gestiones y muestra el seguimiento y el RTM vigente; `DateoCreate.vue` datea desde una gestión (`?gestion_id=`); `DropzoneImagen.vue` compartido; `http.ts::downloadConCabeceras`; permisos `gestionarTelemercadeo`, `controlTelemercadeo`, `configurarSeguimientosTele`; post-login por `agenteTipo` y corrección del respaldo `agenteId || user.id`. Ver secciones 4.2, 4.9 y 8.
 >
 > Actualizado: 2026-11-21 (**Multi-sede, Fase 6**: selector de sede en el encabezado para SUPER_ADMIN/GERENCIA, cabecera `X-Sede-Id`, "Todas las sedes" solo lectura y sede obligatoria en Usuarios; ver sección `Multi-sede`).
 >
 > Actualizado: 2026-11-21, después (**Importación Bogotá** en RTM → Estado turno; ver `Multi-sede`).
 >
-> Actualizado: 2026-11-23 (**arreglos de Telemercadeo y Bogotá**, rama `fix/telemercadeo-bogota`, solo pruebas y sin push): ticket desde una gestión, sin convenio ni descuento con gestión, ventana única de 16 días (`utils/ventanaRtm.ts`), límite de ciclos cerrados y botón de extra. Reglas en `MAPA_DEL_SISTEMA_BACKEND.md`.
+> Actualizado: 2026-11-23 (**arreglos de Telemercadeo y Bogotá**, rama `fix/telemercadeo-bogota`, en producción local desde 2026-11-23): ticket desde una gestión, sin convenio ni descuento con gestión, ventana única de 16 días (`utils/ventanaRtm.ts`), límite de ciclos cerrados y botón de extra. Reglas en `MAPA_DEL_SISTEMA_BACKEND.md`.
 >
 > Actualizado: 2026-11-23, después (**origen del dateo, gestión obligatoria y tickets TELE**, misma rama): `DateoCreate` bloquea al asesor de Telemercadeo y muestra Origen; SUPER_ADMIN/GERENCIA eligen origen con canal Telemercadeo; RTM vuelve a preseleccionarse. Ver 4.2 y 4.9.
+>
+> **Estado de sincronización (2026-11-23):** todo lo de pruebas hasta esta fecha (Telemercadeo, Multi-sede Fases 0–7, Importación Bogotá y `fix/telemercadeo-bogota`) está en **producción local** (`C:\dev`), salvo los tests (`__tests__`), que no se copian. Servidor real pendiente: subir el front junto con el backend (orden en `MAPA_DEL_SISTEMA_BACKEND.md`).
 
 ## Índice
 
