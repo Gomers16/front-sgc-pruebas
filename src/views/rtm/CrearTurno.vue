@@ -930,6 +930,7 @@ import {
   type CanalAtrib,
   type MedioEntero,
 } from './canalCaptacion'
+import { DIAS_VENTANA_PRE_VENCIMIENTO } from '@/utils/ventanaRtm'
 import { etiquetaConvenioConCodigo } from '@/services/conveniosService'
 
 /** ===== Parámetros de búsqueda ===== **/
@@ -1282,7 +1283,6 @@ const captacionChipText = computed(() => {
  * Solo aplica a RTM/SOAT — los demás servicios no tienen ventana de bloqueo.
  */
 const MESES_VIGENCIA_RTM_SOAT = 12
-const DIAS_VENTANA_PRE_VENCIMIENTO = 16
 
 /** "La RTM anterior" / "El SOAT anterior" (mismo texto que el 409 del backend). */
 function servicioAnterior(codigo?: string | null): string {

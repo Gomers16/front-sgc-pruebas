@@ -81,8 +81,20 @@
           />
         </template>
 
+        <!-- Ticket desde una gestión de Telemercadeo: sin convenio ni descuento. -->
+        <v-alert
+          v-if="gestionId"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-4"
+          data-test="ticket-gestion-tele"
+        >
+          Viene de la gestión #{{ gestionId }} de Telemercadeo: va sin convenio ni descuento. Al
+          aprobarse, la gestión queda dateada.
+        </v-alert>
         <!-- Convenio: decisión obligatoria (convenio o "Sin convenio (directo)"). -->
-        <div class="mb-4" data-test="decision-convenio">
+        <div v-else class="mb-4" data-test="decision-convenio">
           <div class="text-subtitle-2 font-weight-bold mb-2">Convenio del cliente</div>
           <v-alert
             v-if="comercialEsAsesorConvenio"
@@ -268,7 +280,11 @@ import {
   camposFallbackParaTicket,
   etiquetaCanalIntento,
   esConflictoSegundaVez,
+  TIPOS_COMERCIAL_TICKET,
+  camposGestionParaTicket,
+  camposConvenioConGestion,
 } from './intentoDateo'
+import { leerGestionIdQuery } from '@/views/comercial/dateos/payloadDateo'
 import {
   asignadoSegunBusqueda,
   camposConvenioCrear,
@@ -290,6 +306,8 @@ const turnoId = computed(() => {
   return Number.isFinite(n) && n > 0 ? n : null
 })
 const placa = computed(() => String(route.query.placa ?? ''))
+// Gestión de Telemercadeo de la que viene el intento (DateoCreate → ?gestion_id=).
+const gestionId = computed(() => leerGestionIdQuery(route.query.gestion_id))
 
 const puedeElegirComercial = computed(() => auth.hasAnyRole(['SUPER_ADMIN', 'GERENCIA']))
 const agentes = ref<AgenteLight[]>([])
@@ -361,9 +379,12 @@ watch(agenteDelTicketId, () => {
   sinConvenio.value = false
 })
 const camposConvenio = computed(() =>
-  camposConvenioCrear(
-    convenioElegido(convenioSel.value?.id, sinConvenio.value),
-    comercialEsAsesorConvenio.value
+  camposConvenioConGestion(
+    gestionId.value,
+    camposConvenioCrear(
+      convenioElegido(convenioSel.value?.id, sinConvenio.value),
+      comercialEsAsesorConvenio.value
+    )
   )
 )
 
@@ -482,6 +503,7 @@ async function enviar() {
         ? camposIntentoParaTicket(intento)
         : camposFallbackParaTicket(null, telefonoFallback.value)),
       ...camposConvenio.value,
+      ...camposGestionParaTicket(gestionId.value),
     })
     router.push({ name: 'TicketDetalle', params: { id: ticket.id } }).catch(() => {})
   } catch (err) {
@@ -512,13 +534,10 @@ onMounted(async () => {
     loadingAgentes.value = true
     try {
       // GET /agentes-captacion/light solo filtra por UN tipo a la vez — se
-      // pide COMERCIAL y CONVENIO por separado y se combinan, para excluir
-      // ASESOR_TELEMERCADEO (no aplica a este flujo de dateos).
-      const [comerciales, convenio] = await Promise.all([
-        listAgentesCaptacion('ASESOR_COMERCIAL'),
-        listAgentesCaptacion('ASESOR_CONVENIO'),
-      ])
-      agentes.value = [...comerciales, ...convenio].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+      // pide cada tipo por separado y se combinan. Incluye Telemercadeo
+      // (decisión 2026-11-23).
+      const listas = await Promise.all(TIPOS_COMERCIAL_TICKET.map((t) => listAgentesCaptacion(t)))
+      agentes.value = listas.flat().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
     } finally {
       loadingAgentes.value = false
     }

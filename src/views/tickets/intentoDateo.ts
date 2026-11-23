@@ -99,10 +99,34 @@ export function camposFallbackParaTicket(convenioId: number | null, telefono: st
 export function etiquetaCanalIntento(canal: string | null): string {
   if (canal === 'ASESOR_CONVENIO') return 'Asesor convenio'
   if (canal === 'ASESOR_COMERCIAL') return 'Asesor comercial'
+  if (canal === 'TELE') return 'Telemercadeo'
   return canal ?? '—'
 }
 
 /** ¿La respuesta de error es el 409 de turno de segunda vez? */
 export function esConflictoSegundaVez(data: unknown): boolean {
   return !!data && typeof data === 'object' && (data as { code?: unknown }).code === 'TURNO_SEGUNDA_VEZ'
+}
+
+/**
+ * Tipos de agente a cuyo nombre SUPER_ADMIN/GERENCIA pueden crear el ticket.
+ * Incluye Telemercadeo (decisión 2026-11-23): el backend ya lo aceptaba.
+ */
+export const TIPOS_COMERCIAL_TICKET = ['ASESOR_COMERCIAL', 'ASESOR_CONVENIO', 'ASESOR_TELEMERCADEO'] as const
+
+/** Ticket que nace de una gestión de Telemercadeo: manda la gestión (?gestion_id=). */
+export function camposGestionParaTicket(gestionId: number | null): { telemercadeo_gestion_id?: number } {
+  return gestionId ? { telemercadeo_gestion_id: gestionId } : {}
+}
+
+/**
+ * Con una gestión de Telemercadeo el ticket va siempre "Sin convenio" (el dateo
+ * desde una gestión no lleva convenio ni descuento); sin gestión, la decisión
+ * normal del formulario (null = todavía sin decidir).
+ */
+export function camposConvenioConGestion<T extends object | null>(
+  gestionId: number | null,
+  campos: T,
+): T | { convenio_id: null; sin_convenio: true } {
+  return gestionId ? { convenio_id: null, sin_convenio: true } : campos
 }

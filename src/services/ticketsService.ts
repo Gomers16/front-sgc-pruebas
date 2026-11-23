@@ -306,6 +306,8 @@ export interface CrearTicketExcepcionDateoPayload {
   telefono?: string | null
   /** "Sin convenio (directo)": obligatorio si no hay convenio_id (salvo asesor convenio). */
   sin_convenio?: boolean
+  /** Gestión de Telemercadeo de la que nace el ticket: al aprobarse queda DATEADO. */
+  telemercadeo_gestion_id?: number
 }
 
 export function crearTicketExcepcionDateo(payload: CrearTicketExcepcionDateoPayload) {

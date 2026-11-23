@@ -107,6 +107,19 @@ reutiliza si el usuario reintenta tras un error; solo una gestión nueva
             <strong>{{ fmtFecha(seg.avisos.rtm_vigente.puede_datear_desde) }}</strong>.
           </v-alert>
           <v-alert
+            v-if="seg.avisos.turno_hoy_sin_dateo"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-2"
+            icon="mdi-ticket-confirmation"
+            data-test="aviso-turno-hoy"
+          >
+            Esta placa ya tiene un turno hoy
+            (#{{ seg.avisos.turno_hoy_sin_dateo.turno_numero ?? seg.avisos.turno_hoy_sin_dateo.turno_id }})
+            sin dateo: para datearla hará falta un ticket de Excepción de Dateo.
+          </v-alert>
+          <v-alert
             v-if="seg.avisos.dateo_activo"
             :type="seg.avisos.dateo_activo.es_propio ? 'info' : 'warning'"
             variant="tonal"

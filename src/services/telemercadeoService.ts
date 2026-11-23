@@ -327,6 +327,12 @@ export interface AvisosGestion {
     bloquea_hasta: string | null
   } | null
   rtm_vigente: { vence_el: string; puede_datear_desde: string } | null
+  /** Turno de hoy sin dateo: datear pedirá un ticket de Excepción de Dateo. */
+  turno_hoy_sin_dateo?: {
+    turno_id: number
+    turno_numero: number | null
+    hora_ingreso: string | null
+  } | null
 }
 
 export interface RegistrarGestionBody {

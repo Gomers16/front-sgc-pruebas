@@ -7,6 +7,9 @@ import {
   camposFallbackParaTicket,
   etiquetaCanalIntento,
   esConflictoSegundaVez,
+  TIPOS_COMERCIAL_TICKET,
+  camposGestionParaTicket,
+  camposConvenioConGestion,
 } from '../intentoDateo'
 
 // Forma del campo `intento` del 409 REQUIERE_TICKET_DATEO.
@@ -97,5 +100,27 @@ describe('textos', () => {
     expect(esConflictoSegundaVez({ code: 'TURNO_SEGUNDA_VEZ', message: '...' })).toBe(true)
     expect(esConflictoSegundaVez({ code: 'TICKET_TURNO_OTRO_DIA' })).toBe(false)
     expect(esConflictoSegundaVez(undefined)).toBe(false)
+  })
+})
+
+describe('ticket desde una gestión de Telemercadeo', () => {
+  it('manda telemercadeo_gestion_id solo si viene de una gestión', () => {
+    expect(camposGestionParaTicket(12)).toEqual({ telemercadeo_gestion_id: 12 })
+    expect(camposGestionParaTicket(null)).toEqual({})
+  })
+
+  it('con gestión va siempre sin convenio; sin gestión manda la decisión del formulario', () => {
+    expect(camposConvenioConGestion(12, null)).toEqual({ convenio_id: null, sin_convenio: true })
+    expect(camposConvenioConGestion(12, { convenio_id: 40 })).toEqual({
+      convenio_id: null,
+      sin_convenio: true,
+    })
+    expect(camposConvenioConGestion(null, null)).toBeNull()
+    expect(camposConvenioConGestion(null, { convenio_id: 40 })).toEqual({ convenio_id: 40 })
+  })
+
+  it('gerencia puede elegir asesores de Telemercadeo y el canal TELE se lee bien', () => {
+    expect(TIPOS_COMERCIAL_TICKET).toContain('ASESOR_TELEMERCADEO')
+    expect(etiquetaCanalIntento('TELE')).toBe('Telemercadeo')
   })
 })

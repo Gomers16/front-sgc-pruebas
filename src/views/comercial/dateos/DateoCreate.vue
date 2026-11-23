@@ -169,12 +169,12 @@
                   <strong>RTM vigente — No puede datear aún</strong><br />
                   Esta placa tiene RTM vigente hasta el <strong>{{ rtmInfo?.valido_hasta }}</strong>.<br />
                   Podrá datear a partir del <strong>{{ rtmInfo?.puede_datear_desde }}</strong>
-                  ({{ diasVentanaPreRtm }} días antes del vencimiento).
+                  ({{ DIAS_VENTANA_PRE_VENCIMIENTO }} días antes del vencimiento).
                 </template>
                 <template v-else>
                   <strong>⚠️ RTM próxima a vencer</strong><br />
                   Esta placa tiene RTM vigente hasta el <strong>{{ rtmInfo?.valido_hasta }}</strong>.<br />
-                  Estás dentro de la ventana permitida de {{ diasVentanaPreRtm }} días previos al vencimiento.
+                  Estás dentro de la ventana permitida de {{ DIAS_VENTANA_PRE_VENCIMIENTO }} días previos al vencimiento.
                 </template>
               </v-alert>
             </v-col>
@@ -360,7 +360,7 @@
           >
             <strong>RTM próxima a vencer</strong><br />
             Esta placa tiene RTM vigente hasta el <strong>{{ rtmInfo?.valido_hasta }}</strong>.<br />
-            Estás dentro de la ventana de {{ diasVentanaPreRtm }} días antes del vencimiento.
+            Estás dentro de la ventana de {{ DIAS_VENTANA_PRE_VENCIMIENTO }} días antes del vencimiento.
           </v-alert>
         </v-card-text>
         <v-card-actions class="justify-center pb-4 pb-sm-6 gap-2">
@@ -625,6 +625,7 @@ import serviciosService from '@/services/Servicios_service'
 import { useAuthStore } from '@/stores/AuthStore'
 import { getGestion } from '@/services/telemercadeoService'
 import { construirPayloadDateo, leerGestionIdQuery, mostrarConvenioEnDateo } from './payloadDateo'
+import { DIAS_VENTANA_PRE_VENCIMIENTO } from '@/utils/ventanaRtm'
 import { mensajeErrorDateoGestion } from '@/views/comercial/telemercadeo/telemercadeoHelpers'
 
 const router = useRouter()
@@ -1010,7 +1011,6 @@ async function subirComprobante(): Promise<boolean> {
 const imageFile = ref<File | File[] | null>(null)
 const imagePreview = ref('')
 const MAX_IMAGE_MB = 8
-const diasVentanaPreRtm = 10
 
 
 function maxSizeRule(v: File | File[] | null) {
@@ -1356,7 +1356,11 @@ function irACrearTicketExcepcionDateo() {
   router
     .push({
       name: 'TicketExcepcionDateoCreate',
-      query: { turno_id: String(info.turnoId), placa: form.value.placa || '' },
+      query: {
+        turno_id: String(info.turnoId),
+        placa: form.value.placa || '',
+        ...(gestionIdQuery.value ? { gestion_id: String(gestionIdQuery.value) } : {}),
+      },
       state: info.intento ? { intento: intentoParaHistorial(info.intento) } : undefined,
     })
     .catch(() => {})
