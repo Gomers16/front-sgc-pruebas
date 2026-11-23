@@ -47,11 +47,13 @@ describe('etiquetas', () => {
 describe('seguimiento', () => {
   it('formato "seguimiento n de max"', () => {
     expect(textoSeguimiento(1, 3)).toBe('Seguimiento 1 de 3')
-    expect(textoSeguimiento(null, undefined)).toBe('Seguimiento 0 de 0')
+    expect(textoSeguimiento(null, undefined)).toBe('Seguimiento 0')
+    expect(textoSeguimiento(1, null)).toBe('Seguimiento 1')
     expect(fraccionSeguimiento(2, 4)).toBe('2/4')
     expect(seguimientoAgotado(3, 3)).toBe(true)
     expect(seguimientoAgotado(2, 3)).toBe(false)
     expect(seguimientoAgotado(0, 0)).toBe(false)
+    expect(seguimientoAgotado(3, null)).toBe(false)
   })
 
   const seg = (o: Partial<SeguimientoPlaca> = {}, ug: Partial<SeguimientoPlaca['ultima_gestion']> = {}): SeguimientoPlaca => ({
@@ -90,6 +92,10 @@ describe('seguimiento', () => {
     expect(puedeAutorizarExtra(g(2, 3))).toBe(false)
     expect(puedeAutorizarExtra(g(3, 3, false))).toBe(false)
     expect(puedeAutorizarExtra(g(3, 4))).toBe(false)
+    // Máximo propio 5, pero otro asesor de la sede ya está bloqueado en 3.
+    expect(
+      puedeAutorizarExtra({ seguimiento: { ...g(4, 5).seguimiento, limite_minimo: 3 } })
+    ).toBe(true)
   })
 })
 

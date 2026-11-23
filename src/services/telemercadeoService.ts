@@ -185,7 +185,10 @@ export async function getCatalogosTele(): Promise<CatalogosTele> {
 export interface SeguimientoGestion {
   ciclo_id: number
   numero_en_ciclo: number
-  limite: number
+  /** null con el ciclo cerrado: el límite actual no es el que regía entonces. */
+  limite: number | null
+  /** Menor límite entre los asesores de la sede (null con el ciclo cerrado). */
+  limite_minimo?: number | null
   ciclo_abierto: boolean
   cerrado_motivo: MotivoCierreCiclo | null
 }

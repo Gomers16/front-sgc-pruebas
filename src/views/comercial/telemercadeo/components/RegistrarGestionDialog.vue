@@ -80,7 +80,7 @@ reutiliza si el usuario reintenta tras un error; solo una gestión nueva
               {{ textoSeguimiento(seg.seguimiento.n, seg.seguimiento.limite) }}
             </v-chip>
             <span v-if="seg.seguimiento.extras_autorizados" class="text-caption">
-              (incluye {{ seg.seguimiento.extras_autorizados }} extra autorizado por gerencia)
+              (con seguimiento extra autorizado por gerencia)
             </span>
             <v-spacer />
             <span class="text-body-2">

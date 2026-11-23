@@ -53,9 +53,8 @@ ciclos (autorizar seguimiento extra) y Metas y configuración.
         <v-card-text>
           <div class="text-body-2 mb-3">
             <strong>{{ autorizar.placa }}</strong> ({{ autorizar.cliente_nombre || 'sin cliente' }}) ya tiene
-            {{ autorizar.seguimiento.numero_en_ciclo }} de {{ autorizar.seguimiento.limite }} seguimientos en el
-            ciclo. Al autorizar, el límite del ciclo sube a {{ autorizar.seguimiento.limite + 1 }}. Queda
-            registrado quién y cuándo.
+            {{ autorizar.seguimiento.numero_en_ciclo }} seguimientos en el ciclo. Al autorizar, cualquier asesor
+            de la sede puede registrar uno más. Queda registrado quién y cuándo.
           </div>
           <v-textarea
             v-model="motivo"

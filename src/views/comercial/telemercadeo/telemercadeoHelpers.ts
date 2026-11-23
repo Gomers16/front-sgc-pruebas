@@ -69,9 +69,10 @@ export const MOTIVO_CIERRE_LABEL: Record<string, string> = {
 
 /* ───────────── Seguimiento ───────────── */
 
-/** "Seguimiento 2 de 3". */
+/** "Seguimiento 2 de 3"; sin límite (ciclo cerrado): "Seguimiento 2". */
 export function textoSeguimiento(n: number | null | undefined, max: number | null | undefined) {
-  return `Seguimiento ${Number(n ?? 0)} de ${Number(max ?? 0)}`
+  const base = `Seguimiento ${Number(n ?? 0)}`
+  return max === null || max === undefined ? base : `${base} de ${Number(max)}`
 }
 
 /** "2/3" para columnas angostas. */
@@ -79,7 +80,7 @@ export const fraccionSeguimiento = (n: number | null | undefined, max: number | 
   `${Number(n ?? 0)}/${Number(max ?? 0)}`
 
 /** ¿Llegó al límite? (n >= max con max > 0). */
-export const seguimientoAgotado = (n: number, max: number) => max > 0 && n >= max
+export const seguimientoAgotado = (n: number, max: number | null | undefined) => !!max && max > 0 && n >= max
 
 /**
  * Gestión con la que "Datear" desde la cola debe ir: la última de la placa,
@@ -99,9 +100,14 @@ export function gestionIdParaDatear(
   return seg.ultima_gestion.id
 }
 
-/** Fila del listado donde gerencia puede autorizar un seguimiento extra. */
+/**
+ * Fila del listado donde gerencia puede autorizar un seguimiento extra: desde
+ * que algún asesor de la sede queda bloqueado (limite_minimo), aunque el de la
+ * fila tenga un máximo propio mayor.
+ */
 export const puedeAutorizarExtra = (g: Pick<Gestion, 'seguimiento'>) =>
-  g.seguimiento.ciclo_abierto && g.seguimiento.numero_en_ciclo >= g.seguimiento.limite
+  g.seguimiento.ciclo_abierto &&
+  g.seguimiento.numero_en_ciclo >= (g.seguimiento.limite_minimo ?? g.seguimiento.limite ?? Infinity)
 
 /* ───────────── Metas: avance y ritmo ───────────── */
 
