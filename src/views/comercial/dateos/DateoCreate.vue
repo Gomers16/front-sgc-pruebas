@@ -111,8 +111,8 @@
               </v-autocomplete>
             </v-col>
 
-            <!-- Convenio -->
-            <v-col cols="12" md="6">
+            <!-- Convenio (oculto con una gestión de Telemercadeo) -->
+            <v-col v-if="mostrarConvenioEnDateo(gestionIdQuery)" cols="12" md="6">
               <v-autocomplete
                 v-model="form.convenio_id"
                 :items="conveniosVisibles"
@@ -624,7 +624,7 @@ import type { Descuento } from '@/services/descuentosService'
 import serviciosService from '@/services/Servicios_service'
 import { useAuthStore } from '@/stores/AuthStore'
 import { getGestion } from '@/services/telemercadeoService'
-import { construirPayloadDateo, leerGestionIdQuery } from './payloadDateo'
+import { construirPayloadDateo, leerGestionIdQuery, mostrarConvenioEnDateo } from './payloadDateo'
 import { mensajeErrorDateoGestion } from '@/views/comercial/telemercadeo/telemercadeoHelpers'
 
 const router = useRouter()

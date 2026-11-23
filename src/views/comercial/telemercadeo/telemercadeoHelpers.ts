@@ -302,6 +302,8 @@ export function mensajeErrorDateoGestion(code: string | null | undefined): strin
       return 'La gestión ya no existe.'
     case 'NO_ES_ASESOR_TELEMERCADEO':
       return 'Solo un asesor de Telemercadeo puede datear desde una gestión.'
+    case 'TELE_SIN_CONVENIO_DESCUENTO':
+      return 'El dateo desde una gestión de Telemercadeo no lleva convenio ni descuento.'
     default:
       return null
   }

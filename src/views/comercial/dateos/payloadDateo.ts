@@ -107,6 +107,15 @@ function agregarImagen(payload: CreateDateoPayload, form: FormDateo) {
   payload.imagen_origen_id = form.imagen_origen_id ?? null
 }
 
+/**
+ * ¿Se muestra el campo "Convenio" en DateoCreate? Con una gestión de
+ * Telemercadeo no (decisión 2026-11-23): el payload lo manda en null y el
+ * backend rechaza convenio_id con 400 TELE_SIN_CONVENIO_DESCUENTO.
+ */
+export function mostrarConvenioEnDateo(gestionId: number | null): boolean {
+  return gestionId === null
+}
+
 /** gestion_id de la query (?gestion_id=12), o null si no viene o no es válido. */
 export function leerGestionIdQuery(v: unknown): number | null {
   const raw = Array.isArray(v) ? v[0] : v

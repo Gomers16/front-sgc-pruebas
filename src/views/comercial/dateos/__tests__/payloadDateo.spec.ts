@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   construirPayloadDateo,
   leerGestionIdQuery,
+  mostrarConvenioEnDateo,
   type CreateDateoPayload,
   type FormDateo,
 } from '../payloadDateo'
@@ -120,5 +121,12 @@ describe('leerGestionIdQuery', () => {
     expect(leerGestionIdQuery('abc')).toBeNull()
     expect(leerGestionIdQuery('0')).toBeNull()
     expect(leerGestionIdQuery('1.5')).toBeNull()
+  })
+})
+
+describe('mostrarConvenioEnDateo', () => {
+  it('oculta el convenio con una gestión de Telemercadeo y lo muestra sin ella', () => {
+    expect(mostrarConvenioEnDateo(77)).toBe(false)
+    expect(mostrarConvenioEnDateo(null)).toBe(true)
   })
 })

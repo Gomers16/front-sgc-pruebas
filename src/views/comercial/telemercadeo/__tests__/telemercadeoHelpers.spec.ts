@@ -185,6 +185,7 @@ describe('errores', () => {
   it('códigos del dateo desde gestión', () => {
     expect(mensajeErrorDateoGestion('GESTION_YA_DATEADA')).toContain('ya tiene un dateo')
     expect(mensajeErrorDateoGestion('GESTION_AJENA')).toContain('otro asesor')
+    expect(mensajeErrorDateoGestion('TELE_SIN_CONVENIO_DESCUENTO')).toContain('ni descuento')
     expect(mensajeErrorDateoGestion('GESTION_PLACA_DISTINTA')).toContain('misma')
     expect(mensajeErrorDateoGestion('DATEO_ACTIVO')).toBeNull()
   })
