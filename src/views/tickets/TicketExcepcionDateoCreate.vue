@@ -70,7 +70,7 @@
         <!-- Sin datos del dateo (se entró por URL): teléfono a mano. -->
         <template v-else>
           <v-alert type="info" variant="tonal" density="compact" class="mb-3">
-            No llegaron los datos del dateo. Indica abajo el convenio del cliente.
+            No llegaron los datos del dateo. Indica abajo el {{ ticketTele ? 'origen' : 'convenio del cliente' }}.
           </v-alert>
           <v-text-field
             v-model="telefonoFallback"
