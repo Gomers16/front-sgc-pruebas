@@ -215,13 +215,13 @@ const METRICAS: { key: MetricaMeta; titulo: string; icono: string; nota: string 
     key: 'dateos',
     titulo: 'Dateos',
     icono: 'mdi-note-plus-outline',
-    nota: 'desde tus gestiones · por fecha de la gestión',
+    nota: 'desde tus gestiones (por fecha de la gestión) y dateos directos',
   },
   {
     key: 'exitosos',
     titulo: 'Dateos exitosos',
     icono: 'mdi-check-decagram',
-    nota: 'desde tus gestiones · por fecha de la gestión',
+    nota: 'desde tus gestiones (por fecha de la gestión) y dateos directos',
   },
 ]
 
